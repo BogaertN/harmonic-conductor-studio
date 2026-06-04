@@ -161,3 +161,13 @@ h3 {
   margin: 1rem 0 0.5rem;
   color: #e7d8a4;
 }
+
+
+button.danger {
+  background: #b85d54;
+  color: #fff7f2;
+}
+
+button.danger:hover {
+  filter: brightness(1.12);
+}

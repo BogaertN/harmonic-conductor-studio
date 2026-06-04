@@ -22,7 +22,25 @@ export type WavRenderReport = {
   wav_hash: string;
   sample_rate_hz: number;
   sample_count: number;
+  duration_seconds: number;
   waveform_summary: WaveformSummary;
+};
+
+export type PlaybackReport = {
+  status: string;
+  message: string;
+  device: string;
+  sample_format: string;
+  sample_rate_hz: number;
+  channels: number;
+  sample_count: number;
+  duration_seconds: number;
+  waveform_summary: WaveformSummary;
+};
+
+export type StopReport = {
+  status: string;
+  message: string;
 };
 
 export async function previewScoreReport(): Promise<PreviewReport> {
@@ -31,6 +49,18 @@ export async function previewScoreReport(): Promise<PreviewReport> {
 
 export async function renderFirstGestureWav(): Promise<WavRenderReport> {
   return await invoke<WavRenderReport>("render_first_gesture_wav");
+}
+
+export async function playFirstGestureAudio(): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_first_gesture_audio");
+}
+
+export async function stopPlayback(): Promise<StopReport> {
+  return await invoke<StopReport>("stop_playback");
+}
+
+export async function getAudioDeviceReport(): Promise<unknown> {
+  return await invoke("get_audio_device_report");
 }
 
 export async function getGestureVocabulary(): Promise<unknown> {

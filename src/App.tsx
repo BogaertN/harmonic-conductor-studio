@@ -1,16 +1,24 @@
 import { useState } from "react";
 import {
   createDefaultScore,
+  getAudioDeviceReport,
   getGestureVocabulary,
+  playFirstGestureAudio,
   previewScoreReport,
   renderFirstGestureWav,
+  stopPlayback,
+  type PlaybackReport,
   type PreviewReport,
+  type StopReport,
   type WavRenderReport
 } from "./bridge/tauriCommands";
 
 export default function App() {
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
+  const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
+  const [stopReport, setStopReport] = useState<StopReport | null>(null);
+  const [deviceReport, setDeviceReport] = useState<unknown>(null);
   const [vocabulary, setVocabulary] = useState<unknown>(null);
   const [score, setScore] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,10 +29,12 @@ export default function App() {
       const nextScore = await createDefaultScore();
       const nextVocabulary = await getGestureVocabulary();
       const nextReport = await previewScoreReport();
+      const nextDeviceReport = await getAudioDeviceReport();
 
       setScore(nextScore);
       setVocabulary(nextVocabulary);
       setReport(nextReport);
+      setDeviceReport(nextDeviceReport);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -40,6 +50,26 @@ export default function App() {
     }
   }
 
+  async function playAudio() {
+    setError(null);
+    try {
+      const nextReport = await playFirstGestureAudio();
+      setPlaybackReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function stopAudio() {
+    setError(null);
+    try {
+      const nextReport = await stopPlayback();
+      setStopReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="hero">
@@ -47,7 +77,7 @@ export default function App() {
         <h1>Harmonic Conductor Studio</h1>
         <p>
           Production baseline for the conducted harmonic field: music, conductor
-          gestures, native Rust score logic, and Tauri desktop shell.
+          gestures, native Rust score logic, native playback, and Tauri desktop shell.
         </p>
       </section>
 
@@ -81,14 +111,40 @@ export default function App() {
           <div className="button-row">
             <button onClick={runPreview}>Run Rust Preview</button>
             <button onClick={renderWav}>Render First Gesture WAV</button>
+            <button onClick={playAudio}>Play First Gesture Audio</button>
+            <button className="danger" onClick={stopAudio}>Stop Playback</button>
           </div>
+
           {error && <pre className="error">{error}</pre>}
+
+          {Boolean(deviceReport) && (
+            <>
+              <h3>Audio Device</h3>
+              <pre>{JSON.stringify(deviceReport, null, 2)}</pre>
+            </>
+          )}
+
+          {playbackReport && (
+            <>
+              <h3>Native Playback</h3>
+              <pre>{JSON.stringify(playbackReport, null, 2)}</pre>
+            </>
+          )}
+
+          {stopReport && (
+            <>
+              <h3>Stop Report</h3>
+              <pre>{JSON.stringify(stopReport, null, 2)}</pre>
+            </>
+          )}
+
           {report && (
             <>
               <h3>Rust Preview</h3>
               <pre>{JSON.stringify(report, null, 2)}</pre>
             </>
           )}
+
           {wavReport && (
             <>
               <h3>WAV Render</h3>
