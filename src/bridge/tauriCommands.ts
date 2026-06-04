@@ -15,6 +15,24 @@ export type PreviewReport = {
   waveform_summary: WaveformSummary;
 };
 
+export type MusicPreviewReport = {
+  status: string;
+  title: string;
+  score_hash: string;
+  tempo_bpm: number;
+  meter: string;
+  tuning_mode: string;
+  track_count: number;
+  note_count: number;
+  music_sample_rate_hz: number;
+  music_sample_count: number;
+  music_duration_seconds: number;
+  music_waveform_summary: WaveformSummary;
+  combined_sample_count: number;
+  combined_duration_seconds: number;
+  combined_waveform_summary: WaveformSummary;
+};
+
 export type WavRenderReport = {
   status: string;
   output_path: string;
@@ -47,12 +65,32 @@ export async function previewScoreReport(): Promise<PreviewReport> {
   return await invoke<PreviewReport>("preview_score_report");
 }
 
+export async function previewSeedMusicReport(): Promise<MusicPreviewReport> {
+  return await invoke<MusicPreviewReport>("preview_seed_music_report");
+}
+
 export async function renderFirstGestureWav(): Promise<WavRenderReport> {
   return await invoke<WavRenderReport>("render_first_gesture_wav");
 }
 
+export async function renderSeedMusicWav(): Promise<WavRenderReport> {
+  return await invoke<WavRenderReport>("render_seed_music_wav");
+}
+
+export async function renderSeedCombinedWav(): Promise<WavRenderReport> {
+  return await invoke<WavRenderReport>("render_seed_combined_wav");
+}
+
 export async function playFirstGestureAudio(): Promise<PlaybackReport> {
   return await invoke<PlaybackReport>("play_first_gesture_audio");
+}
+
+export async function playSeedMusicAudio(): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_seed_music_audio");
+}
+
+export async function playSeedCombinedAudio(): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_seed_combined_audio");
 }
 
 export async function stopPlayback(): Promise<StopReport> {
@@ -69,4 +107,8 @@ export async function getGestureVocabulary(): Promise<unknown> {
 
 export async function createDefaultScore(): Promise<unknown> {
   return await invoke("create_default_score");
+}
+
+export async function createSeedMusicScore(): Promise<unknown> {
+  return await invoke("create_seed_music_score");
 }

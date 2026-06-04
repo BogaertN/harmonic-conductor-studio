@@ -1,12 +1,19 @@
 import { useState } from "react";
 import {
   createDefaultScore,
+  createSeedMusicScore,
   getAudioDeviceReport,
   getGestureVocabulary,
   playFirstGestureAudio,
+  playSeedCombinedAudio,
+  playSeedMusicAudio,
   previewScoreReport,
+  previewSeedMusicReport,
   renderFirstGestureWav,
+  renderSeedCombinedWav,
+  renderSeedMusicWav,
   stopPlayback,
+  type MusicPreviewReport,
   type PlaybackReport,
   type PreviewReport,
   type StopReport,
@@ -15,12 +22,16 @@ import {
 
 export default function App() {
   const [report, setReport] = useState<PreviewReport | null>(null);
+  const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
   const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
+  const [musicWavReport, setMusicWavReport] = useState<WavRenderReport | null>(null);
+  const [combinedWavReport, setCombinedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [stopReport, setStopReport] = useState<StopReport | null>(null);
   const [deviceReport, setDeviceReport] = useState<unknown>(null);
   const [vocabulary, setVocabulary] = useState<unknown>(null);
   const [score, setScore] = useState<unknown>(null);
+  const [seedMusicScore, setSeedMusicScore] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function runPreview() {
@@ -40,6 +51,18 @@ export default function App() {
     }
   }
 
+  async function loadSeedMusic() {
+    setError(null);
+    try {
+      const nextScore = await createSeedMusicScore();
+      const nextReport = await previewSeedMusicReport();
+      setSeedMusicScore(nextScore);
+      setMusicReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderWav() {
     setError(null);
     try {
@@ -50,10 +73,50 @@ export default function App() {
     }
   }
 
+  async function renderMusicWav() {
+    setError(null);
+    try {
+      const nextReport = await renderSeedMusicWav();
+      setMusicWavReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function renderCombinedWav() {
+    setError(null);
+    try {
+      const nextReport = await renderSeedCombinedWav();
+      setCombinedWavReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function playAudio() {
     setError(null);
     try {
       const nextReport = await playFirstGestureAudio();
+      setPlaybackReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playMusicAudio() {
+    setError(null);
+    try {
+      const nextReport = await playSeedMusicAudio();
+      setPlaybackReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playCombinedAudio() {
+    setError(null);
+    try {
+      const nextReport = await playSeedCombinedAudio();
       setPlaybackReport(nextReport);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -76,7 +139,7 @@ export default function App() {
         <p className="eyebrow">AI.Web Native Desktop Application</p>
         <h1>Harmonic Conductor Studio</h1>
         <p>
-          Production baseline for the conducted harmonic field: music, conductor
+          Production baseline for conducted music: real notes, conductor
           gestures, native Rust score logic, native playback, and Tauri desktop shell.
         </p>
       </section>
@@ -110,9 +173,18 @@ export default function App() {
           <h2>Native Core Proof</h2>
           <div className="button-row">
             <button onClick={runPreview}>Run Rust Preview</button>
-            <button onClick={renderWav}>Render First Gesture WAV</button>
-            <button onClick={playAudio}>Play First Gesture Audio</button>
+            <button onClick={renderWav}>Render Gesture WAV</button>
+            <button onClick={playAudio}>Play Gesture Audio</button>
             <button className="danger" onClick={stopAudio}>Stop Playback</button>
+          </div>
+
+          <h2>Music Engine v1</h2>
+          <div className="button-row">
+            <button onClick={loadSeedMusic}>Load Seed Music</button>
+            <button onClick={playMusicAudio}>Play Music Seed</button>
+            <button onClick={playCombinedAudio}>Play Music + Conductor</button>
+            <button onClick={renderMusicWav}>Render Music WAV</button>
+            <button onClick={renderCombinedWav}>Render Combined WAV</button>
           </div>
 
           {error && <pre className="error">{error}</pre>}
@@ -138,6 +210,13 @@ export default function App() {
             </>
           )}
 
+          {musicReport && (
+            <>
+              <h3>Music Preview</h3>
+              <pre>{JSON.stringify(musicReport, null, 2)}</pre>
+            </>
+          )}
+
           {report && (
             <>
               <h3>Rust Preview</h3>
@@ -147,8 +226,22 @@ export default function App() {
 
           {wavReport && (
             <>
-              <h3>WAV Render</h3>
+              <h3>Gesture WAV Render</h3>
               <pre>{JSON.stringify(wavReport, null, 2)}</pre>
+            </>
+          )}
+
+          {musicWavReport && (
+            <>
+              <h3>Music WAV Render</h3>
+              <pre>{JSON.stringify(musicWavReport, null, 2)}</pre>
+            </>
+          )}
+
+          {combinedWavReport && (
+            <>
+              <h3>Combined WAV Render</h3>
+              <pre>{JSON.stringify(combinedWavReport, null, 2)}</pre>
             </>
           )}
         </div>
@@ -156,6 +249,11 @@ export default function App() {
         <div className="panel wide">
           <h2>Default .hfield Score</h2>
           <pre>{score ? JSON.stringify(score, null, 2) : "Run preview to load the default native score."}</pre>
+        </div>
+
+        <div className="panel wide">
+          <h2>Seed Music .hfield Score</h2>
+          <pre>{seedMusicScore ? JSON.stringify(seedMusicScore, null, 2) : "Load seed music to see the first note-based HCS score."}</pre>
         </div>
 
         <div className="panel wide">
