@@ -61,6 +61,28 @@ export type StopReport = {
   message: string;
 };
 
+export type GestureTimelineReport = {
+  track_id: string;
+  event_count: number;
+  total_duration_ms: number;
+  total_duration_seconds: number;
+  events: Array<{
+    event_index: number;
+    gesture_id: string;
+    gesture_name: string;
+    operator: string | null;
+    field_region: string;
+    anchor: string;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    start_seconds: number;
+    duration_seconds: number;
+    intensity: number;
+    cue_text: string;
+  }>;
+};
+
 export type ResonanceLevelBundle = {
   piece_title: string;
   source_summary: {
@@ -116,6 +138,52 @@ export async function previewSeedMusicReport(): Promise<MusicPreviewReport> {
 
 export async function getSeedResonanceLevelBundle(): Promise<ResonanceLevelBundle> {
   return await invoke<ResonanceLevelBundle>("get_seed_resonance_level_bundle");
+}
+
+export async function loadSeedMusicProject(): Promise<unknown> {
+  return await invoke("load_seed_music_project");
+}
+
+export async function getCurrentProjectScore(): Promise<unknown> {
+  return await invoke("get_current_project_score");
+}
+
+export async function getCurrentGestureTimeline(): Promise<GestureTimelineReport> {
+  return await invoke<GestureTimelineReport>("get_current_gesture_timeline");
+}
+
+export async function appendGestureToCurrentScore(
+  gestureId: string,
+  durationMs: number,
+  intensity: number,
+  operator: string | null
+): Promise<GestureTimelineReport> {
+  return await invoke<GestureTimelineReport>("append_gesture_to_current_score", {
+    gestureId,
+    durationMs,
+    intensity,
+    operator
+  });
+}
+
+export async function clearCurrentGestureTimeline(): Promise<GestureTimelineReport> {
+  return await invoke<GestureTimelineReport>("clear_current_gesture_timeline");
+}
+
+export async function resetCurrentGestureTimelineToStandardPath(): Promise<GestureTimelineReport> {
+  return await invoke<GestureTimelineReport>("reset_current_gesture_timeline_to_standard_path");
+}
+
+export async function playCurrentProjectConductorAudio(): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_current_project_conductor_audio");
+}
+
+export async function playCurrentProjectCombinedAudio(): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_current_project_combined_audio");
+}
+
+export async function renderCurrentProjectCombinedWav(): Promise<WavRenderReport> {
+  return await invoke<WavRenderReport>("render_current_project_combined_wav");
 }
 
 export async function renderFirstGestureWav(): Promise<WavRenderReport> {

@@ -123,3 +123,162 @@ mod tests {
         );
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureTimelineReport {
+    pub track_id: String,
+    pub event_count: usize,
+    pub total_duration_ms: u32,
+    pub total_duration_seconds: f64,
+    pub events: Vec<GestureTimelineEventView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureTimelineEventView {
+    pub event_index: usize,
+    pub gesture_id: String,
+    pub gesture_name: String,
+    pub operator: Option<String>,
+    pub field_region: String,
+    pub anchor: String,
+    pub start_ms: u32,
+    pub duration_ms: u32,
+    pub end_ms: u32,
+    pub start_seconds: f64,
+    pub duration_seconds: f64,
+    pub intensity: f32,
+    pub cue_text: String,
+}
+
+pub fn gesture_definition(id: &str) -> Option<GestureDefinition> {
+    nine_gesture_vocabulary()
+        .into_iter()
+        .find(|definition| definition.id == id)
+}
+
+pub fn create_gesture_timeline_report(score: &hfield_domain::FieldScore) -> GestureTimelineReport {
+    let events = score
+        .conductor
+        .primary_hand_track
+        .events
+        .iter()
+        .enumerate()
+        .map(|(index, event)| {
+            let definition = gesture_definition(&event.gesture_id);
+            let gesture_name = definition
+                .as_ref()
+                .map(|definition| definition.name.to_string())
+                .unwrap_or_else(|| "Unknown Gesture".to_string());
+
+            let field_region = definition
+                .as_ref()
+                .map(|definition| definition.field_region.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+
+            let anchor = definition
+                .as_ref()
+                .map(|definition| definition.anchor.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+
+            let end_ms = event.start_ms.saturating_add(event.duration_ms);
+
+            GestureTimelineEventView {
+                event_index: index + 1,
+                gesture_id: event.gesture_id.clone(),
+                gesture_name: gesture_name.clone(),
+                operator: event.operator.clone(),
+                field_region: field_region.clone(),
+                anchor,
+                start_ms: event.start_ms,
+                duration_ms: event.duration_ms,
+                end_ms,
+                start_seconds: round3(event.start_ms as f64 / 1000.0),
+                duration_seconds: round3(event.duration_ms as f64 / 1000.0),
+                intensity: event.intensity,
+                cue_text: timeline_cue_text(
+                    &event.gesture_id,
+                    &gesture_name,
+                    event.operator.as_deref(),
+                    &field_region,
+                ),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let total_duration_ms = events.iter().map(|event| event.end_ms).max().unwrap_or(0);
+
+    GestureTimelineReport {
+        track_id: score.conductor.primary_hand_track.track_id.clone(),
+        event_count: events.len(),
+        total_duration_ms,
+        total_duration_seconds: round3(total_duration_ms as f64 / 1000.0),
+        events,
+    }
+}
+
+fn timeline_cue_text(
+    gesture_id: &str,
+    gesture_name: &str,
+    operator: Option<&str>,
+    field_region: &str,
+) -> String {
+    let operator_text = operator.unwrap_or("gesture");
+
+    match gesture_id {
+        "g1" => format!("{operator_text}: {gesture_name}; settle at center/root presence."),
+        "g2" => format!("{operator_text}: {gesture_name}; prepare and open from center."),
+        "g3" => format!("{operator_text}: {gesture_name}; emerge outward from center."),
+        "g4" => format!("{operator_text}: {gesture_name}; descend into lower constraint."),
+        "g5" => format!("{operator_text}: {gesture_name}; hold lower depth and transformation."),
+        "g6" => format!("{operator_text}: {gesture_name}; release from lower depth."),
+        "g7" => format!("{operator_text}: {gesture_name}; gather expression upward."),
+        "g9" => format!("{operator_text}: {gesture_name}; hold formed upper expression."),
+        "g8" => format!("{operator_text}: {gesture_name}; emit outward from upper expression."),
+        _ => format!("{operator_text}: {gesture_name}; conduct through {field_region}."),
+    }
+}
+
+fn round3(value: f64) -> f64 {
+    (value * 1000.0).round() / 1000.0
+}
+
+#[cfg(test)]
+mod timeline_tests {
+    use super::*;
+    use hfield_domain::{FieldScore, GestureEvent};
+
+    #[test]
+    fn creates_timeline_report_from_default_score() {
+        let score = FieldScore::default_hcs();
+        let report = create_gesture_timeline_report(&score);
+
+        assert_eq!(report.track_id, "primary_hand");
+        assert_eq!(report.event_count, 3);
+        assert_eq!(report.events[0].gesture_id, "g2");
+        assert_eq!(report.events[1].gesture_id, "g1");
+        assert!(report.total_duration_ms > 0);
+    }
+
+    #[test]
+    fn timeline_report_handles_appended_gesture() {
+        let mut score = FieldScore::default_hcs();
+
+        score
+            .conductor
+            .primary_hand_track
+            .events
+            .push(GestureEvent {
+                gesture_id: "g9".to_string(),
+                start_ms: 620,
+                duration_ms: 500,
+                intensity: 0.7,
+                operator: Some("formed_hold".to_string()),
+            });
+
+        let report = create_gesture_timeline_report(&score);
+
+        assert_eq!(report.event_count, 4);
+        assert_eq!(report.events[3].gesture_name, "Formed Expression Hold");
+        assert_eq!(report.total_duration_ms, 1120);
+    }
+}

@@ -1,6 +1,8 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use hfield_analysis::summarize_waveform;
-use hfield_conductor::nine_gesture_vocabulary;
+use hfield_conductor::{
+    create_gesture_timeline_report, is_valid_gesture_id, nine_gesture_vocabulary,
+};
 use hfield_domain::{ConductedPerformance, FieldScore, GestureEvent, GestureTrack, NoteEvent};
 use hfield_dsp::{
     compile_combined_music_and_conductor_preview, compile_music_preview, compile_pitch_preview,
@@ -21,9 +23,18 @@ struct ActivePlayback {
     thread: thread::JoinHandle<()>,
 }
 
-#[derive(Default)]
 struct AppState {
     playback: Mutex<Option<ActivePlayback>>,
+    current_score: Mutex<FieldScore>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            playback: Mutex::new(None),
+            current_score: Mutex::new(FieldScore::default_hcs()),
+        }
+    }
 }
 
 fn app_root_dir() -> std::path::PathBuf {
@@ -233,6 +244,175 @@ fn stop_existing_playback(state: &AppState) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn load_seed_music_project(state: tauri::State<'_, AppState>) -> Result<FieldScore, String> {
+    let score = seed_music_score();
+
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    *guard = score.clone();
+
+    Ok(score)
+}
+
+#[tauri::command]
+fn get_current_project_score(state: tauri::State<'_, AppState>) -> Result<FieldScore, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    Ok(guard.clone())
+}
+
+#[tauri::command]
+fn get_current_gesture_timeline(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_gesture_timeline_report(&guard))
+        .map_err(|err| format!("timeline serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn append_gesture_to_current_score(
+    state: tauri::State<'_, AppState>,
+    gesture_id: String,
+    duration_ms: u32,
+    intensity: f32,
+    operator: Option<String>,
+) -> Result<serde_json::Value, String> {
+    if !is_valid_gesture_id(&gesture_id) {
+        return Err(format!("invalid gesture id: {gesture_id}"));
+    }
+
+    let duration_ms = duration_ms.clamp(80, 8_000);
+    let intensity = intensity.clamp(0.0, 1.0);
+
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    let start_ms = guard
+        .conductor
+        .primary_hand_track
+        .events
+        .iter()
+        .map(|event| event.start_ms.saturating_add(event.duration_ms))
+        .max()
+        .unwrap_or(0);
+
+    guard
+        .conductor
+        .primary_hand_track
+        .events
+        .push(GestureEvent {
+            gesture_id,
+            start_ms,
+            duration_ms,
+            intensity,
+            operator,
+        });
+
+    serde_json::to_value(create_gesture_timeline_report(&guard))
+        .map_err(|err| format!("timeline serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn clear_current_gesture_timeline(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    guard.conductor.primary_hand_track.events.clear();
+
+    serde_json::to_value(create_gesture_timeline_report(&guard))
+        .map_err(|err| format!("timeline serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn reset_current_gesture_timeline_to_standard_path(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let standard = audition_score();
+
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    guard.conductor = standard.conductor;
+
+    serde_json::to_value(create_gesture_timeline_report(&guard))
+        .map_err(|err| format!("timeline serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn play_current_project_conductor_audio(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    stop_existing_playback(&state)?;
+    start_native_playback(state, move |sample_rate_hz| {
+        compile_pitch_preview(&score, sample_rate_hz)
+    })
+}
+
+#[tauri::command]
+fn play_current_project_combined_audio(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    stop_existing_playback(&state)?;
+    start_native_playback(state, move |sample_rate_hz| {
+        compile_combined_music_and_conductor_preview(&score, sample_rate_hz)
+    })
+}
+
+#[tauri::command]
+fn render_current_project_combined_wav(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    let compiled = compile_combined_music_and_conductor_preview(&score, 48_000);
+    Ok(write_rendered_wav_report(
+        "hcs_current_project_combined_v1.wav",
+        compiled,
+    ))
 }
 
 #[tauri::command]
@@ -621,6 +801,15 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            load_seed_music_project,
+            get_current_project_score,
+            get_current_gesture_timeline,
+            append_gesture_to_current_score,
+            clear_current_gesture_timeline,
+            reset_current_gesture_timeline_to_standard_path,
+            play_current_project_conductor_audio,
+            play_current_project_combined_audio,
+            render_current_project_combined_wav,
             create_default_score,
             create_seed_music_score,
             get_seed_resonance_level_bundle,

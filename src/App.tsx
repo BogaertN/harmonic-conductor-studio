@@ -1,19 +1,27 @@
 import { useState } from "react";
 import {
+  appendGestureToCurrentScore,
+  clearCurrentGestureTimeline,
   createDefaultScore,
-  createSeedMusicScore,
   getAudioDeviceReport,
+  getCurrentGestureTimeline,
   getGestureVocabulary,
   getSeedResonanceLevelBundle,
+  loadSeedMusicProject,
+  playCurrentProjectCombinedAudio,
+  playCurrentProjectConductorAudio,
   playFirstGestureAudio,
   playSeedCombinedAudio,
   playSeedMusicAudio,
   previewScoreReport,
   previewSeedMusicReport,
+  renderCurrentProjectCombinedWav,
   renderFirstGestureWav,
   renderSeedCombinedWav,
   renderSeedMusicWav,
+  resetCurrentGestureTimelineToStandardPath,
   stopPlayback,
+  type GestureTimelineReport,
   type MusicPreviewReport,
   type PlaybackReport,
   type PreviewReport,
@@ -22,13 +30,27 @@ import {
   type WavRenderReport
 } from "./bridge/tauriCommands";
 
+const gestureAppendPlan = [
+  { id: "g2", operator: "prepare", durationMs: 360, intensity: 0.42 },
+  { id: "g1", operator: "ictus", durationMs: 420, intensity: 0.5 },
+  { id: "g3", operator: "emerge", durationMs: 360, intensity: 0.56 },
+  { id: "g4", operator: "descend", durationMs: 420, intensity: 0.62 },
+  { id: "g5", operator: "hold", durationMs: 520, intensity: 0.7 },
+  { id: "g6", operator: "release", durationMs: 420, intensity: 0.62 },
+  { id: "g7", operator: "gather", durationMs: 360, intensity: 0.56 },
+  { id: "g9", operator: "formed_hold", durationMs: 520, intensity: 0.62 },
+  { id: "g8", operator: "emit", durationMs: 480, intensity: 0.52 }
+];
+
 export default function App() {
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
   const [resonanceBundle, setResonanceBundle] = useState<ResonanceLevelBundle | null>(null);
+  const [gestureTimeline, setGestureTimeline] = useState<GestureTimelineReport | null>(null);
   const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
   const [musicWavReport, setMusicWavReport] = useState<WavRenderReport | null>(null);
   const [combinedWavReport, setCombinedWavReport] = useState<WavRenderReport | null>(null);
+  const [currentProjectWavReport, setCurrentProjectWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [stopReport, setStopReport] = useState<StopReport | null>(null);
   const [deviceReport, setDeviceReport] = useState<unknown>(null);
@@ -40,15 +62,10 @@ export default function App() {
   async function runPreview() {
     setError(null);
     try {
-      const nextScore = await createDefaultScore();
-      const nextVocabulary = await getGestureVocabulary();
-      const nextReport = await previewScoreReport();
-      const nextDeviceReport = await getAudioDeviceReport();
-
-      setScore(nextScore);
-      setVocabulary(nextVocabulary);
-      setReport(nextReport);
-      setDeviceReport(nextDeviceReport);
+      setScore(await createDefaultScore());
+      setVocabulary(await getGestureVocabulary());
+      setReport(await previewScoreReport());
+      setDeviceReport(await getAudioDeviceReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -57,13 +74,47 @@ export default function App() {
   async function loadSeedMusic() {
     setError(null);
     try {
-      const nextScore = await createSeedMusicScore();
-      const nextReport = await previewSeedMusicReport();
-      const nextResonanceBundle = await getSeedResonanceLevelBundle();
-
+      const nextScore = await loadSeedMusicProject();
       setSeedMusicScore(nextScore);
-      setMusicReport(nextReport);
-      setResonanceBundle(nextResonanceBundle);
+      setMusicReport(await previewSeedMusicReport());
+      setResonanceBundle(await getSeedResonanceLevelBundle());
+      setGestureTimeline(await getCurrentGestureTimeline());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function refreshTimeline() {
+    setError(null);
+    try {
+      setGestureTimeline(await getCurrentGestureTimeline());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function appendGesture(gestureId: string, durationMs: number, intensity: number, operator: string) {
+    setError(null);
+    try {
+      setGestureTimeline(await appendGestureToCurrentScore(gestureId, durationMs, intensity, operator));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function clearTimeline() {
+    setError(null);
+    try {
+      setGestureTimeline(await clearCurrentGestureTimeline());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function resetTimeline() {
+    setError(null);
+    try {
+      setGestureTimeline(await resetCurrentGestureTimelineToStandardPath());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -96,6 +147,15 @@ export default function App() {
     }
   }
 
+  async function renderCurrentProjectWav() {
+    setError(null);
+    try {
+      setCurrentProjectWavReport(await renderCurrentProjectCombinedWav());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function playAudio() {
     setError(null);
     try {
@@ -118,6 +178,24 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playSeedCombinedAudio());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playCurrentConductorAudio() {
+    setError(null);
+    try {
+      setPlaybackReport(await playCurrentProjectConductorAudio());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playCurrentCombinedAudio() {
+    setError(null);
+    try {
+      setPlaybackReport(await playCurrentProjectCombinedAudio());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -147,25 +225,11 @@ export default function App() {
         <div className="panel conductor-stage">
           <h2>Conductor Field</h2>
           <div className="field">
-            <div className="row upper">
-              <span>g7</span>
-              <strong>g9</strong>
-              <span>g8</span>
-            </div>
-            <div className="row center">
-              <span>g2</span>
-              <strong>g1</strong>
-              <span>g3</span>
-            </div>
-            <div className="row lower">
-              <span>g4</span>
-              <strong>g5</strong>
-              <span>g6</span>
-            </div>
+            <div className="row upper"><span>g7</span><strong>g9</strong><span>g8</span></div>
+            <div className="row center"><span>g2</span><strong>g1</strong><span>g3</span></div>
+            <div className="row lower"><span>g4</span><strong>g5</strong><span>g6</span></div>
           </div>
-          <p className="note">
-            Center = 1 home/root. Lower = 5 depth/weight. Upper = 9 lift/expression.
-          </p>
+          <p className="note">Center = 1 home/root. Lower = 5 depth/weight. Upper = 9 lift/expression.</p>
         </div>
 
         <div className="panel">
@@ -186,7 +250,35 @@ export default function App() {
             <button onClick={renderCombinedWav}>Render Combined WAV</button>
           </div>
 
+          <h2>Gesture Timeline v1</h2>
+          <div className="button-row">
+            <button onClick={refreshTimeline}>Refresh Timeline</button>
+            <button onClick={resetTimeline}>Reset Standard Path</button>
+            <button onClick={clearTimeline}>Clear Timeline</button>
+            <button onClick={playCurrentConductorAudio}>Play Current Conductor</button>
+            <button onClick={playCurrentCombinedAudio}>Play Current Music + Conductor</button>
+            <button onClick={renderCurrentProjectWav}>Render Current Combined WAV</button>
+          </div>
+
+          <div className="button-row gesture-row">
+            {gestureAppendPlan.map((gesture) => (
+              <button
+                key={gesture.id}
+                onClick={() => appendGesture(gesture.id, gesture.durationMs, gesture.intensity, gesture.operator)}
+              >
+                Append {gesture.id}
+              </button>
+            ))}
+          </div>
+
           {error && <pre className="error">{error}</pre>}
+
+          {gestureTimeline && (
+            <>
+              <h3>Gesture Timeline Report</h3>
+              <pre>{JSON.stringify(gestureTimeline, null, 2)}</pre>
+            </>
+          )}
 
           {Boolean(deviceReport) && (
             <>
@@ -243,35 +335,25 @@ export default function App() {
               <pre>{JSON.stringify(combinedWavReport, null, 2)}</pre>
             </>
           )}
+
+          {currentProjectWavReport && (
+            <>
+              <h3>Current Project Combined WAV Render</h3>
+              <pre>{JSON.stringify(currentProjectWavReport, null, 2)}</pre>
+            </>
+          )}
         </div>
 
         {resonanceBundle && (
           <div className="panel wide">
             <h2>Resonance Level View v1</h2>
-            <p className="note">
-              One source score. Multiple playable views. Same resonance identity.
-            </p>
+            <p className="note">One source score. Multiple playable views. Same resonance identity.</p>
 
             <div className="level-grid">
-              <section>
-                <h3>Source Summary</h3>
-                <pre>{JSON.stringify(resonanceBundle.source_summary, null, 2)}</pre>
-              </section>
-
-              <section>
-                <h3>Beginner View</h3>
-                <pre>{JSON.stringify(resonanceBundle.beginner_view, null, 2)}</pre>
-              </section>
-
-              <section>
-                <h3>Note Name View</h3>
-                <pre>{JSON.stringify(resonanceBundle.note_name_view, null, 2)}</pre>
-              </section>
-
-              <section>
-                <h3>Conductor View</h3>
-                <pre>{JSON.stringify(resonanceBundle.conductor_view, null, 2)}</pre>
-              </section>
+              <section><h3>Source Summary</h3><pre>{JSON.stringify(resonanceBundle.source_summary, null, 2)}</pre></section>
+              <section><h3>Beginner View</h3><pre>{JSON.stringify(resonanceBundle.beginner_view, null, 2)}</pre></section>
+              <section><h3>Note Name View</h3><pre>{JSON.stringify(resonanceBundle.note_name_view, null, 2)}</pre></section>
+              <section><h3>Conductor View</h3><pre>{JSON.stringify(resonanceBundle.conductor_view, null, 2)}</pre></section>
             </div>
 
             <h3>Accessibility Guidance</h3>
