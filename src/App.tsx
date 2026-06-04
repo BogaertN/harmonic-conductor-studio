@@ -1,6 +1,12 @@
 import { useState } from "react";
 import {
   appendGestureToCurrentScore,
+  appendNoteToCurrentTrack,
+  clearCurrentMusicTrack,
+  getCurrentMusicTimeline,
+  playCurrentProjectMusicAudio,
+  renderCurrentProjectMusicWav,
+  resetCurrentMusicToSeed,
   clearCurrentGestureTimeline,
   createDefaultScore,
   getAudioDeviceReport,
@@ -23,12 +29,23 @@ import {
   stopPlayback,
   type GestureTimelineReport,
   type MusicPreviewReport,
+  type MusicTimelineReport,
   type PlaybackReport,
   type PreviewReport,
   type ResonanceLevelBundle,
   type StopReport,
   type WavRenderReport
 } from "./bridge/tauriCommands";
+
+const musicAppendPlan = [
+  { label: "Lead C4", trackId: "lead_voice", midiNote: 60, durationMs: 714, velocity: 0.82 },
+  { label: "Lead D4", trackId: "lead_voice", midiNote: 62, durationMs: 714, velocity: 0.84 },
+  { label: "Lead E4", trackId: "lead_voice", midiNote: 64, durationMs: 714, velocity: 0.86 },
+  { label: "Lead F4", trackId: "lead_voice", midiNote: 65, durationMs: 714, velocity: 0.84 },
+  { label: "Lead G4", trackId: "lead_voice", midiNote: 67, durationMs: 714, velocity: 0.88 },
+  { label: "Depth C3", trackId: "depth_voice", midiNote: 48, durationMs: 1428, velocity: 0.52 },
+  { label: "Field C4", trackId: "field_voice", midiNote: 60, durationMs: 2856, velocity: 0.28 }
+];
 
 const gestureAppendPlan = [
   { id: "g2", operator: "prepare", durationMs: 360, intensity: 0.42 },
@@ -47,10 +64,12 @@ export default function App() {
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
   const [resonanceBundle, setResonanceBundle] = useState<ResonanceLevelBundle | null>(null);
   const [gestureTimeline, setGestureTimeline] = useState<GestureTimelineReport | null>(null);
+  const [musicTimeline, setMusicTimeline] = useState<MusicTimelineReport | null>(null);
   const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
   const [musicWavReport, setMusicWavReport] = useState<WavRenderReport | null>(null);
   const [combinedWavReport, setCombinedWavReport] = useState<WavRenderReport | null>(null);
   const [currentProjectWavReport, setCurrentProjectWavReport] = useState<WavRenderReport | null>(null);
+  const [currentProjectMusicWavReport, setCurrentProjectMusicWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [stopReport, setStopReport] = useState<StopReport | null>(null);
   const [deviceReport, setDeviceReport] = useState<unknown>(null);
@@ -79,6 +98,61 @@ export default function App() {
       setMusicReport(await previewSeedMusicReport());
       setResonanceBundle(await getSeedResonanceLevelBundle());
       setGestureTimeline(await getCurrentGestureTimeline());
+      setMusicTimeline(await getCurrentMusicTimeline());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function refreshMusicTimeline() {
+    setError(null);
+    try {
+      setMusicTimeline(await getCurrentMusicTimeline());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function appendMusicNote(trackId: string, midiNote: number, durationMs: number, velocity: number) {
+    setError(null);
+    try {
+      setMusicTimeline(await appendNoteToCurrentTrack(trackId, midiNote, durationMs, velocity));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function clearMusicTrack(trackId: string) {
+    setError(null);
+    try {
+      setMusicTimeline(await clearCurrentMusicTrack(trackId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function resetMusicNotes() {
+    setError(null);
+    try {
+      setMusicTimeline(await resetCurrentMusicToSeed());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playCurrentMusicAudio() {
+    setError(null);
+    try {
+      setPlaybackReport(await playCurrentProjectMusicAudio());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function renderCurrentMusicWav() {
+    setError(null);
+    try {
+      setCurrentProjectMusicWavReport(await renderCurrentProjectMusicWav());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -250,6 +324,29 @@ export default function App() {
             <button onClick={renderCombinedWav}>Render Combined WAV</button>
           </div>
 
+
+          <h2>Music Note Timeline v1</h2>
+          <div className="button-row">
+            <button onClick={refreshMusicTimeline}>Refresh Music Timeline</button>
+            <button onClick={resetMusicNotes}>Reset Seed Notes</button>
+            <button onClick={() => clearMusicTrack("lead_voice")}>Clear Lead Track</button>
+            <button onClick={() => clearMusicTrack("depth_voice")}>Clear Depth Track</button>
+            <button onClick={() => clearMusicTrack("field_voice")}>Clear Field Track</button>
+            <button onClick={playCurrentMusicAudio}>Play Current Music</button>
+            <button onClick={renderCurrentMusicWav}>Render Current Music WAV</button>
+          </div>
+
+          <div className="button-row music-note-row">
+            {musicAppendPlan.map((note) => (
+              <button
+                key={`${note.trackId}-${note.midiNote}-${note.label}`}
+                onClick={() => appendMusicNote(note.trackId, note.midiNote, note.durationMs, note.velocity)}
+              >
+                Append {note.label}
+              </button>
+            ))}
+          </div>
+
           <h2>Gesture Timeline v1</h2>
           <div className="button-row">
             <button onClick={refreshTimeline}>Refresh Timeline</button>
@@ -272,6 +369,13 @@ export default function App() {
           </div>
 
           {error && <pre className="error">{error}</pre>}
+
+          {musicTimeline && (
+            <>
+              <h3>Music Note Timeline Report</h3>
+              <pre>{JSON.stringify(musicTimeline, null, 2)}</pre>
+            </>
+          )}
 
           {gestureTimeline && (
             <>
@@ -333,6 +437,13 @@ export default function App() {
             <>
               <h3>Combined WAV Render</h3>
               <pre>{JSON.stringify(combinedWavReport, null, 2)}</pre>
+            </>
+          )}
+
+          {currentProjectMusicWavReport && (
+            <>
+              <h3>Current Project Music WAV Render</h3>
+              <pre>{JSON.stringify(currentProjectMusicWavReport, null, 2)}</pre>
             </>
           )}
 

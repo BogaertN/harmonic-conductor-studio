@@ -8,6 +8,7 @@ use hfield_dsp::{
     compile_combined_music_and_conductor_preview, compile_music_preview, compile_pitch_preview,
     write_wav_i16, CompiledAudio,
 };
+use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
 use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
 use serde_json::json;
@@ -244,6 +245,108 @@ fn stop_existing_playback(state: &AppState) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn get_current_music_timeline(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_music_timeline_report(&guard))
+        .map_err(|err| format!("music timeline serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn append_note_to_current_track(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+    midi_note: u8,
+    duration_ms: u32,
+    velocity: f32,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    let report = append_note_to_track(&mut guard, &track_id, midi_note, duration_ms, velocity)?;
+
+    serde_json::to_value(report)
+        .map_err(|err| format!("music timeline serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn clear_current_music_track(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    let report = clear_track_notes(&mut guard, &track_id)?;
+
+    serde_json::to_value(report)
+        .map_err(|err| format!("music timeline serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn reset_current_music_to_seed(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let seed = seed_music_score();
+
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    guard.music = seed.music;
+
+    serde_json::to_value(create_music_timeline_report(&guard))
+        .map_err(|err| format!("music timeline serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn play_current_project_music_audio(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    stop_existing_playback(&state)?;
+    start_native_playback(state, move |sample_rate_hz| {
+        compile_music_preview(&score, sample_rate_hz)
+    })
+}
+
+#[tauri::command]
+fn render_current_project_music_wav(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    let compiled = compile_music_preview(&score, 48_000);
+    Ok(write_rendered_wav_report(
+        "hcs_current_project_music_v1.wav",
+        compiled,
+    ))
 }
 
 #[tauri::command]
@@ -801,6 +904,12 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            get_current_music_timeline,
+            append_note_to_current_track,
+            clear_current_music_track,
+            reset_current_music_to_seed,
+            play_current_project_music_audio,
+            render_current_project_music_wav,
             load_seed_music_project,
             get_current_project_score,
             get_current_gesture_timeline,

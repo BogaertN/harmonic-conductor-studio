@@ -61,6 +61,39 @@ export type StopReport = {
   message: string;
 };
 
+export type MusicTimelineReport = {
+  tempo_bpm: number;
+  meter: string;
+  tuning_mode: string;
+  track_count: number;
+  total_note_count: number;
+  total_duration_ms: number;
+  total_duration_seconds: number;
+  tracks: Array<{
+    track_id: string;
+    role: string;
+    note_count: number;
+    track_duration_ms: number;
+    track_duration_seconds: number;
+    notes: Array<{
+      event_index: number;
+      track_id: string;
+      role: string;
+      midi_note: number;
+      note_name: string;
+      frequency_hz: number;
+      start_ms: number;
+      duration_ms: number;
+      end_ms: number;
+      start_beat: number;
+      duration_beats: number;
+      velocity: number;
+      movement_from_previous: string;
+      resonance_lane: string;
+    }>;
+  }>;
+};
+
 export type GestureTimelineReport = {
   track_id: string;
   event_count: number;
@@ -146,6 +179,40 @@ export async function loadSeedMusicProject(): Promise<unknown> {
 
 export async function getCurrentProjectScore(): Promise<unknown> {
   return await invoke("get_current_project_score");
+}
+
+export async function getCurrentMusicTimeline(): Promise<MusicTimelineReport> {
+  return await invoke<MusicTimelineReport>("get_current_music_timeline");
+}
+
+export async function appendNoteToCurrentTrack(
+  trackId: string,
+  midiNote: number,
+  durationMs: number,
+  velocity: number
+): Promise<MusicTimelineReport> {
+  return await invoke<MusicTimelineReport>("append_note_to_current_track", {
+    trackId,
+    midiNote,
+    durationMs,
+    velocity
+  });
+}
+
+export async function clearCurrentMusicTrack(trackId: string): Promise<MusicTimelineReport> {
+  return await invoke<MusicTimelineReport>("clear_current_music_track", { trackId });
+}
+
+export async function resetCurrentMusicToSeed(): Promise<MusicTimelineReport> {
+  return await invoke<MusicTimelineReport>("reset_current_music_to_seed");
+}
+
+export async function playCurrentProjectMusicAudio(): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_current_project_music_audio");
+}
+
+export async function renderCurrentProjectMusicWav(): Promise<WavRenderReport> {
+  return await invoke<WavRenderReport>("render_current_project_music_wav");
 }
 
 export async function getCurrentGestureTimeline(): Promise<GestureTimelineReport> {
