@@ -20,3 +20,4 @@ hfield-conductor = { path = "../crates/hfield-conductor" }
 hfield-dsp = { path = "../crates/hfield-dsp" }
 hfield-analysis = { path = "../crates/hfield-analysis" }
 hfield-storage = { path = "../crates/hfield-storage" }
+hfield-resonance = { path = "../crates/hfield-resonance" }

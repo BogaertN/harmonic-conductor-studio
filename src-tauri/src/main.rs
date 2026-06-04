@@ -6,6 +6,7 @@ use hfield_dsp::{
     compile_combined_music_and_conductor_preview, compile_music_preview, compile_pitch_preview,
     write_wav_i16, CompiledAudio,
 };
+use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
 use serde_json::json;
 use std::sync::{
@@ -242,6 +243,13 @@ fn create_default_score() -> FieldScore {
 #[tauri::command]
 fn create_seed_music_score() -> FieldScore {
     seed_music_score()
+}
+
+#[tauri::command]
+fn get_seed_resonance_level_bundle() -> serde_json::Value {
+    let score = seed_music_score();
+    serde_json::to_value(create_resonance_level_bundle(&score))
+        .expect("resonance level bundle should serialize")
 }
 
 #[tauri::command]
@@ -615,6 +623,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             create_default_score,
             create_seed_music_score,
+            get_seed_resonance_level_bundle,
             get_gesture_vocabulary,
             get_audio_device_report,
             preview_score_report,

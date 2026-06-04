@@ -6,6 +6,7 @@ members = [
   "crates/hfield-dsp",
   "crates/hfield-analysis",
   "crates/hfield-storage",
+  "crates/hfield-resonance",
   "src-tauri"
 ]
 

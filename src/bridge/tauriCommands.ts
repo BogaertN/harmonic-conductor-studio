@@ -61,12 +61,61 @@ export type StopReport = {
   message: string;
 };
 
+export type ResonanceLevelBundle = {
+  piece_title: string;
+  source_summary: {
+    tempo_bpm: number;
+    meter: string;
+    tuning_mode: string;
+    music_track_count: number;
+    total_note_count: number;
+    conductor_event_count: number;
+  };
+  beginner_view: Array<{
+    block_index: number;
+    note_label: string;
+    start_ms: number;
+    duration_ms: number;
+    start_beat: number;
+    duration_beats: number;
+    movement: string;
+    resonance_lane: string;
+    beginner_instruction: string;
+  }>;
+  note_name_view: Array<{
+    event_index: number;
+    midi_note: number;
+    note_name: string;
+    start_ms: number;
+    duration_ms: number;
+    start_beat: number;
+    duration_beats: number;
+    velocity: number;
+  }>;
+  conductor_view: Array<{
+    cue_index: number;
+    gesture_id: string;
+    operator: string | null;
+    field_region: string;
+    start_ms: number;
+    duration_ms: number;
+    intensity: number;
+    cue_text: string;
+  }>;
+  accessibility_guidance: string[];
+  professional_boundary: string;
+};
+
 export async function previewScoreReport(): Promise<PreviewReport> {
   return await invoke<PreviewReport>("preview_score_report");
 }
 
 export async function previewSeedMusicReport(): Promise<MusicPreviewReport> {
   return await invoke<MusicPreviewReport>("preview_seed_music_report");
+}
+
+export async function getSeedResonanceLevelBundle(): Promise<ResonanceLevelBundle> {
+  return await invoke<ResonanceLevelBundle>("get_seed_resonance_level_bundle");
 }
 
 export async function renderFirstGestureWav(): Promise<WavRenderReport> {

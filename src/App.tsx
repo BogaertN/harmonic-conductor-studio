@@ -4,6 +4,7 @@ import {
   createSeedMusicScore,
   getAudioDeviceReport,
   getGestureVocabulary,
+  getSeedResonanceLevelBundle,
   playFirstGestureAudio,
   playSeedCombinedAudio,
   playSeedMusicAudio,
@@ -16,6 +17,7 @@ import {
   type MusicPreviewReport,
   type PlaybackReport,
   type PreviewReport,
+  type ResonanceLevelBundle,
   type StopReport,
   type WavRenderReport
 } from "./bridge/tauriCommands";
@@ -23,6 +25,7 @@ import {
 export default function App() {
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
+  const [resonanceBundle, setResonanceBundle] = useState<ResonanceLevelBundle | null>(null);
   const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
   const [musicWavReport, setMusicWavReport] = useState<WavRenderReport | null>(null);
   const [combinedWavReport, setCombinedWavReport] = useState<WavRenderReport | null>(null);
@@ -56,8 +59,11 @@ export default function App() {
     try {
       const nextScore = await createSeedMusicScore();
       const nextReport = await previewSeedMusicReport();
+      const nextResonanceBundle = await getSeedResonanceLevelBundle();
+
       setSeedMusicScore(nextScore);
       setMusicReport(nextReport);
+      setResonanceBundle(nextResonanceBundle);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -66,8 +72,7 @@ export default function App() {
   async function renderWav() {
     setError(null);
     try {
-      const nextReport = await renderFirstGestureWav();
-      setWavReport(nextReport);
+      setWavReport(await renderFirstGestureWav());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -76,8 +81,7 @@ export default function App() {
   async function renderMusicWav() {
     setError(null);
     try {
-      const nextReport = await renderSeedMusicWav();
-      setMusicWavReport(nextReport);
+      setMusicWavReport(await renderSeedMusicWav());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -86,8 +90,7 @@ export default function App() {
   async function renderCombinedWav() {
     setError(null);
     try {
-      const nextReport = await renderSeedCombinedWav();
-      setCombinedWavReport(nextReport);
+      setCombinedWavReport(await renderSeedCombinedWav());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -96,8 +99,7 @@ export default function App() {
   async function playAudio() {
     setError(null);
     try {
-      const nextReport = await playFirstGestureAudio();
-      setPlaybackReport(nextReport);
+      setPlaybackReport(await playFirstGestureAudio());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -106,8 +108,7 @@ export default function App() {
   async function playMusicAudio() {
     setError(null);
     try {
-      const nextReport = await playSeedMusicAudio();
-      setPlaybackReport(nextReport);
+      setPlaybackReport(await playSeedMusicAudio());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -116,8 +117,7 @@ export default function App() {
   async function playCombinedAudio() {
     setError(null);
     try {
-      const nextReport = await playSeedCombinedAudio();
-      setPlaybackReport(nextReport);
+      setPlaybackReport(await playSeedCombinedAudio());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -126,8 +126,7 @@ export default function App() {
   async function stopAudio() {
     setError(null);
     try {
-      const nextReport = await stopPlayback();
-      setStopReport(nextReport);
+      setStopReport(await stopPlayback());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -139,8 +138,8 @@ export default function App() {
         <p className="eyebrow">AI.Web Native Desktop Application</p>
         <h1>Harmonic Conductor Studio</h1>
         <p>
-          Production baseline for conducted music: real notes, conductor
-          gestures, native Rust score logic, native playback, and Tauri desktop shell.
+          A conducted music system where one source score can open through
+          beginner, note-name, conductor, accessibility, and professional views.
         </p>
       </section>
 
@@ -180,7 +179,7 @@ export default function App() {
 
           <h2>Music Engine v1</h2>
           <div className="button-row">
-            <button onClick={loadSeedMusic}>Load Seed Music</button>
+            <button onClick={loadSeedMusic}>Load Seed Music + Levels</button>
             <button onClick={playMusicAudio}>Play Music Seed</button>
             <button onClick={playCombinedAudio}>Play Music + Conductor</button>
             <button onClick={renderMusicWav}>Render Music WAV</button>
@@ -245,6 +244,43 @@ export default function App() {
             </>
           )}
         </div>
+
+        {resonanceBundle && (
+          <div className="panel wide">
+            <h2>Resonance Level View v1</h2>
+            <p className="note">
+              One source score. Multiple playable views. Same resonance identity.
+            </p>
+
+            <div className="level-grid">
+              <section>
+                <h3>Source Summary</h3>
+                <pre>{JSON.stringify(resonanceBundle.source_summary, null, 2)}</pre>
+              </section>
+
+              <section>
+                <h3>Beginner View</h3>
+                <pre>{JSON.stringify(resonanceBundle.beginner_view, null, 2)}</pre>
+              </section>
+
+              <section>
+                <h3>Note Name View</h3>
+                <pre>{JSON.stringify(resonanceBundle.note_name_view, null, 2)}</pre>
+              </section>
+
+              <section>
+                <h3>Conductor View</h3>
+                <pre>{JSON.stringify(resonanceBundle.conductor_view, null, 2)}</pre>
+              </section>
+            </div>
+
+            <h3>Accessibility Guidance</h3>
+            <pre>{JSON.stringify(resonanceBundle.accessibility_guidance, null, 2)}</pre>
+
+            <h3>Professional Boundary</h3>
+            <pre>{resonanceBundle.professional_boundary}</pre>
+          </div>
+        )}
 
         <div className="panel wide">
           <h2>Default .hfield Score</h2>
