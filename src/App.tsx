@@ -1,0 +1,87 @@
+import { useState } from "react";
+import {
+  createDefaultScore,
+  getGestureVocabulary,
+  previewScoreReport,
+  type PreviewReport
+} from "./bridge/tauriCommands";
+
+export default function App() {
+  const [report, setReport] = useState<PreviewReport | null>(null);
+  const [vocabulary, setVocabulary] = useState<unknown>(null);
+  const [score, setScore] = useState<unknown>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function runPreview() {
+    setError(null);
+    try {
+      const nextScore = await createDefaultScore();
+      const nextVocabulary = await getGestureVocabulary();
+      const nextReport = await previewScoreReport();
+
+      setScore(nextScore);
+      setVocabulary(nextVocabulary);
+      setReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <main className="app-shell">
+      <section className="hero">
+        <p className="eyebrow">AI.Web Native Desktop Application</p>
+        <h1>Harmonic Conductor Studio</h1>
+        <p>
+          Production baseline for the conducted harmonic field: music, conductor
+          gestures, native Rust score logic, and Tauri desktop shell.
+        </p>
+      </section>
+
+      <section className="grid">
+        <div className="panel conductor-stage">
+          <h2>Conductor Field</h2>
+          <div className="field">
+            <div className="row upper">
+              <span>g7</span>
+              <strong>g9</strong>
+              <span>g8</span>
+            </div>
+            <div className="row center">
+              <span>g2</span>
+              <strong>g1</strong>
+              <span>g3</span>
+            </div>
+            <div className="row lower">
+              <span>g4</span>
+              <strong>g5</strong>
+              <span>g6</span>
+            </div>
+          </div>
+          <p className="note">
+            Center = 1 home/root. Lower = 5 depth/weight. Upper = 9 lift/expression.
+          </p>
+        </div>
+
+        <div className="panel">
+          <h2>Native Core Proof</h2>
+          <button onClick={runPreview}>Run Rust Preview</button>
+          {error && <pre className="error">{error}</pre>}
+          {report && (
+            <pre>{JSON.stringify(report, null, 2)}</pre>
+          )}
+        </div>
+
+        <div className="panel wide">
+          <h2>Default .hfield Score</h2>
+          <pre>{score ? JSON.stringify(score, null, 2) : "Run preview to load the default native score."}</pre>
+        </div>
+
+        <div className="panel wide">
+          <h2>Nine-Gesture Vocabulary</h2>
+          <pre>{vocabulary ? JSON.stringify(vocabulary, null, 2) : "Run preview to load the native gesture vocabulary."}</pre>
+        </div>
+      </section>
+    </main>
+  );
+}

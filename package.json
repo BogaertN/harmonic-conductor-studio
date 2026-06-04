@@ -1,0 +1,31 @@
+{
+  "name": "harmonic-conductor-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "latest",
+    "@react-three/drei": "latest",
+    "@react-three/fiber": "latest",
+    "three": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "zustand": "latest"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest"
+  }
+}

@@ -1,0 +1,20 @@
+[package]
+name = "harmonic-conductor-studio-tauri"
+version = "0.1.0"
+description = "AI.Web Harmonic Conductor Studio desktop shell"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+hfield-domain = { path = "../crates/hfield-domain" }
+hfield-conductor = { path = "../crates/hfield-conductor" }
+hfield-dsp = { path = "../crates/hfield-dsp" }
+hfield-analysis = { path = "../crates/hfield-analysis" }
+hfield-storage = { path = "../crates/hfield-storage" }
