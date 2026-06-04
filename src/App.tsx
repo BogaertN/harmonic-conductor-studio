@@ -3,11 +3,14 @@ import {
   createDefaultScore,
   getGestureVocabulary,
   previewScoreReport,
-  type PreviewReport
+  renderFirstGestureWav,
+  type PreviewReport,
+  type WavRenderReport
 } from "./bridge/tauriCommands";
 
 export default function App() {
   const [report, setReport] = useState<PreviewReport | null>(null);
+  const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
   const [vocabulary, setVocabulary] = useState<unknown>(null);
   const [score, setScore] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +25,16 @@ export default function App() {
       setScore(nextScore);
       setVocabulary(nextVocabulary);
       setReport(nextReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function renderWav() {
+    setError(null);
+    try {
+      const nextReport = await renderFirstGestureWav();
+      setWavReport(nextReport);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -65,10 +78,22 @@ export default function App() {
 
         <div className="panel">
           <h2>Native Core Proof</h2>
-          <button onClick={runPreview}>Run Rust Preview</button>
+          <div className="button-row">
+            <button onClick={runPreview}>Run Rust Preview</button>
+            <button onClick={renderWav}>Render First Gesture WAV</button>
+          </div>
           {error && <pre className="error">{error}</pre>}
           {report && (
-            <pre>{JSON.stringify(report, null, 2)}</pre>
+            <>
+              <h3>Rust Preview</h3>
+              <pre>{JSON.stringify(report, null, 2)}</pre>
+            </>
+          )}
+          {wavReport && (
+            <>
+              <h3>WAV Render</h3>
+              <pre>{JSON.stringify(wavReport, null, 2)}</pre>
+            </>
           )}
         </div>
 

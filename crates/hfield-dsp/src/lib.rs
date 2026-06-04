@@ -119,4 +119,38 @@ mod tests {
     fn center_root_frequency_is_144() {
         assert_eq!(gesture_frequency_hz(144.0, "g1"), 144.0);
     }
+
+    #[test]
+    fn writes_wav_file() {
+        let score = FieldScore::default_hcs();
+        let compiled = compile_pitch_preview(&score, 48_000);
+        let path = std::env::temp_dir().join("hcs_test_preview.wav");
+        write_wav_i16(&path, &compiled).expect("write wav");
+        let metadata = std::fs::metadata(&path).expect("wav metadata");
+        assert!(metadata.len() > 44);
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+pub fn write_wav_i16<P: AsRef<std::path::Path>>(
+    path: P,
+    compiled: &CompiledAudio,
+) -> Result<(), hound::Error> {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: compiled.sample_rate_hz,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+
+    let mut writer = hound::WavWriter::create(path, spec)?;
+
+    for sample in &compiled.samples {
+        let clamped = sample.clamp(-1.0, 1.0);
+        let value = (clamped * i16::MAX as f32).round() as i16;
+        writer.write_sample(value)?;
+    }
+
+    writer.finalize()?;
+    Ok(())
 }

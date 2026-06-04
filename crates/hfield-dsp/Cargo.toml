@@ -8,3 +8,4 @@ license.workspace = true
 [dependencies]
 hfield-domain = { path = "../hfield-domain" }
 hfield-conductor = { path = "../hfield-conductor" }
+hound.workspace = true
