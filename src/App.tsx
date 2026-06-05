@@ -211,6 +211,77 @@ function StatusChip({ label, value }: { label: string; value: string | number })
   );
 }
 
+
+function NotationSpine({
+  musicTimeline,
+  gestureTimeline,
+  motionReport,
+  motionTimeMs,
+  modeLabel,
+  variant = "full"
+}: {
+  musicTimeline: MusicTimelineReport | null;
+  gestureTimeline: GestureTimelineReport | null;
+  motionReport: ConductorMotionReport | null;
+  motionTimeMs: number;
+  modeLabel: string;
+  variant?: "full" | "compact" | "performance" | "compose";
+}) {
+  const lead = musicTimeline?.tracks.find((track) => track.track_id === "lead_voice") ?? null;
+  const depth = musicTimeline?.tracks.find((track) => track.track_id === "depth_voice") ?? null;
+  const field = musicTimeline?.tracks.find((track) => track.track_id === "field_voice") ?? null;
+  const tracks = [
+    { label: "Lead", role: "melody", track: lead },
+    { label: "Depth", role: "bass/depth", track: depth },
+    { label: "Field", role: "harmonic field", track: field }
+  ];
+  const durationMs = Math.max(1, motionReport?.total_duration_ms ?? musicTimeline?.total_duration_ms ?? 1);
+  const cursorPercent = Math.min(99, Math.max(0, (motionTimeMs / durationMs) * 100));
+  const activeEvent = getActiveEvent(motionReport, motionTimeMs);
+  const cueEvents = gestureTimeline?.events ?? [];
+  const measureCount = Math.max(4, Math.ceil((musicTimeline?.total_duration_seconds ?? 0) / 2.856));
+  const ruler = Array.from({ length: Math.min(8, measureCount) }, (_, index) => index + 1);
+  return (
+    <section className={`notation-spine notation-spine-${variant}`} aria-label={`${modeLabel} notation spine`}>
+      <div className="notation-spine-header">
+        <div><p className="eyebrow">Persistent Score Spine</p><h3>{modeLabel} Music Reading View</h3></div>
+        <div className="notation-meta-strip">
+          <StatusChip label="Meter" value={musicTimeline?.meter ?? "4/4"} />
+          <StatusChip label="Tempo" value={`${musicTimeline?.tempo_bpm ?? 84} BPM`} />
+          <StatusChip label="Notes" value={musicTimeline?.total_note_count ?? 0} />
+          <StatusChip label="Cue" value={activeEvent?.gesture_id ?? "—"} />
+        </div>
+      </div>
+      <div className="notation-score-window">
+        <div className="notation-measure-ruler">{ruler.map((measure) => <span key={measure}>M{measure}</span>)}</div>
+        <div className="notation-staff-stack">
+          {tracks.map(({ label, role, track }) => (
+            <div key={label} className="notation-voice-row">
+              <div className="notation-voice-label"><strong>{label}</strong><span>{role}</span></div>
+              <div className="notation-staff-lane">
+                {[0, 1, 2, 3, 4].map((line) => <span key={line} className="notation-staff-line" />)}
+                {(track?.notes ?? []).slice(0, 24).map((note, index) => {
+                  const left = Math.min(94, Math.max(3, 5 + note.start_beat * 5.8));
+                  const top = Math.min(84, Math.max(14, 66 - (note.midi_note - 60) * 3.6));
+                  const width = Math.max(3.8, Math.min(13, note.duration_beats * 5.2));
+                  return (
+                    <span key={`${label}-${note.start_ms}-${note.midi_note}-${index}`} className={`notation-note ${note.resonance_lane}`} style={{ left: `${left}%`, top: `${top}%`, width: `${width}%` }} title={`${note.note_name} · beat ${note.start_beat} · ${note.frequency_hz.toFixed(2)} Hz`}>{note.note_name}</span>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="notation-playhead" style={{ left: `${cursorPercent}%` }}><span>{Math.round(motionTimeMs)}ms</span></div>
+      </div>
+      <div className="notation-cue-strip">
+        {cueEvents.slice(0, 18).map((cue) => <span key={`${cue.event_index}-${cue.gesture_id}`} className={activeEvent?.gesture_id === cue.gesture_id ? "notation-cue active" : "notation-cue"} title={cue.cue_text}>{cue.gesture_id} · {cue.gesture_name}</span>)}
+        {cueEvents.length === 0 && <span className="notation-cue empty">Load or map a conductor path to show cues.</span>}
+      </div>
+    </section>
+  );
+}
+
 function VisibleConductorMotion({
   report,
   timeMs,
@@ -824,7 +895,7 @@ export default function App() {
   const conductorCues = resonanceBundle?.conductor_view.slice(0, 8) ?? [];
 
   return (
-    <main className="app-shell workstation-shell shell-v2">
+    <main className={`app-shell workstation-shell shell-v2 mode-${activeTab}`}>
       <header className="top-status-bar">
         <div className="brand-block">
           <p className="eyebrow">AI.Web Native Desktop Application</p>
@@ -876,6 +947,15 @@ export default function App() {
                   <button onClick={playCurrentMusicAudio} type="button">Play Music</button>
                 </div>
               </div>
+
+              <NotationSpine
+                musicTimeline={musicTimeline}
+                gestureTimeline={gestureTimeline}
+                motionReport={motionReport}
+                motionTimeMs={motionTimeMs}
+                modeLabel="Compose"
+                variant="compose"
+              />
 
               <div className="composition-grid">
                 <section className="notation-board">
@@ -954,6 +1034,24 @@ export default function App() {
                 </div>
               </div>
 
+              <NotationSpine
+                musicTimeline={musicTimeline}
+                gestureTimeline={gestureTimeline}
+                motionReport={motionReport}
+                motionTimeMs={motionTimeMs}
+                modeLabel="Conduct"
+                variant="compact"
+              />
+
+              <NotationSpine
+                musicTimeline={musicTimeline}
+                gestureTimeline={gestureTimeline}
+                motionReport={motionReport}
+                motionTimeMs={motionTimeMs}
+                modeLabel="Perform"
+                variant="performance"
+              />
+
               <VisibleConductorMotion
                 report={motionReport}
                 timeMs={motionTimeMs}
@@ -986,6 +1084,15 @@ export default function App() {
                   <button onClick={playCurrentCombinedAudio} type="button">Play With Conductor</button>
                 </div>
               </div>
+
+              <NotationSpine
+                musicTimeline={musicTimeline}
+                gestureTimeline={gestureTimeline}
+                motionReport={motionReport}
+                motionTimeMs={motionTimeMs}
+                modeLabel="Rehearse"
+                variant="compact"
+              />
 
               <div className="rehearsal-grid">
                 <section className="rehearsal-card">
@@ -1062,6 +1169,15 @@ export default function App() {
                 </div>
               </div>
 
+              <NotationSpine
+                musicTimeline={musicTimeline}
+                gestureTimeline={gestureTimeline}
+                motionReport={motionReport}
+                motionTimeMs={motionTimeMs}
+                modeLabel="Project"
+                variant="compact"
+              />
+
               <div className="project-custody-card">
                 <label htmlFor="project-file-name">Project file</label>
                 <div className="project-row console-project-row">
@@ -1114,6 +1230,15 @@ export default function App() {
                   </select>
                 </div>
               </div>
+
+              <NotationSpine
+                musicTimeline={musicTimeline}
+                gestureTimeline={gestureTimeline}
+                motionReport={motionReport}
+                motionTimeMs={motionTimeMs}
+                modeLabel="Diagnostics"
+                variant="compact"
+              />
 
               <section className="report-card diagnostics-report-card">
                 <h3>{activeDiagnosticLabel}</h3>
