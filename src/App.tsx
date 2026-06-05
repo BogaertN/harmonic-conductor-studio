@@ -13,13 +13,11 @@ import {
   getCurrentMusicTimeline,
   getCurrentProjectScore,
   getCurrentResonanceLevelBundle,
-  listSavedProjects,
-  openProjectByFileName,
-  saveCurrentProjectAs,
   getGeneratedConductorMotionReport,
   getGestureVocabulary,
-  getSeedResonanceLevelBundle,
+  listSavedProjects,
   loadSeedMusicProject,
+  openProjectByFileName,
   playCurrentProjectCombinedAudio,
   playCurrentProjectConductorAudio,
   playCurrentProjectMusicAudio,
@@ -38,6 +36,7 @@ import {
   renderSeedMusicWav,
   resetCurrentGestureTimelineToStandardPath,
   resetCurrentMusicToSeed,
+  saveCurrentProjectAs,
   stopPlayback,
   type ConductorMappingReport,
   type ConductorMotionPoint,
@@ -47,12 +46,35 @@ import {
   type MusicTimelineReport,
   type PlaybackReport,
   type PreviewReport,
-  type ProjectListReport,
   type ProjectFileReport,
+  type ProjectListReport,
   type ResonanceLevelBundle,
   type StopReport,
   type WavRenderReport
 } from "./bridge/tauriCommands";
+
+type OperatorTab = "perform" | "project" | "music" | "conductor" | "diagnostics";
+type DiagnosticKey =
+  | "projectReport"
+  | "projectList"
+  | "motionReport"
+  | "mappingReport"
+  | "musicTimeline"
+  | "gestureTimeline"
+  | "playbackReport"
+  | "stopReport"
+  | "musicReport"
+  | "rustPreview"
+  | "audioDevice"
+  | "gestureWav"
+  | "musicWav"
+  | "combinedWav"
+  | "currentProjectMusicWav"
+  | "currentProjectCombinedWav"
+  | "mappedWav"
+  | "currentScore"
+  | "defaultScore"
+  | "vocabulary";
 
 const musicAppendPlan = [
   { label: "Lead C4", trackId: "lead_voice", midiNote: 60, durationMs: 714, velocity: 0.82 },
@@ -74,6 +96,29 @@ const gestureAppendPlan = [
   { id: "g7", operator: "gather", durationMs: 360, intensity: 0.56 },
   { id: "g9", operator: "formed_hold", durationMs: 520, intensity: 0.62 },
   { id: "g8", operator: "emit", durationMs: 480, intensity: 0.52 }
+];
+
+const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
+  { key: "projectReport", label: "Project File Report" },
+  { key: "projectList", label: "Project List" },
+  { key: "motionReport", label: "Conductor Motion" },
+  { key: "mappingReport", label: "Conductor Mapping" },
+  { key: "musicTimeline", label: "Music Timeline" },
+  { key: "gestureTimeline", label: "Gesture Timeline" },
+  { key: "playbackReport", label: "Playback" },
+  { key: "stopReport", label: "Stop Report" },
+  { key: "musicReport", label: "Music Preview" },
+  { key: "rustPreview", label: "Rust Preview" },
+  { key: "audioDevice", label: "Audio Device" },
+  { key: "gestureWav", label: "Gesture WAV" },
+  { key: "musicWav", label: "Music WAV" },
+  { key: "combinedWav", label: "Combined WAV" },
+  { key: "currentProjectMusicWav", label: "Current Music WAV" },
+  { key: "currentProjectCombinedWav", label: "Current Combined WAV" },
+  { key: "mappedWav", label: "Generated Mapped WAV" },
+  { key: "currentScore", label: "Current .hfield Score" },
+  { key: "defaultScore", label: "Default .hfield Score" },
+  { key: "vocabulary", label: "Nine-Gesture Vocabulary" }
 ];
 
 function getMotionPoint(report: ConductorMotionReport | null, timeMs: number): ConductorMotionPoint | null {
@@ -127,6 +172,45 @@ function conductorPointToSvg(point: ConductorMotionPoint | null) {
   };
 }
 
+function formatMs(ms: number | undefined) {
+  if (!ms) {
+    return "0.000s";
+  }
+
+  return `${(ms / 1000).toFixed(3)}s`;
+}
+
+function TabButton({
+  tab,
+  activeTab,
+  setActiveTab,
+  children
+}: {
+  tab: OperatorTab;
+  activeTab: OperatorTab;
+  setActiveTab: (tab: OperatorTab) => void;
+  children: string;
+}) {
+  return (
+    <button
+      className={activeTab === tab ? "tab-button active" : "tab-button"}
+      onClick={() => setActiveTab(tab)}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function StatusChip({ label, value }: { label: string; value: string | number }) {
+  return (
+    <span className="status-chip">
+      <strong>{label}</strong>
+      <em>{value}</em>
+    </span>
+  );
+}
+
 function VisibleConductorMotion({
   report,
   timeMs,
@@ -152,15 +236,17 @@ function VisibleConductorMotion({
       .join(" ") ?? "";
 
   return (
-    <div className="motion-stage">
-      <div className="motion-toolbar">
-        <button onClick={onPlay} disabled={!report || report.event_count === 0 || isPlaying}>
-          Animate Motion
+    <div className="motion-stage performance-motion-stage">
+      <div className="motion-toolbar compact-toolbar">
+        <button onClick={onPlay} disabled={!report || report.event_count === 0 || isPlaying} type="button">
+          Animate
         </button>
-        <button onClick={onStop} disabled={!isPlaying}>
+        <button onClick={onStop} disabled={!isPlaying} type="button">
           Stop Motion
         </button>
-        <button onClick={onReset}>Reset Motion</button>
+        <button onClick={onReset} type="button">
+          Reset
+        </button>
       </div>
 
       <svg viewBox="0 0 1000 600" role="img" aria-label="Visible conductor motion field">
@@ -209,6 +295,8 @@ function VisibleConductorMotion({
 }
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState<OperatorTab>("perform");
+  const [selectedDiagnostic, setSelectedDiagnostic] = useState<DiagnosticKey>("motionReport");
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
   const [resonanceBundle, setResonanceBundle] = useState<ResonanceLevelBundle | null>(null);
@@ -297,6 +385,7 @@ export default function App() {
     setError(null);
     try {
       setProjectList(await listSavedProjects());
+      setSelectedDiagnostic("projectList");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -308,6 +397,7 @@ export default function App() {
       const saved = await saveCurrentProjectAs(projectFileName);
       setProjectReport(saved);
       setProjectList(await listSavedProjects());
+      setSelectedDiagnostic("projectReport");
       await refreshAllCurrentProjectViews();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -322,6 +412,7 @@ export default function App() {
       setProjectFileName(opened.file_name);
       setProjectReport(opened);
       setProjectList(await listSavedProjects());
+      setSelectedDiagnostic("projectReport");
       await refreshAllCurrentProjectViews();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -335,6 +426,7 @@ export default function App() {
       setVocabulary(await getGestureVocabulary());
       setReport(await previewScoreReport());
       setDeviceReport(await getAudioDeviceReport());
+      setSelectedDiagnostic("rustPreview");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -345,13 +437,9 @@ export default function App() {
     try {
       setSeedMusicScore(await loadSeedMusicProject());
       setMusicReport(await previewSeedMusicReport());
-      setResonanceBundle(await getSeedResonanceLevelBundle());
-      setGestureTimeline(await getCurrentGestureTimeline());
-      setMusicTimeline(await getCurrentMusicTimeline());
-      setMappingReport(await getCurrentConductorMappingReport());
-      setMotionReport(await getCurrentConductorMotionReport());
+      await refreshAllCurrentProjectViews();
       setProjectList(await listSavedProjects());
-      resetMotionAnimation();
+      setSelectedDiagnostic("musicReport");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -361,6 +449,7 @@ export default function App() {
     setError(null);
     try {
       setMusicTimeline(await getCurrentMusicTimeline());
+      setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -372,6 +461,8 @@ export default function App() {
       setMusicTimeline(await appendNoteToCurrentTrack(trackId, midiNote, durationMs, velocity));
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -383,6 +474,8 @@ export default function App() {
       setMusicTimeline(await clearCurrentMusicTrack(trackId));
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -394,6 +487,8 @@ export default function App() {
       setMusicTimeline(await resetCurrentMusicToSeed());
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -404,6 +499,7 @@ export default function App() {
     try {
       setGestureTimeline(await getCurrentGestureTimeline());
       setMotionReport(await getCurrentConductorMotionReport());
+      setSelectedDiagnostic("gestureTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -414,6 +510,8 @@ export default function App() {
     try {
       setGestureTimeline(await appendGestureToCurrentScore(gestureId, durationMs, intensity, operator));
       setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setSelectedDiagnostic("gestureTimeline");
       resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -425,6 +523,8 @@ export default function App() {
     try {
       setGestureTimeline(await clearCurrentGestureTimeline());
       setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setSelectedDiagnostic("gestureTimeline");
       resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -436,6 +536,8 @@ export default function App() {
     try {
       setGestureTimeline(await resetCurrentGestureTimelineToStandardPath());
       setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setSelectedDiagnostic("gestureTimeline");
       resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -446,6 +548,7 @@ export default function App() {
     setError(null);
     try {
       setMappingReport(await getCurrentConductorMappingReport());
+      setSelectedDiagnostic("mappingReport");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -455,10 +558,8 @@ export default function App() {
     setError(null);
     try {
       setMappingReport(await applyGeneratedConductorMappingToCurrentScore());
-      setGestureTimeline(await getCurrentGestureTimeline());
-      setMotionReport(await getCurrentConductorMotionReport());
-      setSeedMusicScore(await getCurrentProjectScore());
-      resetMotionAnimation();
+      await refreshAllCurrentProjectViews();
+      setSelectedDiagnostic("mappingReport");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -468,6 +569,7 @@ export default function App() {
     setError(null);
     try {
       setMotionReport(await getCurrentConductorMotionReport());
+      setSelectedDiagnostic("motionReport");
       resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -478,6 +580,7 @@ export default function App() {
     setError(null);
     try {
       setMotionReport(await getGeneratedConductorMotionReport());
+      setSelectedDiagnostic("motionReport");
       resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -489,6 +592,7 @@ export default function App() {
     try {
       setPlaybackReport(await playGeneratedConductorMappingAudio());
       setMotionReport(await getGeneratedConductorMotionReport());
+      setSelectedDiagnostic("playbackReport");
       resetMotionAnimation();
       setIsMotionPlaying(true);
     } catch (err) {
@@ -501,6 +605,7 @@ export default function App() {
     try {
       setPlaybackReport(await playGeneratedMappedCombinedAudio());
       setMotionReport(await getGeneratedConductorMotionReport());
+      setSelectedDiagnostic("playbackReport");
       resetMotionAnimation();
       setIsMotionPlaying(true);
     } catch (err) {
@@ -512,6 +617,7 @@ export default function App() {
     setError(null);
     try {
       setMappedWavReport(await renderGeneratedMappedCombinedWav());
+      setSelectedDiagnostic("mappedWav");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -521,6 +627,7 @@ export default function App() {
     setError(null);
     try {
       setWavReport(await renderFirstGestureWav());
+      setSelectedDiagnostic("gestureWav");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -530,6 +637,7 @@ export default function App() {
     setError(null);
     try {
       setMusicWavReport(await renderSeedMusicWav());
+      setSelectedDiagnostic("musicWav");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -539,6 +647,7 @@ export default function App() {
     setError(null);
     try {
       setCombinedWavReport(await renderSeedCombinedWav());
+      setSelectedDiagnostic("combinedWav");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -548,6 +657,7 @@ export default function App() {
     setError(null);
     try {
       setCurrentProjectWavReport(await renderCurrentProjectCombinedWav());
+      setSelectedDiagnostic("currentProjectCombinedWav");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -557,6 +667,7 @@ export default function App() {
     setError(null);
     try {
       setCurrentProjectMusicWavReport(await renderCurrentProjectMusicWav());
+      setSelectedDiagnostic("currentProjectMusicWav");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -566,6 +677,7 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playFirstGestureAudio());
+      setSelectedDiagnostic("playbackReport");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -575,6 +687,7 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playSeedMusicAudio());
+      setSelectedDiagnostic("playbackReport");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -584,6 +697,7 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playSeedCombinedAudio());
+      setSelectedDiagnostic("playbackReport");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -593,6 +707,7 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playCurrentProjectMusicAudio());
+      setSelectedDiagnostic("playbackReport");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -603,6 +718,7 @@ export default function App() {
     try {
       setPlaybackReport(await playCurrentProjectConductorAudio());
       setMotionReport(await getCurrentConductorMotionReport());
+      setSelectedDiagnostic("playbackReport");
       resetMotionAnimation();
       setIsMotionPlaying(true);
     } catch (err) {
@@ -615,6 +731,7 @@ export default function App() {
     try {
       setPlaybackReport(await playCurrentProjectCombinedAudio());
       setMotionReport(await getCurrentConductorMotionReport());
+      setSelectedDiagnostic("playbackReport");
       resetMotionAnimation();
       setIsMotionPlaying(true);
     } catch (err) {
@@ -626,305 +743,335 @@ export default function App() {
     setError(null);
     try {
       setStopReport(await stopPlayback());
+      setSelectedDiagnostic("stopReport");
       stopMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
   }
 
+  const currentDuration = motionReport?.total_duration_ms ?? musicTimeline?.total_duration_ms ?? 0;
+  const currentProjectTitle = projectReport?.title ?? musicReport?.title ?? "No project loaded";
+  const currentProjectStatus = projectReport ? `${projectReport.file_name}` : "unsaved session";
+  const currentNoteCount = musicTimeline?.total_note_count ?? projectReport?.note_count ?? 0;
+  const currentGestureCount = gestureTimeline?.event_count ?? projectReport?.conductor_event_count ?? motionReport?.event_count ?? 0;
+  const alignmentStatus = mappingReport?.alignment_status ?? "not generated";
+
+  function diagnosticPayload() {
+    switch (selectedDiagnostic) {
+      case "projectReport":
+        return projectReport;
+      case "projectList":
+        return projectList;
+      case "motionReport":
+        return motionReport;
+      case "mappingReport":
+        return mappingReport;
+      case "musicTimeline":
+        return musicTimeline;
+      case "gestureTimeline":
+        return gestureTimeline;
+      case "playbackReport":
+        return playbackReport;
+      case "stopReport":
+        return stopReport;
+      case "musicReport":
+        return musicReport;
+      case "rustPreview":
+        return report;
+      case "audioDevice":
+        return deviceReport;
+      case "gestureWav":
+        return wavReport;
+      case "musicWav":
+        return musicWavReport;
+      case "combinedWav":
+        return combinedWavReport;
+      case "currentProjectMusicWav":
+        return currentProjectMusicWavReport;
+      case "currentProjectCombinedWav":
+        return currentProjectWavReport;
+      case "mappedWav":
+        return mappedWavReport;
+      case "currentScore":
+        return seedMusicScore;
+      case "defaultScore":
+        return score;
+      case "vocabulary":
+        return vocabulary;
+      default:
+        return null;
+    }
+  }
+
+  const activeDiagnosticLabel =
+    diagnosticOptions.find((option) => option.key === selectedDiagnostic)?.label ?? "Diagnostic";
+
   return (
-    <main className="app-shell">
-      <section className="hero">
+    <main className="app-shell workstation-shell">
+      <section className="hero compact-hero">
         <p className="eyebrow">AI.Web Native Desktop Application</p>
         <h1>Harmonic Conductor Studio</h1>
         <p>
-          A conducted music system where one source score can open through
-          beginner, note-name, conductor, accessibility, mapping, visible motion, and professional views.
+          Professional conductor workspace for mapped music, visible motion, project custody, and operator-grade playback.
         </p>
       </section>
 
-      <section className="grid">
-        <div className="panel conductor-stage">
-          <h2>Conductor Field</h2>
-          <div className="field">
-            <div className="row upper"><span>g7</span><strong>g9</strong><span>g8</span></div>
-            <div className="row center"><span>g2</span><strong>g1</strong><span>g3</span></div>
-            <div className="row lower"><span>g4</span><strong>g5</strong><span>g6</span></div>
-          </div>
-          <p className="note">Center = 1 home/root. Lower = 5 depth/weight. Upper = 9 lift/expression.</p>
-        </div>
+      <section className="workstation-grid">
+        <section className="stage-column">
+          <div className="panel stage-panel">
+            <div className="stage-header">
+              <div>
+                <p className="eyebrow">Live Field</p>
+                <h2>{currentProjectTitle}</h2>
+                <p className="note">{currentProjectStatus}</p>
+              </div>
+              <div className="status-chip-row">
+                <StatusChip label="Duration" value={formatMs(currentDuration)} />
+                <StatusChip label="Notes" value={currentNoteCount} />
+                <StatusChip label="Gestures" value={currentGestureCount} />
+                <StatusChip label="Alignment" value={alignmentStatus} />
+              </div>
+            </div>
 
-        <div className="panel">
-          <h2>Native Core Proof</h2>
-          <div className="button-row">
-            <button onClick={runPreview}>Run Rust Preview</button>
-            <button onClick={renderWav}>Render Gesture WAV</button>
-            <button onClick={playAudio}>Play Gesture Audio</button>
-            <button className="danger" onClick={stopAudio}>Stop Playback</button>
-          </div>
-
-
-          <h2>Project Save/Open v1</h2>
-          <div className="project-row">
-            <input
-              value={projectFileName}
-              onChange={(event) => setProjectFileName(event.target.value)}
-              aria-label="Project file name"
-              placeholder="project_name.hfield"
+            <VisibleConductorMotion
+              report={motionReport}
+              timeMs={motionTimeMs}
+              isPlaying={isMotionPlaying}
+              onPlay={startMotionAnimation}
+              onStop={stopMotionAnimation}
+              onReset={resetMotionAnimation}
             />
-            <button onClick={saveProject}>Save Current .hfield</button>
-            <button onClick={() => openProject()}>Open .hfield</button>
-            <button onClick={refreshProjectList}>List Projects</button>
           </div>
 
-          {projectList && (
-            <div className="project-list">
-              <strong>Saved Projects: {projectList.project_count}</strong>
-              {projectList.projects.map((project) => (
-                <button
-                  key={project.file_name}
-                  onClick={() => openProject(project.file_name)}
-                  title={project.path}
+          {resonanceBundle && (
+            <div className="panel performance-summary-panel">
+              <div className="summary-grid">
+                <section>
+                  <h3>Source</h3>
+                  <p>{resonanceBundle.piece_title}</p>
+                  <p className="note">
+                    {resonanceBundle.source_summary.tempo_bpm} BPM · {resonanceBundle.source_summary.meter} · {resonanceBundle.source_summary.total_note_count} notes · {resonanceBundle.source_summary.conductor_event_count} gestures
+                  </p>
+                </section>
+                <section>
+                  <h3>Current Gesture</h3>
+                  <p>{getActiveEvent(motionReport, motionTimeMs)?.gesture_name ?? "No active gesture"}</p>
+                  <p className="note">{getActiveEvent(motionReport, motionTimeMs)?.motion_label ?? "Load or map a project."}</p>
+                </section>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <aside className="panel operator-console" aria-label="Operator console">
+          <div className="console-header">
+            <div>
+              <p className="eyebrow">Operator Console</p>
+              <h2>{activeTab[0].toUpperCase() + activeTab.slice(1)}</h2>
+            </div>
+            <button className="danger transport-stop" onClick={stopAudio} type="button">
+              Stop
+            </button>
+          </div>
+
+          <nav className="tab-strip" aria-label="Operator console tabs">
+            <TabButton tab="perform" activeTab={activeTab} setActiveTab={setActiveTab}>Perform</TabButton>
+            <TabButton tab="project" activeTab={activeTab} setActiveTab={setActiveTab}>Project</TabButton>
+            <TabButton tab="music" activeTab={activeTab} setActiveTab={setActiveTab}>Music</TabButton>
+            <TabButton tab="conductor" activeTab={activeTab} setActiveTab={setActiveTab}>Conductor</TabButton>
+            <TabButton tab="diagnostics" activeTab={activeTab} setActiveTab={setActiveTab}>Diagnostics</TabButton>
+          </nav>
+
+          {error && <pre className="error console-error">{error}</pre>}
+
+          {activeTab === "perform" && (
+            <div className="tab-panel">
+              <div className="control-section primary-control-section">
+                <h3>Live Transport</h3>
+                <div className="button-grid primary-buttons">
+                  <button onClick={loadSeedMusic} type="button">Load Seed</button>
+                  <button onClick={applyGeneratedMapping} type="button">Apply Mapping</button>
+                  <button onClick={playCurrentCombinedAudio} type="button">Play Current</button>
+                  <button onClick={playGeneratedCombined} type="button">Play Generated</button>
+                  <button onClick={startMotionAnimation} disabled={!motionReport} type="button">Animate</button>
+                  <button onClick={resetMotionAnimation} type="button">Reset Motion</button>
+                </div>
+              </div>
+
+              <div className="control-section">
+                <h3>Quick State</h3>
+                <div className="quick-state-grid">
+                  <StatusChip label="Project" value={currentProjectStatus} />
+                  <StatusChip label="Playback" value={playbackReport?.status ?? "idle"} />
+                  <StatusChip label="Motion" value={isMotionPlaying ? "running" : "ready"} />
+                  <StatusChip label="Warnings" value={motionReport?.warnings.length ?? 0} />
+                </div>
+              </div>
+
+              <div className="control-section compact-actions">
+                <h3>Common Actions</h3>
+                <div className="button-row">
+                  <button onClick={() => openProject()} type="button">Open Named Project</button>
+                  <button onClick={saveProject} type="button">Save Current</button>
+                  <button onClick={refreshAllCurrentProjectViews} type="button">Refresh Views</button>
+                  <button onClick={runPreview} type="button">Run System Preview</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "project" && (
+            <div className="tab-panel">
+              <div className="control-section">
+                <h3>Project Custody</h3>
+                <div className="project-row console-project-row">
+                  <input
+                    value={projectFileName}
+                    onChange={(event) => setProjectFileName(event.target.value)}
+                    aria-label="Project file name"
+                    placeholder="project_name.hfield"
+                  />
+                  <button onClick={saveProject} type="button">Save</button>
+                  <button onClick={() => openProject()} type="button">Open</button>
+                  <button onClick={refreshProjectList} type="button">List</button>
+                </div>
+              </div>
+
+              {projectList && (
+                <div className="control-section">
+                  <h3>Saved Projects</h3>
+                  <div className="project-list compact-project-list">
+                    {projectList.projects.length === 0 && <span className="note">No saved .hfield projects found.</span>}
+                    {projectList.projects.map((project) => (
+                      <button
+                        key={project.file_name}
+                        onClick={() => openProject(project.file_name)}
+                        title={project.path}
+                        type="button"
+                      >
+                        {project.file_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="control-section report-card">
+                <h3>Last Project Report</h3>
+                <pre>{JSON.stringify(projectReport ?? "No project save/open report yet.", null, 2)}</pre>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "music" && (
+            <div className="tab-panel">
+              <div className="control-section">
+                <h3>Music Playback</h3>
+                <div className="button-row">
+                  <button onClick={playMusicAudio} type="button">Play Seed Music</button>
+                  <button onClick={playCurrentMusicAudio} type="button">Play Current Music</button>
+                  <button onClick={renderMusicWav} type="button">Render Seed WAV</button>
+                  <button onClick={renderCurrentMusicWav} type="button">Render Current WAV</button>
+                </div>
+              </div>
+
+              <div className="control-section">
+                <h3>Music Timeline</h3>
+                <div className="button-row">
+                  <button onClick={refreshMusicTimeline} type="button">Refresh Timeline</button>
+                  <button onClick={resetMusicNotes} type="button">Reset Seed Notes</button>
+                  <button onClick={() => clearMusicTrack("lead_voice")} type="button">Clear Lead</button>
+                  <button onClick={() => clearMusicTrack("depth_voice")} type="button">Clear Depth</button>
+                  <button onClick={() => clearMusicTrack("field_voice")} type="button">Clear Field</button>
+                </div>
+              </div>
+
+              <div className="control-section">
+                <h3>Append Notes</h3>
+                <div className="button-grid small-button-grid">
+                  {musicAppendPlan.map((note) => (
+                    <button
+                      key={`${note.trackId}-${note.midiNote}-${note.label}`}
+                      onClick={() => appendMusicNote(note.trackId, note.midiNote, note.durationMs, note.velocity)}
+                      type="button"
+                    >
+                      {note.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "conductor" && (
+            <div className="tab-panel">
+              <div className="control-section">
+                <h3>Mapping and Motion</h3>
+                <div className="button-row">
+                  <button onClick={generateMappingReport} type="button">Generate Mapping</button>
+                  <button onClick={applyGeneratedMapping} type="button">Apply Mapping</button>
+                  <button onClick={previewGeneratedMotion} type="button">Preview Motion</button>
+                  <button onClick={refreshCurrentMotion} type="button">Refresh Motion</button>
+                  <button onClick={renderGeneratedMappedWav} type="button">Render Mapped WAV</button>
+                </div>
+              </div>
+
+              <div className="control-section">
+                <h3>Conductor Playback</h3>
+                <div className="button-row">
+                  <button onClick={playGeneratedConductor} type="button">Play Generated Conductor</button>
+                  <button onClick={playGeneratedCombined} type="button">Play Generated Combined</button>
+                  <button onClick={playCurrentConductorAudio} type="button">Play Current Conductor</button>
+                  <button onClick={playCurrentCombinedAudio} type="button">Play Current Combined</button>
+                  <button onClick={renderCurrentProjectWav} type="button">Render Current Combined</button>
+                </div>
+              </div>
+
+              <div className="control-section">
+                <h3>Gesture Timeline</h3>
+                <div className="button-row">
+                  <button onClick={refreshTimeline} type="button">Refresh Timeline</button>
+                  <button onClick={resetTimeline} type="button">Reset Standard</button>
+                  <button onClick={clearTimeline} type="button">Clear Timeline</button>
+                </div>
+                <div className="button-grid small-button-grid">
+                  {gestureAppendPlan.map((gesture) => (
+                    <button
+                      key={gesture.id}
+                      onClick={() => appendGesture(gesture.id, gesture.durationMs, gesture.intensity, gesture.operator)}
+                      type="button"
+                    >
+                      {gesture.id}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "diagnostics" && (
+            <div className="tab-panel diagnostics-panel">
+              <div className="control-section diagnostics-selector-row">
+                <label htmlFor="diagnostic-select">Report</label>
+                <select
+                  id="diagnostic-select"
+                  value={selectedDiagnostic}
+                  onChange={(event) => setSelectedDiagnostic(event.target.value as DiagnosticKey)}
                 >
-                  Open {project.file_name}
-                </button>
-              ))}
+                  {diagnosticOptions.map((option) => (
+                    <option key={option.key} value={option.key}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="control-section report-card diagnostics-report-card">
+                <h3>{activeDiagnosticLabel}</h3>
+                <pre>{JSON.stringify(diagnosticPayload() ?? "No data loaded for this report yet.", null, 2)}</pre>
+              </div>
             </div>
           )}
-
-          <h2>Music Engine v1</h2>
-          <div className="button-row">
-            <button onClick={loadSeedMusic}>Load Seed Music + Levels</button>
-            <button onClick={playMusicAudio}>Play Music Seed</button>
-            <button onClick={playCombinedAudio}>Play Music + Conductor</button>
-            <button onClick={renderMusicWav}>Render Music WAV</button>
-            <button onClick={renderCombinedWav}>Render Combined WAV</button>
-          </div>
-
-          <h2>Music Note Timeline v1</h2>
-          <div className="button-row">
-            <button onClick={refreshMusicTimeline}>Refresh Music Timeline</button>
-            <button onClick={resetMusicNotes}>Reset Seed Notes</button>
-            <button onClick={() => clearMusicTrack("lead_voice")}>Clear Lead Track</button>
-            <button onClick={() => clearMusicTrack("depth_voice")}>Clear Depth Track</button>
-            <button onClick={() => clearMusicTrack("field_voice")}>Clear Field Track</button>
-            <button onClick={playCurrentMusicAudio}>Play Current Music</button>
-            <button onClick={renderCurrentMusicWav}>Render Current Music WAV</button>
-          </div>
-
-          <div className="button-row music-note-row">
-            {musicAppendPlan.map((note) => (
-              <button
-                key={`${note.trackId}-${note.midiNote}-${note.label}`}
-                onClick={() => appendMusicNote(note.trackId, note.midiNote, note.durationMs, note.velocity)}
-              >
-                Append {note.label}
-              </button>
-            ))}
-          </div>
-
-          <h2>Conductor Mapping v1</h2>
-          <div className="button-row mapping-row">
-            <button onClick={generateMappingReport}>Generate Mapping Report</button>
-            <button onClick={applyGeneratedMapping}>Apply Generated Mapping</button>
-            <button onClick={playGeneratedConductor}>Play Generated Conductor</button>
-            <button onClick={playGeneratedCombined}>Play Generated Music + Conductor</button>
-            <button onClick={renderGeneratedMappedWav}>Render Generated Mapped WAV</button>
-          </div>
-
-          <h2>Visible Hand Motion v1</h2>
-          <div className="button-row motion-row">
-            <button onClick={refreshCurrentMotion}>Refresh Current Motion</button>
-            <button onClick={previewGeneratedMotion}>Preview Generated Motion</button>
-          </div>
-
-          <VisibleConductorMotion
-            report={motionReport}
-            timeMs={motionTimeMs}
-            isPlaying={isMotionPlaying}
-            onPlay={startMotionAnimation}
-            onStop={stopMotionAnimation}
-            onReset={resetMotionAnimation}
-          />
-
-          <h2>Gesture Timeline v1</h2>
-          <div className="button-row">
-            <button onClick={refreshTimeline}>Refresh Timeline</button>
-            <button onClick={resetTimeline}>Reset Standard Path</button>
-            <button onClick={clearTimeline}>Clear Timeline</button>
-            <button onClick={playCurrentConductorAudio}>Play Current Conductor</button>
-            <button onClick={playCurrentCombinedAudio}>Play Current Music + Conductor</button>
-            <button onClick={renderCurrentProjectWav}>Render Current Combined WAV</button>
-          </div>
-
-          <div className="button-row gesture-row">
-            {gestureAppendPlan.map((gesture) => (
-              <button
-                key={gesture.id}
-                onClick={() => appendGesture(gesture.id, gesture.durationMs, gesture.intensity, gesture.operator)}
-              >
-                Append {gesture.id}
-              </button>
-            ))}
-          </div>
-
-          {error && <pre className="error">{error}</pre>}
-
-
-          {projectReport && (
-            <>
-              <h3>Project File Report</h3>
-              <pre>{JSON.stringify(projectReport, null, 2)}</pre>
-            </>
-          )}
-
-          {projectList && (
-            <>
-              <h3>Project List Report</h3>
-              <pre>{JSON.stringify(projectList, null, 2)}</pre>
-            </>
-          )}
-
-          {motionReport && (
-            <>
-              <h3>Conductor Motion Report</h3>
-              <pre>{JSON.stringify(motionReport, null, 2)}</pre>
-            </>
-          )}
-
-          {mappingReport && (
-            <>
-              <h3>Conductor Mapping Report</h3>
-              <pre>{JSON.stringify(mappingReport, null, 2)}</pre>
-            </>
-          )}
-
-          {musicTimeline && (
-            <>
-              <h3>Music Note Timeline Report</h3>
-              <pre>{JSON.stringify(musicTimeline, null, 2)}</pre>
-            </>
-          )}
-
-          {gestureTimeline && (
-            <>
-              <h3>Gesture Timeline Report</h3>
-              <pre>{JSON.stringify(gestureTimeline, null, 2)}</pre>
-            </>
-          )}
-
-          {Boolean(deviceReport) && (
-            <>
-              <h3>Audio Device</h3>
-              <pre>{JSON.stringify(deviceReport, null, 2)}</pre>
-            </>
-          )}
-
-          {playbackReport && (
-            <>
-              <h3>Native Playback</h3>
-              <pre>{JSON.stringify(playbackReport, null, 2)}</pre>
-            </>
-          )}
-
-          {stopReport && (
-            <>
-              <h3>Stop Report</h3>
-              <pre>{JSON.stringify(stopReport, null, 2)}</pre>
-            </>
-          )}
-
-          {musicReport && (
-            <>
-              <h3>Music Preview</h3>
-              <pre>{JSON.stringify(musicReport, null, 2)}</pre>
-            </>
-          )}
-
-          {report && (
-            <>
-              <h3>Rust Preview</h3>
-              <pre>{JSON.stringify(report, null, 2)}</pre>
-            </>
-          )}
-
-          {wavReport && (
-            <>
-              <h3>Gesture WAV Render</h3>
-              <pre>{JSON.stringify(wavReport, null, 2)}</pre>
-            </>
-          )}
-
-          {musicWavReport && (
-            <>
-              <h3>Music WAV Render</h3>
-              <pre>{JSON.stringify(musicWavReport, null, 2)}</pre>
-            </>
-          )}
-
-          {combinedWavReport && (
-            <>
-              <h3>Combined WAV Render</h3>
-              <pre>{JSON.stringify(combinedWavReport, null, 2)}</pre>
-            </>
-          )}
-
-          {currentProjectMusicWavReport && (
-            <>
-              <h3>Current Project Music WAV Render</h3>
-              <pre>{JSON.stringify(currentProjectMusicWavReport, null, 2)}</pre>
-            </>
-          )}
-
-          {currentProjectWavReport && (
-            <>
-              <h3>Current Project Combined WAV Render</h3>
-              <pre>{JSON.stringify(currentProjectWavReport, null, 2)}</pre>
-            </>
-          )}
-
-          {mappedWavReport && (
-            <>
-              <h3>Generated Mapped Combined WAV Render</h3>
-              <pre>{JSON.stringify(mappedWavReport, null, 2)}</pre>
-            </>
-          )}
-        </div>
-
-        {resonanceBundle && (
-          <div className="panel wide">
-            <h2>Resonance Level View v1</h2>
-            <p className="note">One source score. Multiple playable views. Same resonance identity.</p>
-
-            <div className="level-grid">
-              <section><h3>Source Summary</h3><pre>{JSON.stringify(resonanceBundle.source_summary, null, 2)}</pre></section>
-              <section><h3>Beginner View</h3><pre>{JSON.stringify(resonanceBundle.beginner_view, null, 2)}</pre></section>
-              <section><h3>Note Name View</h3><pre>{JSON.stringify(resonanceBundle.note_name_view, null, 2)}</pre></section>
-              <section><h3>Conductor View</h3><pre>{JSON.stringify(resonanceBundle.conductor_view, null, 2)}</pre></section>
-            </div>
-
-            <h3>Accessibility Guidance</h3>
-            <pre>{JSON.stringify(resonanceBundle.accessibility_guidance, null, 2)}</pre>
-
-            <h3>Professional Boundary</h3>
-            <pre>{resonanceBundle.professional_boundary}</pre>
-          </div>
-        )}
-
-        <div className="panel wide">
-          <h2>Default .hfield Score</h2>
-          <pre>{score ? JSON.stringify(score, null, 2) : "Run preview to load the default native score."}</pre>
-        </div>
-
-        <div className="panel wide">
-          <h2>Seed Music .hfield Score</h2>
-          <pre>{seedMusicScore ? JSON.stringify(seedMusicScore, null, 2) : "Load seed music to see the first note-based HCS score."}</pre>
-        </div>
-
-        <div className="panel wide">
-          <h2>Nine-Gesture Vocabulary</h2>
-          <pre>{vocabulary ? JSON.stringify(vocabulary, null, 2) : "Run preview to load the native gesture vocabulary."}</pre>
-        </div>
+        </aside>
       </section>
     </main>
   );

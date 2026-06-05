@@ -7,3 +7,5 @@
 *.log
 .DS_Store
 exports/audio/*.wav
+/projects/*.hfield
+/projects/*.hfield.tmp
