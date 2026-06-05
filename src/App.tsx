@@ -967,7 +967,7 @@ export default function App() {
         <div className="brand-block">
           <p className="eyebrow">AI.Web Native Desktop Application</p>
           <h1>Harmonic Conductor Studio</h1>
-          <p>Professional workstation shell for composing, conducting, rehearsing, performing, and project custody.</p>
+          <p>Professional workstation for composition, notation, conducting, rehearsal, performance, and .hfield custody.</p>
         </div>
 
         <div className="global-status-strip" aria-label="Project status">
@@ -1024,6 +1024,20 @@ export default function App() {
                 modeLabel="Compose"
                 variant="compose"
               />
+
+              <section className="composer-tool-dock" aria-label="Composer workstation tool dock">
+                <div className="tool-card primary-tool-card">
+                  <p className="eyebrow">Composer Tool Dock</p>
+                  <h3>Professional Score Tools</h3>
+                  <p className="note">Reserved workstation zones for the tools a composer expects: notation, piano roll, tracks, mixer, palettes, import/export, shortcuts, and measure tools.</p>
+                </div>
+                <div className="tool-card"><strong>Notation</strong><span>staff, clef, rests, ties, slurs, dynamics</span></div>
+                <div className="tool-card"><strong>Piano Roll</strong><span>pitch grid, duration, velocity, lanes</span></div>
+                <div className="tool-card"><strong>Tracks</strong><span>lead, depth, field, conductor cue strip</span></div>
+                <div className="tool-card"><strong>Palette</strong><span>articulations, markings, symbols, rehearsal marks</span></div>
+                <div className="tool-card"><strong>Mixer</strong><span>voice balance, conductor layer, instrument buses</span></div>
+                <div className="tool-card"><strong>Import / Export</strong><span>MIDI, MusicXML, WAV, .hfield custody</span></div>
+              </section>
 
               <div className="composition-grid">
                 <section className="notation-board">
@@ -1336,6 +1350,18 @@ export default function App() {
                   <span><strong>MIDI</strong>{selectedNote?.midi_note ?? "—"}</span>
                   <span><strong>Frequency</strong>{selectedNote ? `${selectedNote.frequency_hz.toFixed(2)} Hz` : "—"}</span>
                   <span><strong>Lane</strong>{selectedNote?.resonance_lane ?? "—"}</span>
+                </div>
+              </section>
+
+              <section className="control-section composer-bench-section">
+                <h3>Composer Workbench</h3>
+                <div className="composer-bench-grid" aria-label="Professional composer tool placeholders">
+                  <span>Score</span>
+                  <span>Palette</span>
+                  <span>Mixer</span>
+                  <span>Tracks</span>
+                  <span>Shortcuts</span>
+                  <span>Export</span>
                 </div>
               </section>
 
