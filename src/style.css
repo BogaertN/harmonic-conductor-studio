@@ -218,3 +218,100 @@ button.danger:hover {
 .mapping-row button {
   min-width: 150px;
 }
+
+
+.motion-row {
+  border-top: 1px solid rgba(231, 216, 164, 0.18);
+  padding-top: 0.75rem;
+}
+
+.motion-stage {
+  margin: 0.75rem 0 1rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(231, 216, 164, 0.16);
+  border-radius: 16px;
+  background: rgba(5, 7, 12, 0.38);
+}
+
+.motion-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.motion-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.motion-stage svg {
+  width: 100%;
+  min-height: 260px;
+  display: block;
+}
+
+.motion-bg {
+  fill: rgba(18, 20, 30, 0.78);
+  stroke: rgba(231, 216, 164, 0.16);
+  stroke-width: 2;
+}
+
+.motion-guide {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 3;
+}
+
+.motion-anchor {
+  fill: rgba(231, 216, 164, 0.14);
+  stroke: rgba(231, 216, 164, 0.5);
+  stroke-width: 2;
+}
+
+.motion-label,
+.motion-hand-label {
+  fill: #fff7df;
+  font-weight: 800;
+  font-size: 26px;
+}
+
+.motion-event {
+  fill: rgba(255, 255, 255, 0.18);
+  stroke: rgba(231, 216, 164, 0.25);
+  stroke-width: 2;
+}
+
+.motion-event.active {
+  fill: rgba(231, 216, 164, 0.42);
+  stroke: rgba(231, 216, 164, 0.95);
+  stroke-width: 4;
+}
+
+.motion-path {
+  fill: none;
+  stroke: rgba(231, 216, 164, 0.54);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.motion-hand-glow {
+  fill: rgba(231, 216, 164, 0.18);
+}
+
+.motion-hand {
+  fill: #f4df9b;
+  stroke: #fff7df;
+  stroke-width: 4;
+}
+
+.motion-readout {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  color: #d9d5c9;
+}
+
+.motion-readout strong {
+  color: #fff7df;
+}

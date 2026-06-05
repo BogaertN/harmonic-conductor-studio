@@ -61,6 +61,46 @@ export type StopReport = {
   message: string;
 };
 
+export type ConductorMotionPoint = {
+  time_ms: number;
+  time_seconds: number;
+  x: number;
+  y: number;
+  gesture_id: string;
+  event_index: number;
+  field_region: string;
+  intensity: number;
+};
+
+export type ConductorMotionReport = {
+  strategy: string;
+  track_id: string;
+  event_count: number;
+  total_duration_ms: number;
+  total_duration_seconds: number;
+  event_views: Array<{
+    event_index: number;
+    gesture_id: string;
+    gesture_name: string;
+    operator: string | null;
+    field_region: string;
+    anchor: string;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    start_seconds: number;
+    duration_seconds: number;
+    start_x: number;
+    start_y: number;
+    target_x: number;
+    target_y: number;
+    intensity: number;
+    motion_label: string;
+  }>;
+  sampled_points: ConductorMotionPoint[];
+  warnings: string[];
+};
+
 export type ConductorMappingReport = {
   strategy: string;
   piece_title: string;
@@ -202,12 +242,12 @@ export async function getSeedResonanceLevelBundle(): Promise<ResonanceLevelBundl
   return await invoke<ResonanceLevelBundle>("get_seed_resonance_level_bundle");
 }
 
-export async function loadSeedMusicProject(): Promise<unknown> {
-  return await invoke("load_seed_music_project");
+export async function getCurrentConductorMotionReport(): Promise<ConductorMotionReport> {
+  return await invoke<ConductorMotionReport>("get_current_conductor_motion_report");
 }
 
-export async function getCurrentProjectScore(): Promise<unknown> {
-  return await invoke("get_current_project_score");
+export async function getGeneratedConductorMotionReport(): Promise<ConductorMotionReport> {
+  return await invoke<ConductorMotionReport>("get_generated_conductor_motion_report");
 }
 
 export async function getCurrentConductorMappingReport(): Promise<ConductorMappingReport> {
@@ -228,6 +268,14 @@ export async function playGeneratedMappedCombinedAudio(): Promise<PlaybackReport
 
 export async function renderGeneratedMappedCombinedWav(): Promise<WavRenderReport> {
   return await invoke<WavRenderReport>("render_generated_mapped_combined_wav");
+}
+
+export async function loadSeedMusicProject(): Promise<unknown> {
+  return await invoke("load_seed_music_project");
+}
+
+export async function getCurrentProjectScore(): Promise<unknown> {
+  return await invoke("get_current_project_score");
 }
 
 export async function getCurrentMusicTimeline(): Promise<MusicTimelineReport> {

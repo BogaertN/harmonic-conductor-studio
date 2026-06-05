@@ -12,6 +12,7 @@ use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
 use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
 use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
+use hfield_visual::create_conductor_motion_report;
 use serde_json::json;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -246,6 +247,37 @@ fn stop_existing_playback(state: &AppState) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn get_current_conductor_motion_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_conductor_motion_report(&guard))
+        .map_err(|err| format!("conductor motion serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn get_generated_conductor_motion_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    apply_generated_mapping(&mut score);
+
+    serde_json::to_value(create_conductor_motion_report(&score))
+        .map_err(|err| format!("generated conductor motion serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -994,6 +1026,8 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            get_current_conductor_motion_report,
+            get_generated_conductor_motion_report,
             get_current_conductor_mapping_report,
             apply_generated_conductor_mapping_to_current_score,
             play_generated_conductor_mapping_audio,

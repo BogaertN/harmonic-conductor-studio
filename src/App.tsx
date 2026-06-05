@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   appendGestureToCurrentScore,
   appendNoteToCurrentTrack,
@@ -8,8 +8,11 @@ import {
   createDefaultScore,
   getAudioDeviceReport,
   getCurrentConductorMappingReport,
+  getCurrentConductorMotionReport,
   getCurrentGestureTimeline,
   getCurrentMusicTimeline,
+  getCurrentProjectScore,
+  getGeneratedConductorMotionReport,
   getGestureVocabulary,
   getSeedResonanceLevelBundle,
   loadSeedMusicProject,
@@ -33,6 +36,8 @@ import {
   resetCurrentMusicToSeed,
   stopPlayback,
   type ConductorMappingReport,
+  type ConductorMotionPoint,
+  type ConductorMotionReport,
   type GestureTimelineReport,
   type MusicPreviewReport,
   type MusicTimelineReport,
@@ -65,6 +70,138 @@ const gestureAppendPlan = [
   { id: "g8", operator: "emit", durationMs: 480, intensity: 0.52 }
 ];
 
+function getMotionPoint(report: ConductorMotionReport | null, timeMs: number): ConductorMotionPoint | null {
+  if (!report || report.sampled_points.length === 0) {
+    return null;
+  }
+
+  const points = report.sampled_points;
+  if (timeMs <= points[0].time_ms) {
+    return points[0];
+  }
+
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const next = points[index];
+
+    if (timeMs <= next.time_ms) {
+      const span = Math.max(1, next.time_ms - previous.time_ms);
+      const amount = (timeMs - previous.time_ms) / span;
+
+      return {
+        ...next,
+        time_ms: timeMs,
+        time_seconds: Math.round((timeMs / 1000) * 1000) / 1000,
+        x: previous.x + (next.x - previous.x) * amount,
+        y: previous.y + (next.y - previous.y) * amount,
+        intensity: previous.intensity + (next.intensity - previous.intensity) * amount
+      };
+    }
+  }
+
+  return points[points.length - 1];
+}
+
+function getActiveEvent(report: ConductorMotionReport | null, timeMs: number) {
+  if (!report) {
+    return null;
+  }
+
+  return (
+    report.event_views.find((event) => timeMs >= event.start_ms && timeMs <= event.end_ms) ??
+    report.event_views[report.event_views.length - 1] ??
+    null
+  );
+}
+
+function conductorPointToSvg(point: ConductorMotionPoint | null) {
+  return {
+    x: (point?.x ?? 0.5) * 1000,
+    y: (point?.y ?? 0.5) * 600
+  };
+}
+
+function VisibleConductorMotion({
+  report,
+  timeMs,
+  isPlaying,
+  onPlay,
+  onStop,
+  onReset
+}: {
+  report: ConductorMotionReport | null;
+  timeMs: number;
+  isPlaying: boolean;
+  onPlay: () => void;
+  onStop: () => void;
+  onReset: () => void;
+}) {
+  const activePoint = useMemo(() => getMotionPoint(report, timeMs), [report, timeMs]);
+  const activeEvent = useMemo(() => getActiveEvent(report, timeMs), [report, timeMs]);
+  const marker = conductorPointToSvg(activePoint);
+
+  const pathPoints =
+    report?.sampled_points
+      .map((point) => `${Math.round(point.x * 1000)},${Math.round(point.y * 600)}`)
+      .join(" ") ?? "";
+
+  return (
+    <div className="motion-stage">
+      <div className="motion-toolbar">
+        <button onClick={onPlay} disabled={!report || report.event_count === 0 || isPlaying}>
+          Animate Motion
+        </button>
+        <button onClick={onStop} disabled={!isPlaying}>
+          Stop Motion
+        </button>
+        <button onClick={onReset}>Reset Motion</button>
+      </div>
+
+      <svg viewBox="0 0 1000 600" role="img" aria-label="Visible conductor motion field">
+        <rect className="motion-bg" x="0" y="0" width="1000" height="600" rx="26" />
+        <line className="motion-guide" x1="160" y1="90" x2="840" y2="90" />
+        <line className="motion-guide" x1="160" y1="300" x2="840" y2="300" />
+        <line className="motion-guide" x1="160" y1="510" x2="840" y2="510" />
+
+        <circle className="motion-anchor" cx="500" cy="90" r="42" />
+        <text className="motion-label" x="500" y="99" textAnchor="middle">9</text>
+
+        <circle className="motion-anchor" cx="500" cy="300" r="42" />
+        <text className="motion-label" x="500" y="309" textAnchor="middle">1</text>
+
+        <circle className="motion-anchor" cx="500" cy="510" r="42" />
+        <text className="motion-label" x="500" y="519" textAnchor="middle">5</text>
+
+        {report?.event_views.map((event) => (
+          <circle
+            key={`${event.event_index}-${event.gesture_id}`}
+            className={activeEvent?.event_index === event.event_index ? "motion-event active" : "motion-event"}
+            cx={event.target_x * 1000}
+            cy={event.target_y * 600}
+            r={10 + event.intensity * 12}
+          />
+        ))}
+
+        {pathPoints && <polyline className="motion-path" points={pathPoints} />}
+
+        <circle className="motion-hand-glow" cx={marker.x} cy={marker.y} r="42" />
+        <circle className="motion-hand" cx={marker.x} cy={marker.y} r="18" />
+        <text className="motion-hand-label" x={marker.x} y={marker.y + 5} textAnchor="middle">
+          {activePoint?.gesture_id ?? "g1"}
+        </text>
+      </svg>
+
+      <div className="motion-readout">
+        <strong>{activeEvent ? `${activeEvent.gesture_id} — ${activeEvent.gesture_name}` : "No motion loaded"}</strong>
+        <span>{activeEvent?.motion_label ?? "Load or generate a conductor motion report."}</span>
+        <span>
+          time {Math.round(timeMs)} ms / {report?.total_duration_ms ?? 0} ms
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
@@ -72,6 +209,12 @@ export default function App() {
   const [musicTimeline, setMusicTimeline] = useState<MusicTimelineReport | null>(null);
   const [gestureTimeline, setGestureTimeline] = useState<GestureTimelineReport | null>(null);
   const [mappingReport, setMappingReport] = useState<ConductorMappingReport | null>(null);
+  const [motionReport, setMotionReport] = useState<ConductorMotionReport | null>(null);
+  const [motionTimeMs, setMotionTimeMs] = useState(0);
+  const [isMotionPlaying, setIsMotionPlaying] = useState(false);
+  const motionStartRef = useRef(0);
+  const wallClockStartRef = useRef(0);
+
   const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
   const [musicWavReport, setMusicWavReport] = useState<WavRenderReport | null>(null);
   const [combinedWavReport, setCombinedWavReport] = useState<WavRenderReport | null>(null);
@@ -85,6 +228,50 @@ export default function App() {
   const [score, setScore] = useState<unknown>(null);
   const [seedMusicScore, setSeedMusicScore] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isMotionPlaying || !motionReport) {
+      return undefined;
+    }
+
+    let animationFrame = 0;
+
+    const tick = (now: number) => {
+      const elapsed = now - wallClockStartRef.current;
+      const nextTime = Math.min(motionStartRef.current + elapsed, motionReport.total_duration_ms);
+      setMotionTimeMs(nextTime);
+
+      if (nextTime >= motionReport.total_duration_ms) {
+        setIsMotionPlaying(false);
+        return;
+      }
+
+      animationFrame = requestAnimationFrame(tick);
+    };
+
+    wallClockStartRef.current = performance.now();
+    animationFrame = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+    };
+  }, [isMotionPlaying, motionReport]);
+
+  function startMotionAnimation() {
+    motionStartRef.current = motionTimeMs;
+    setIsMotionPlaying(true);
+  }
+
+  function stopMotionAnimation() {
+    motionStartRef.current = motionTimeMs;
+    setIsMotionPlaying(false);
+  }
+
+  function resetMotionAnimation() {
+    motionStartRef.current = 0;
+    setMotionTimeMs(0);
+    setIsMotionPlaying(false);
+  }
 
   async function runPreview() {
     setError(null);
@@ -107,6 +294,8 @@ export default function App() {
       setGestureTimeline(await getCurrentGestureTimeline());
       setMusicTimeline(await getCurrentMusicTimeline());
       setMappingReport(await getCurrentConductorMappingReport());
+      setMotionReport(await getCurrentConductorMotionReport());
+      resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -126,6 +315,7 @@ export default function App() {
     try {
       setMusicTimeline(await appendNoteToCurrentTrack(trackId, midiNote, durationMs, velocity));
       setMappingReport(await getCurrentConductorMappingReport());
+      setMotionReport(await getCurrentConductorMotionReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -136,6 +326,7 @@ export default function App() {
     try {
       setMusicTimeline(await clearCurrentMusicTrack(trackId));
       setMappingReport(await getCurrentConductorMappingReport());
+      setMotionReport(await getCurrentConductorMotionReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -146,6 +337,7 @@ export default function App() {
     try {
       setMusicTimeline(await resetCurrentMusicToSeed());
       setMappingReport(await getCurrentConductorMappingReport());
+      setMotionReport(await getCurrentConductorMotionReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -155,6 +347,7 @@ export default function App() {
     setError(null);
     try {
       setGestureTimeline(await getCurrentGestureTimeline());
+      setMotionReport(await getCurrentConductorMotionReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -164,6 +357,8 @@ export default function App() {
     setError(null);
     try {
       setGestureTimeline(await appendGestureToCurrentScore(gestureId, durationMs, intensity, operator));
+      setMotionReport(await getCurrentConductorMotionReport());
+      resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -173,6 +368,8 @@ export default function App() {
     setError(null);
     try {
       setGestureTimeline(await clearCurrentGestureTimeline());
+      setMotionReport(await getCurrentConductorMotionReport());
+      resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -182,6 +379,8 @@ export default function App() {
     setError(null);
     try {
       setGestureTimeline(await resetCurrentGestureTimelineToStandardPath());
+      setMotionReport(await getCurrentConductorMotionReport());
+      resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -201,6 +400,29 @@ export default function App() {
     try {
       setMappingReport(await applyGeneratedConductorMappingToCurrentScore());
       setGestureTimeline(await getCurrentGestureTimeline());
+      setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      resetMotionAnimation();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function refreshCurrentMotion() {
+    setError(null);
+    try {
+      setMotionReport(await getCurrentConductorMotionReport());
+      resetMotionAnimation();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function previewGeneratedMotion() {
+    setError(null);
+    try {
+      setMotionReport(await getGeneratedConductorMotionReport());
+      resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -210,6 +432,9 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playGeneratedConductorMappingAudio());
+      setMotionReport(await getGeneratedConductorMotionReport());
+      resetMotionAnimation();
+      setIsMotionPlaying(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -219,6 +444,9 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playGeneratedMappedCombinedAudio());
+      setMotionReport(await getGeneratedConductorMotionReport());
+      resetMotionAnimation();
+      setIsMotionPlaying(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -318,6 +546,9 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playCurrentProjectConductorAudio());
+      setMotionReport(await getCurrentConductorMotionReport());
+      resetMotionAnimation();
+      setIsMotionPlaying(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -327,6 +558,9 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playCurrentProjectCombinedAudio());
+      setMotionReport(await getCurrentConductorMotionReport());
+      resetMotionAnimation();
+      setIsMotionPlaying(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -336,6 +570,7 @@ export default function App() {
     setError(null);
     try {
       setStopReport(await stopPlayback());
+      stopMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -348,7 +583,7 @@ export default function App() {
         <h1>Harmonic Conductor Studio</h1>
         <p>
           A conducted music system where one source score can open through
-          beginner, note-name, conductor, accessibility, mapping, and professional views.
+          beginner, note-name, conductor, accessibility, mapping, visible motion, and professional views.
         </p>
       </section>
 
@@ -412,6 +647,21 @@ export default function App() {
             <button onClick={renderGeneratedMappedWav}>Render Generated Mapped WAV</button>
           </div>
 
+          <h2>Visible Hand Motion v1</h2>
+          <div className="button-row motion-row">
+            <button onClick={refreshCurrentMotion}>Refresh Current Motion</button>
+            <button onClick={previewGeneratedMotion}>Preview Generated Motion</button>
+          </div>
+
+          <VisibleConductorMotion
+            report={motionReport}
+            timeMs={motionTimeMs}
+            isPlaying={isMotionPlaying}
+            onPlay={startMotionAnimation}
+            onStop={stopMotionAnimation}
+            onReset={resetMotionAnimation}
+          />
+
           <h2>Gesture Timeline v1</h2>
           <div className="button-row">
             <button onClick={refreshTimeline}>Refresh Timeline</button>
@@ -434,6 +684,13 @@ export default function App() {
           </div>
 
           {error && <pre className="error">{error}</pre>}
+
+          {motionReport && (
+            <>
+              <h3>Conductor Motion Report</h3>
+              <pre>{JSON.stringify(motionReport, null, 2)}</pre>
+            </>
+          )}
 
           {mappingReport && (
             <>
