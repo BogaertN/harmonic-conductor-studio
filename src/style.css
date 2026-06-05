@@ -1019,3 +1019,310 @@ body {
     justify-content: flex-start;
   }
 }
+
+/* === HCS Compose Notation Focus Repair v1 ===
+   Purpose:
+   - Do NOT remove modes.
+   - Do NOT hide score spine from Conduct/Rehearse/Perform/Project.
+   - Make Compose the big professional music-composition surface.
+   - Keep the workstation readable on normal desktop windows.
+*/
+:root {
+  --hcs-rail-width: 148px;
+  --hcs-inspector-width: 380px;
+  --hcs-score-ink: #fff8dd;
+  --hcs-score-muted: #e3d6b8;
+  --hcs-staff-strong: rgba(255, 248, 221, 0.58);
+  --hcs-staff-soft: rgba(255, 248, 221, 0.32);
+}
+
+body {
+  min-width: 0 !important;
+  overflow-x: hidden;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: none;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.top-status-bar {
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 1.35fr) auto !important;
+  overflow: hidden;
+}
+
+.brand-block,
+.global-status-strip,
+.global-transport {
+  min-width: 0;
+}
+
+.brand-block h1 {
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.05;
+}
+
+.workstation-frame {
+  grid-template-columns: var(--hcs-rail-width) minmax(0, 1fr) var(--hcs-inspector-width) !important;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.mode-rail {
+  min-width: var(--hcs-rail-width);
+  width: var(--hcs-rail-width);
+  overflow: visible;
+}
+
+.mode-button {
+  width: 100%;
+  min-height: 54px;
+  padding: 0.74rem 0.85rem;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.14;
+  font-size: 0.92rem;
+}
+
+.main-workspace,
+.workspace-panel,
+.right-inspector {
+  min-width: 0;
+}
+
+.main-workspace {
+  overflow: auto;
+}
+
+/* Compose owns the big notation surface. */
+.compose-workspace {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, auto);
+  align-content: start;
+}
+
+.compose-workspace .notation-spine-compose {
+  min-height: 620px !important;
+  margin-top: 0.9rem;
+  margin-bottom: 1.1rem;
+  border-width: 1.5px;
+}
+
+.compose-workspace .notation-spine-compose .notation-score-window {
+  min-height: 500px !important;
+}
+
+.compose-workspace .notation-spine-compose .notation-staff-stack {
+  inset: 44px 20px 24px 20px;
+  gap: 1rem;
+}
+
+.compose-workspace .notation-spine-compose .notation-voice-row {
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.compose-workspace .notation-spine-compose .notation-staff-lane {
+  min-height: 132px;
+  background: rgba(255,255,255,0.028);
+}
+
+.compose-workspace .notation-spine-compose .notation-staff-line {
+  height: 2px;
+  background: var(--hcs-staff-strong);
+}
+
+.compose-workspace .notation-spine-compose .notation-voice-label strong {
+  font-size: 0.96rem;
+  color: var(--hcs-score-ink);
+}
+
+.compose-workspace .notation-spine-compose .notation-voice-label span {
+  font-size: 0.82rem;
+  color: var(--hcs-score-muted);
+}
+
+.compose-workspace .notation-spine-compose .notation-note {
+  min-width: 52px;
+  min-height: 32px;
+  font-size: 0.82rem;
+  border-color: rgba(255,255,255,0.55);
+}
+
+.compose-workspace .notation-spine-compose .notation-measure-ruler {
+  inset-left: 156px;
+  height: 38px;
+  font-size: 0.82rem;
+  color: var(--hcs-score-ink);
+}
+
+.compose-workspace .notation-spine-compose .notation-cue-strip {
+  min-height: 3rem;
+}
+
+.compose-workspace .notation-spine-compose .notation-cue {
+  font-size: 0.76rem;
+  padding: 0.45rem 0.62rem;
+}
+
+/* The secondary staff/piano-roll boards stay below the main staff, not above it. */
+.compose-workspace .composition-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr) !important;
+  align-items: start;
+  gap: 1rem;
+}
+
+.compose-workspace .notation-board,
+.compose-workspace .piano-roll-board {
+  min-height: 330px;
+}
+
+.compose-workspace .staff-system {
+  min-height: 270px;
+}
+
+/* If an earlier readability patch added a composer tool dock, keep it compact and below the true score spine. */
+.composer-tool-dock {
+  margin: 0.2rem 0 1rem !important;
+  padding: 0.75rem !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  max-height: none;
+}
+
+.composer-tool-dock .primary-tool-card {
+  grid-column: span 2;
+}
+
+.tool-card {
+  min-height: 58px !important;
+  padding: 0.65rem !important;
+}
+
+.tool-card p,
+.tool-card span {
+  line-height: 1.25;
+}
+
+/* Every music-reading mode keeps a score spine. */
+.conduct-workspace .notation-spine,
+.rehearse-workspace .notation-spine,
+.perform-workspace .notation-spine,
+.project-workspace .notation-spine {
+  display: grid !important;
+  min-height: 260px !important;
+}
+
+.conduct-workspace .notation-score-window,
+.rehearse-workspace .notation-score-window,
+.project-workspace .notation-score-window {
+  min-height: 185px !important;
+}
+
+.perform-workspace .notation-score-window {
+  min-height: 165px !important;
+}
+
+.conduct-workspace .notation-staff-line,
+.rehearse-workspace .notation-staff-line,
+.perform-workspace .notation-staff-line,
+.project-workspace .notation-staff-line {
+  background: var(--hcs-staff-soft);
+}
+
+/* Diagnostics can remain technical, but the score spine remains available without taking over the screen. */
+.diagnostics-workspace .notation-spine {
+  display: grid !important;
+  min-height: 220px !important;
+}
+
+.diagnostics-workspace .notation-score-window {
+  min-height: 150px !important;
+}
+
+/* Inspector and rail readability. */
+.right-inspector {
+  overflow: auto;
+}
+
+.inspector-header h2,
+.control-section h3 {
+  color: var(--hcs-score-ink);
+}
+
+.property-list span,
+.note,
+.lesson-row span {
+  color: var(--hcs-score-muted);
+}
+
+.small-button-grid button,
+.primary-buttons button,
+.compact-row button,
+.project-row button {
+  min-height: 42px;
+  white-space: normal;
+}
+
+@media (max-width: 1550px) {
+  :root {
+    --hcs-rail-width: 132px;
+    --hcs-inspector-width: 340px;
+  }
+
+  .top-status-bar {
+    grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr) auto !important;
+  }
+
+  .compose-workspace .notation-spine-compose {
+    min-height: 540px !important;
+  }
+
+  .compose-workspace .notation-spine-compose .notation-score-window {
+    min-height: 430px !important;
+  }
+
+  .compose-workspace .notation-spine-compose .notation-voice-row {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+
+  .compose-workspace .notation-spine-compose .notation-note {
+    min-width: 44px;
+    font-size: 0.74rem;
+  }
+
+  .composer-tool-dock {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .compose-workspace .composition-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 1250px) {
+  .workstation-frame {
+    grid-template-columns: 1fr !important;
+  }
+
+  .mode-rail {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .mode-button {
+    width: auto;
+    min-width: 120px;
+  }
+
+  .right-inspector {
+    min-height: 260px;
+  }
+}
