@@ -9,3 +9,4 @@
 exports/audio/*.wav
 /projects/*.hfield
 /projects/*.hfield.tmp
+projects/*.hfield

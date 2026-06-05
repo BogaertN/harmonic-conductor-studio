@@ -53,7 +53,7 @@ import {
   type WavRenderReport
 } from "./bridge/tauriCommands";
 
-type OperatorTab = "perform" | "project" | "music" | "conductor" | "diagnostics";
+type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "project" | "diagnostics";
 type DiagnosticKey =
   | "projectReport"
   | "projectList"
@@ -295,7 +295,7 @@ function VisibleConductorMotion({
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<OperatorTab>("perform");
+  const [activeTab, setActiveTab] = useState<OperatorTab>("compose");
   const [selectedDiagnostic, setSelectedDiagnostic] = useState<DiagnosticKey>("motionReport");
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
@@ -807,268 +807,450 @@ export default function App() {
   const activeDiagnosticLabel =
     diagnosticOptions.find((option) => option.key === selectedDiagnostic)?.label ?? "Diagnostic";
 
-  return (
-    <main className="app-shell workstation-shell">
-      <section className="hero compact-hero">
-        <p className="eyebrow">AI.Web Native Desktop Application</p>
-        <h1>Harmonic Conductor Studio</h1>
-        <p>
-          Professional conductor workspace for mapped music, visible motion, project custody, and operator-grade playback.
-        </p>
-      </section>
 
-      <section className="workstation-grid">
-        <section className="stage-column">
-          <div className="panel stage-panel">
-            <div className="stage-header">
-              <div>
-                <p className="eyebrow">Live Field</p>
-                <h2>{currentProjectTitle}</h2>
-                <p className="note">{currentProjectStatus}</p>
+  const activeModeLabel =
+    activeTab === "compose" ? "Compose" :
+    activeTab === "conduct" ? "Conduct" :
+    activeTab === "rehearse" ? "Rehearse" :
+    activeTab === "perform" ? "Perform" :
+    activeTab === "project" ? "Project" : "Diagnostics";
+
+  const leadTrack = musicTimeline?.tracks.find((track) => track.track_id === "lead_voice") ?? null;
+  const depthTrack = musicTimeline?.tracks.find((track) => track.track_id === "depth_voice") ?? null;
+  const fieldTrack = musicTimeline?.tracks.find((track) => track.track_id === "field_voice") ?? null;
+  const activeEvent = getActiveEvent(motionReport, motionTimeMs);
+  const selectedNote = leadTrack?.notes[0] ?? null;
+  const beginnerBlocks = resonanceBundle?.beginner_view.slice(0, 8) ?? [];
+  const conductorCues = resonanceBundle?.conductor_view.slice(0, 8) ?? [];
+
+  return (
+    <main className="app-shell workstation-shell shell-v2">
+      <header className="top-status-bar">
+        <div className="brand-block">
+          <p className="eyebrow">AI.Web Native Desktop Application</p>
+          <h1>Harmonic Conductor Studio</h1>
+          <p>Professional workstation shell for composing, conducting, rehearsing, performing, and project custody.</p>
+        </div>
+
+        <div className="global-status-strip" aria-label="Project status">
+          <StatusChip label="Mode" value={activeModeLabel} />
+          <StatusChip label="Project" value={currentProjectStatus} />
+          <StatusChip label="Duration" value={formatMs(currentDuration)} />
+          <StatusChip label="Notes" value={currentNoteCount} />
+          <StatusChip label="Gestures" value={currentGestureCount} />
+          <StatusChip label="Alignment" value={alignmentStatus} />
+        </div>
+
+        <div className="global-transport">
+          <button onClick={loadSeedMusic} type="button">Load</button>
+          <button onClick={applyGeneratedMapping} type="button">Map</button>
+          <button onClick={playCurrentCombinedAudio} type="button">Play</button>
+          <button className="danger" onClick={stopAudio} type="button">Stop</button>
+        </div>
+      </header>
+
+      <section className="workstation-frame">
+        <nav className="mode-rail" aria-label="Workspace modes">
+          <button className={activeTab === "compose" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("compose")} type="button">Compose</button>
+          <button className={activeTab === "conduct" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("conduct")} type="button">Conduct</button>
+          <button className={activeTab === "rehearse" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("rehearse")} type="button">Rehearse</button>
+          <button className={activeTab === "perform" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("perform")} type="button">Perform</button>
+          <button className={activeTab === "project" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("project")} type="button">Project</button>
+          <button className={activeTab === "diagnostics" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("diagnostics")} type="button">Diagnostics</button>
+        </nav>
+
+        <section className="main-workspace" aria-label={`${activeModeLabel} workspace`}>
+          {error && <pre className="error workspace-error">{error}</pre>}
+
+          {activeTab === "compose" && (
+            <div className="workspace-panel compose-workspace">
+              <div className="workspace-header-row">
+                <div>
+                  <p className="eyebrow">Composition Workspace</p>
+                  <h2>Notation and Timeline</h2>
+                  <p className="note">This is the primary creation surface. The notation, piano roll, track lanes, and conductor cue strip now own the biggest area.</p>
+                </div>
+                <div className="button-row compact-row">
+                  <button onClick={loadSeedMusic} type="button">Load Seed</button>
+                  <button onClick={refreshMusicTimeline} type="button">Refresh Notes</button>
+                  <button onClick={playCurrentMusicAudio} type="button">Play Music</button>
+                </div>
               </div>
-              <div className="status-chip-row">
-                <StatusChip label="Duration" value={formatMs(currentDuration)} />
-                <StatusChip label="Notes" value={currentNoteCount} />
-                <StatusChip label="Gestures" value={currentGestureCount} />
-                <StatusChip label="Alignment" value={alignmentStatus} />
+
+              <div className="composition-grid">
+                <section className="notation-board">
+                  <div className="board-title-row">
+                    <h3>Notation Staff</h3>
+                    <span>{musicTimeline?.meter ?? "4/4"} · {musicTimeline?.tempo_bpm ?? 84} BPM · {musicTimeline?.tuning_mode ?? "12-TET"}</span>
+                  </div>
+                  <div className="staff-system" aria-label="Notation staff placeholder">
+                    {[0, 1, 2, 3, 4].map((line) => <span key={line} className="staff-line" />)}
+                    {(leadTrack?.notes ?? []).slice(0, 15).map((note, index) => (
+                      <span
+                        key={`${note.start_ms}-${note.midi_note}-${index}`}
+                        className="staff-note"
+                        style={{ left: `${5 + index * 6}%`, top: `${60 - ((note.midi_note - 60) * 4)}%` }}
+                        title={`${note.note_name} beat ${note.start_beat}`}
+                      >
+                        {note.note_name}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="piano-roll-board">
+                  <div className="board-title-row">
+                    <h3>Piano Roll</h3>
+                    <span>Lead · Depth · Field</span>
+                  </div>
+
+                  {[leadTrack, depthTrack, fieldTrack].map((track) => (
+                    <div key={track?.track_id ?? "empty-track"} className="track-lane">
+                      <strong>{track?.track_id ?? "empty"}</strong>
+                      <div className="lane-notes">
+                        {(track?.notes ?? []).slice(0, 18).map((note, index) => (
+                          <span
+                            key={`${track?.track_id}-${note.start_ms}-${note.midi_note}-${index}`}
+                            className={`lane-note ${note.resonance_lane}`}
+                            style={{ width: `${Math.max(5, note.duration_beats * 8)}%` }}
+                            title={`${note.note_name} · ${note.frequency_hz.toFixed(2)} Hz`}
+                          >
+                            {note.note_name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              </div>
+
+              <section className="bottom-timeline-strip">
+                <div className="timeline-ruler">
+                  {[1, 2, 3, 4].map((measure) => <span key={measure}>M{measure}</span>)}
+                </div>
+                <div className="cue-strip">
+                  {(gestureTimeline?.events ?? []).slice(0, 15).map((gesture) => (
+                    <span key={`${gesture.event_index}-${gesture.gesture_id}`} className="cue-chip">
+                      {gesture.gesture_id} · {gesture.gesture_name}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === "conduct" && (
+            <div className="workspace-panel conduct-workspace">
+              <div className="workspace-header-row">
+                <div>
+                  <p className="eyebrow">Conduct Workspace</p>
+                  <h2>Motion Field and Gesture Path</h2>
+                  <p className="note">Music-to-conductor mapping, nine-field gesture motion, and visible path verification.</p>
+                </div>
+                <div className="button-row compact-row">
+                  <button onClick={previewGeneratedMotion} type="button">Preview Generated</button>
+                  <button onClick={applyGeneratedMapping} type="button">Apply Mapping</button>
+                  <button onClick={playGeneratedCombined} type="button">Play Generated</button>
+                </div>
+              </div>
+
+              <VisibleConductorMotion
+                report={motionReport}
+                timeMs={motionTimeMs}
+                isPlaying={isMotionPlaying}
+                onPlay={startMotionAnimation}
+                onStop={stopMotionAnimation}
+                onReset={resetMotionAnimation}
+              />
+
+              <div className="mapping-summary-grid">
+                <StatusChip label="Mapping" value={alignmentStatus} />
+                <StatusChip label="Generated" value={mappingReport?.generated_event_count ?? 0} />
+                <StatusChip label="Delta" value={`${mappingReport?.alignment_delta_ms ?? 0} ms`} />
+                <StatusChip label="Motion Events" value={motionReport?.event_count ?? 0} />
               </div>
             </div>
+          )}
 
-            <VisibleConductorMotion
-              report={motionReport}
-              timeMs={motionTimeMs}
-              isPlaying={isMotionPlaying}
-              onPlay={startMotionAnimation}
-              onStop={stopMotionAnimation}
-              onReset={resetMotionAnimation}
-            />
-          </div>
+          {activeTab === "rehearse" && (
+            <div className="workspace-panel rehearse-workspace">
+              <div className="workspace-header-row">
+                <div>
+                  <p className="eyebrow">Rehearsal Workspace</p>
+                  <h2>Same Song, Multiple Entry Levels</h2>
+                  <p className="note">Beginner blocks, note names, conductor cues, and accessibility guidance stay attached to the same .hfield source.</p>
+                </div>
+                <div className="button-row compact-row">
+                  <button onClick={loadSeedMusic} type="button">Load Lesson</button>
+                  <button onClick={playCurrentMusicAudio} type="button">Play Current Music</button>
+                  <button onClick={playCurrentCombinedAudio} type="button">Play With Conductor</button>
+                </div>
+              </div>
 
-          {resonanceBundle && (
-            <div className="panel performance-summary-panel">
-              <div className="summary-grid">
-                <section>
-                  <h3>Source</h3>
-                  <p>{resonanceBundle.piece_title}</p>
-                  <p className="note">
-                    {resonanceBundle.source_summary.tempo_bpm} BPM · {resonanceBundle.source_summary.meter} · {resonanceBundle.source_summary.total_note_count} notes · {resonanceBundle.source_summary.conductor_event_count} gestures
-                  </p>
+              <div className="rehearsal-grid">
+                <section className="rehearsal-card">
+                  <h3>Beginner View</h3>
+                  {beginnerBlocks.length === 0 && <p className="note">Load a project to see beginner guidance.</p>}
+                  {beginnerBlocks.map((block) => (
+                    <div key={block.block_index} className="lesson-row">
+                      <strong>{block.note_label}</strong>
+                      <span>{block.beginner_instruction}</span>
+                    </div>
+                  ))}
                 </section>
-                <section>
-                  <h3>Current Gesture</h3>
-                  <p>{getActiveEvent(motionReport, motionTimeMs)?.gesture_name ?? "No active gesture"}</p>
-                  <p className="note">{getActiveEvent(motionReport, motionTimeMs)?.motion_label ?? "Load or map a project."}</p>
+
+                <section className="rehearsal-card">
+                  <h3>Conductor Cues</h3>
+                  {conductorCues.length === 0 && <p className="note">Load or map a conductor path to see cues.</p>}
+                  {conductorCues.map((cue) => (
+                    <div key={cue.cue_index} className="lesson-row">
+                      <strong>{cue.gesture_id}</strong>
+                      <span>{cue.cue_text}</span>
+                    </div>
+                  ))}
+                </section>
+
+                <section className="rehearsal-card wide-card">
+                  <h3>Accessibility Guidance</h3>
+                  {(resonanceBundle?.accessibility_guidance ?? ["Load a project to see accessibility guidance."]).map((item) => (
+                    <p key={item} className="note">{item}</p>
+                  ))}
                 </section>
               </div>
             </div>
           )}
-        </section>
-
-        <aside className="panel operator-console" aria-label="Operator console">
-          <div className="console-header">
-            <div>
-              <p className="eyebrow">Operator Console</p>
-              <h2>{activeTab[0].toUpperCase() + activeTab.slice(1)}</h2>
-            </div>
-            <button className="danger transport-stop" onClick={stopAudio} type="button">
-              Stop
-            </button>
-          </div>
-
-          <nav className="tab-strip" aria-label="Operator console tabs">
-            <TabButton tab="perform" activeTab={activeTab} setActiveTab={setActiveTab}>Perform</TabButton>
-            <TabButton tab="project" activeTab={activeTab} setActiveTab={setActiveTab}>Project</TabButton>
-            <TabButton tab="music" activeTab={activeTab} setActiveTab={setActiveTab}>Music</TabButton>
-            <TabButton tab="conductor" activeTab={activeTab} setActiveTab={setActiveTab}>Conductor</TabButton>
-            <TabButton tab="diagnostics" activeTab={activeTab} setActiveTab={setActiveTab}>Diagnostics</TabButton>
-          </nav>
-
-          {error && <pre className="error console-error">{error}</pre>}
 
           {activeTab === "perform" && (
-            <div className="tab-panel">
-              <div className="control-section primary-control-section">
-                <h3>Live Transport</h3>
-                <div className="button-grid primary-buttons">
-                  <button onClick={loadSeedMusic} type="button">Load Seed</button>
-                  <button onClick={applyGeneratedMapping} type="button">Apply Mapping</button>
-                  <button onClick={playCurrentCombinedAudio} type="button">Play Current</button>
-                  <button onClick={playGeneratedCombined} type="button">Play Generated</button>
-                  <button onClick={startMotionAnimation} disabled={!motionReport} type="button">Animate</button>
-                  <button onClick={resetMotionAnimation} type="button">Reset Motion</button>
+            <div className="workspace-panel perform-workspace">
+              <div className="performance-stage-header">
+                <div>
+                  <p className="eyebrow">Live Performance</p>
+                  <h2>{currentProjectTitle}</h2>
+                  <p className="note">Minimal controls. Maximum visibility.</p>
+                </div>
+                <div className="button-row compact-row">
+                  <button onClick={playCurrentCombinedAudio} type="button">Play</button>
+                  <button className="danger" onClick={stopAudio} type="button">Stop</button>
+                  <button onClick={resetMotionAnimation} type="button">Reset</button>
                 </div>
               </div>
 
-              <div className="control-section">
-                <h3>Quick State</h3>
-                <div className="quick-state-grid">
-                  <StatusChip label="Project" value={currentProjectStatus} />
-                  <StatusChip label="Playback" value={playbackReport?.status ?? "idle"} />
-                  <StatusChip label="Motion" value={isMotionPlaying ? "running" : "ready"} />
-                  <StatusChip label="Warnings" value={motionReport?.warnings.length ?? 0} />
-                </div>
-              </div>
+              <VisibleConductorMotion
+                report={motionReport}
+                timeMs={motionTimeMs}
+                isPlaying={isMotionPlaying}
+                onPlay={startMotionAnimation}
+                onStop={stopMotionAnimation}
+                onReset={resetMotionAnimation}
+              />
 
-              <div className="control-section compact-actions">
-                <h3>Common Actions</h3>
-                <div className="button-row">
-                  <button onClick={() => openProject()} type="button">Open Named Project</button>
-                  <button onClick={saveProject} type="button">Save Current</button>
-                  <button onClick={refreshAllCurrentProjectViews} type="button">Refresh Views</button>
-                  <button onClick={runPreview} type="button">Run System Preview</button>
-                </div>
+              <div className="perform-readout-grid">
+                <section><strong>Current Gesture</strong><span>{activeEvent?.gesture_name ?? "No active gesture"}</span></section>
+                <section><strong>Time</strong><span>{Math.round(motionTimeMs)} / {currentDuration} ms</span></section>
+                <section><strong>Audio</strong><span>{playbackReport?.status ?? "idle"}</span></section>
               </div>
             </div>
           )}
 
           {activeTab === "project" && (
-            <div className="tab-panel">
-              <div className="control-section">
-                <h3>Project Custody</h3>
+            <div className="workspace-panel project-workspace">
+              <div className="workspace-header-row">
+                <div>
+                  <p className="eyebrow">Project Custody</p>
+                  <h2>Save, Open, Validate, Hash</h2>
+                  <p className="note">The .hfield project is the durable source of music, conductor mapping, and motion state.</p>
+                </div>
+              </div>
+
+              <div className="project-custody-card">
+                <label htmlFor="project-file-name">Project file</label>
                 <div className="project-row console-project-row">
                   <input
+                    id="project-file-name"
                     value={projectFileName}
                     onChange={(event) => setProjectFileName(event.target.value)}
                     aria-label="Project file name"
                     placeholder="project_name.hfield"
                   />
-                  <button onClick={saveProject} type="button">Save</button>
-                  <button onClick={() => openProject()} type="button">Open</button>
-                  <button onClick={refreshProjectList} type="button">List</button>
+                  <button onClick={saveProject} type="button">Save Current</button>
+                  <button onClick={() => openProject()} type="button">Open Named</button>
+                  <button onClick={refreshProjectList} type="button">List Projects</button>
                 </div>
               </div>
 
-              {projectList && (
-                <div className="control-section">
+              <div className="project-grid">
+                <section className="report-card">
                   <h3>Saved Projects</h3>
                   <div className="project-list compact-project-list">
-                    {projectList.projects.length === 0 && <span className="note">No saved .hfield projects found.</span>}
-                    {projectList.projects.map((project) => (
-                      <button
-                        key={project.file_name}
-                        onClick={() => openProject(project.file_name)}
-                        title={project.path}
-                        type="button"
-                      >
+                    {projectList?.projects.length === 0 && <span className="note">No saved .hfield projects found.</span>}
+                    {(projectList?.projects ?? []).map((project) => (
+                      <button key={project.file_name} onClick={() => openProject(project.file_name)} title={project.path} type="button">
                         {project.file_name}
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
+                </section>
 
-              <div className="control-section report-card">
-                <h3>Last Project Report</h3>
-                <pre>{JSON.stringify(projectReport ?? "No project save/open report yet.", null, 2)}</pre>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "music" && (
-            <div className="tab-panel">
-              <div className="control-section">
-                <h3>Music Playback</h3>
-                <div className="button-row">
-                  <button onClick={playMusicAudio} type="button">Play Seed Music</button>
-                  <button onClick={playCurrentMusicAudio} type="button">Play Current Music</button>
-                  <button onClick={renderMusicWav} type="button">Render Seed WAV</button>
-                  <button onClick={renderCurrentMusicWav} type="button">Render Current WAV</button>
-                </div>
-              </div>
-
-              <div className="control-section">
-                <h3>Music Timeline</h3>
-                <div className="button-row">
-                  <button onClick={refreshMusicTimeline} type="button">Refresh Timeline</button>
-                  <button onClick={resetMusicNotes} type="button">Reset Seed Notes</button>
-                  <button onClick={() => clearMusicTrack("lead_voice")} type="button">Clear Lead</button>
-                  <button onClick={() => clearMusicTrack("depth_voice")} type="button">Clear Depth</button>
-                  <button onClick={() => clearMusicTrack("field_voice")} type="button">Clear Field</button>
-                </div>
-              </div>
-
-              <div className="control-section">
-                <h3>Append Notes</h3>
-                <div className="button-grid small-button-grid">
-                  {musicAppendPlan.map((note) => (
-                    <button
-                      key={`${note.trackId}-${note.midiNote}-${note.label}`}
-                      onClick={() => appendMusicNote(note.trackId, note.midiNote, note.durationMs, note.velocity)}
-                      type="button"
-                    >
-                      {note.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "conductor" && (
-            <div className="tab-panel">
-              <div className="control-section">
-                <h3>Mapping and Motion</h3>
-                <div className="button-row">
-                  <button onClick={generateMappingReport} type="button">Generate Mapping</button>
-                  <button onClick={applyGeneratedMapping} type="button">Apply Mapping</button>
-                  <button onClick={previewGeneratedMotion} type="button">Preview Motion</button>
-                  <button onClick={refreshCurrentMotion} type="button">Refresh Motion</button>
-                  <button onClick={renderGeneratedMappedWav} type="button">Render Mapped WAV</button>
-                </div>
-              </div>
-
-              <div className="control-section">
-                <h3>Conductor Playback</h3>
-                <div className="button-row">
-                  <button onClick={playGeneratedConductor} type="button">Play Generated Conductor</button>
-                  <button onClick={playGeneratedCombined} type="button">Play Generated Combined</button>
-                  <button onClick={playCurrentConductorAudio} type="button">Play Current Conductor</button>
-                  <button onClick={playCurrentCombinedAudio} type="button">Play Current Combined</button>
-                  <button onClick={renderCurrentProjectWav} type="button">Render Current Combined</button>
-                </div>
-              </div>
-
-              <div className="control-section">
-                <h3>Gesture Timeline</h3>
-                <div className="button-row">
-                  <button onClick={refreshTimeline} type="button">Refresh Timeline</button>
-                  <button onClick={resetTimeline} type="button">Reset Standard</button>
-                  <button onClick={clearTimeline} type="button">Clear Timeline</button>
-                </div>
-                <div className="button-grid small-button-grid">
-                  {gestureAppendPlan.map((gesture) => (
-                    <button
-                      key={gesture.id}
-                      onClick={() => appendGesture(gesture.id, gesture.durationMs, gesture.intensity, gesture.operator)}
-                      type="button"
-                    >
-                      {gesture.id}
-                    </button>
-                  ))}
-                </div>
+                <section className="report-card">
+                  <h3>Last Project Report</h3>
+                  <pre>{JSON.stringify(projectReport ?? "No project save/open report yet.", null, 2)}</pre>
+                </section>
               </div>
             </div>
           )}
 
           {activeTab === "diagnostics" && (
-            <div className="tab-panel diagnostics-panel">
-              <div className="control-section diagnostics-selector-row">
-                <label htmlFor="diagnostic-select">Report</label>
-                <select
-                  id="diagnostic-select"
-                  value={selectedDiagnostic}
-                  onChange={(event) => setSelectedDiagnostic(event.target.value as DiagnosticKey)}
-                >
-                  {diagnosticOptions.map((option) => (
-                    <option key={option.key} value={option.key}>{option.label}</option>
-                  ))}
-                </select>
+            <div className="workspace-panel diagnostics-workspace">
+              <div className="workspace-header-row">
+                <div>
+                  <p className="eyebrow">Diagnostics</p>
+                  <h2>Single Report Viewer</h2>
+                  <p className="note">Technical reports are available, but no longer pollute the performance workspace.</p>
+                </div>
+                <div className="diagnostics-selector-row">
+                  <label htmlFor="diagnostic-select">Report</label>
+                  <select id="diagnostic-select" value={selectedDiagnostic} onChange={(event) => setSelectedDiagnostic(event.target.value as DiagnosticKey)}>
+                    {diagnosticOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                  </select>
+                </div>
               </div>
 
-              <div className="control-section report-card diagnostics-report-card">
+              <section className="report-card diagnostics-report-card">
                 <h3>{activeDiagnosticLabel}</h3>
                 <pre>{JSON.stringify(diagnosticPayload() ?? "No data loaded for this report yet.", null, 2)}</pre>
-              </div>
+              </section>
+            </div>
+          )}
+        </section>
+
+        <aside className="right-inspector" aria-label="Context inspector">
+          <div className="inspector-header">
+            <p className="eyebrow">Inspector</p>
+            <h2>{activeModeLabel}</h2>
+          </div>
+
+          {activeTab === "compose" && (
+            <div className="inspector-stack">
+              <section className="control-section">
+                <h3>Selected Note</h3>
+                <div className="property-list">
+                  <span><strong>Pitch</strong>{selectedNote?.note_name ?? "none"}</span>
+                  <span><strong>MIDI</strong>{selectedNote?.midi_note ?? "—"}</span>
+                  <span><strong>Frequency</strong>{selectedNote ? `${selectedNote.frequency_hz.toFixed(2)} Hz` : "—"}</span>
+                  <span><strong>Lane</strong>{selectedNote?.resonance_lane ?? "—"}</span>
+                </div>
+              </section>
+
+              <section className="control-section">
+                <h3>Add Notes</h3>
+                <div className="button-grid small-button-grid">
+                  {musicAppendPlan.map((note) => (
+                    <button key={`${note.trackId}-${note.midiNote}-${note.label}`} onClick={() => appendMusicNote(note.trackId, note.midiNote, note.durationMs, note.velocity)} type="button">
+                      {note.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="control-section">
+                <h3>Track Controls</h3>
+                <div className="button-row">
+                  <button onClick={resetMusicNotes} type="button">Reset Seed Notes</button>
+                  <button onClick={() => clearMusicTrack("lead_voice")} type="button">Clear Lead</button>
+                  <button onClick={() => clearMusicTrack("depth_voice")} type="button">Clear Depth</button>
+                  <button onClick={() => clearMusicTrack("field_voice")} type="button">Clear Field</button>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === "conduct" && (
+            <div className="inspector-stack">
+              <section className="control-section">
+                <h3>Mapping</h3>
+                <div className="button-row">
+                  <button onClick={generateMappingReport} type="button">Generate Report</button>
+                  <button onClick={applyGeneratedMapping} type="button">Apply Mapping</button>
+                  <button onClick={refreshCurrentMotion} type="button">Refresh Motion</button>
+                </div>
+              </section>
+              <section className="control-section">
+                <h3>Gesture Timeline</h3>
+                <div className="button-grid small-button-grid">
+                  {gestureAppendPlan.map((gesture) => (
+                    <button key={gesture.id} onClick={() => appendGesture(gesture.id, gesture.durationMs, gesture.intensity, gesture.operator)} type="button">{gesture.id}</button>
+                  ))}
+                </div>
+                <div className="button-row">
+                  <button onClick={resetTimeline} type="button">Reset Standard</button>
+                  <button onClick={clearTimeline} type="button">Clear</button>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === "rehearse" && (
+            <div className="inspector-stack">
+              <section className="control-section">
+                <h3>Practice Controls</h3>
+                <div className="button-row">
+                  <button onClick={playCurrentMusicAudio} type="button">Music Only</button>
+                  <button onClick={playCurrentCombinedAudio} type="button">With Conductor</button>
+                  <button onClick={stopAudio} type="button">Stop</button>
+                </div>
+              </section>
+              <section className="control-section">
+                <h3>Current Cue</h3>
+                <p>{activeEvent?.motion_label ?? "Load a project to see current cue."}</p>
+              </section>
+            </div>
+          )}
+
+          {activeTab === "perform" && (
+            <div className="inspector-stack">
+              <section className="control-section primary-control-section">
+                <h3>Live Transport</h3>
+                <div className="button-grid primary-buttons">
+                  <button onClick={playCurrentCombinedAudio} type="button">Play Current</button>
+                  <button onClick={playGeneratedCombined} type="button">Play Generated</button>
+                  <button className="danger" onClick={stopAudio} type="button">Stop</button>
+                  <button onClick={resetMotionAnimation} type="button">Reset Motion</button>
+                </div>
+              </section>
+              <section className="control-section">
+                <h3>Live State</h3>
+                <div className="quick-state-grid">
+                  <StatusChip label="Playback" value={playbackReport?.status ?? "idle"} />
+                  <StatusChip label="Motion" value={isMotionPlaying ? "running" : "ready"} />
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === "project" && (
+            <div className="inspector-stack">
+              <section className="control-section">
+                <h3>Validation</h3>
+                <div className="property-list">
+                  <span><strong>File</strong>{projectReport?.file_name ?? currentProjectStatus}</span>
+                  <span><strong>Score Hash</strong>{projectReport?.score_hash?.slice(0, 16) ?? "—"}</span>
+                  <span><strong>Warnings</strong>{projectReport?.warnings.length ?? 0}</span>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === "diagnostics" && (
+            <div className="inspector-stack">
+              <section className="control-section">
+                <h3>System Preview</h3>
+                <div className="button-row">
+                  <button onClick={runPreview} type="button">Run Preview</button>
+                  <button onClick={renderWav} type="button">Gesture WAV</button>
+                  <button onClick={renderCombinedWav} type="button">Seed Combined WAV</button>
+                  <button onClick={renderGeneratedMappedWav} type="button">Mapped WAV</button>
+                </div>
+              </section>
             </div>
           )}
         </aside>
@@ -1076,3 +1258,4 @@ export default function App() {
     </main>
   );
 }
+
