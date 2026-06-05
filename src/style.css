@@ -315,3 +315,47 @@ button.danger:hover {
 .motion-readout strong {
   color: #fff7df;
 }
+
+
+.project-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  border-top: 1px solid rgba(231, 216, 164, 0.18);
+  padding-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.project-row input {
+  min-width: 280px;
+  flex: 1;
+  background: rgba(5, 7, 12, 0.72);
+  color: #fff7df;
+  border: 1px solid rgba(231, 216, 164, 0.26);
+  border-radius: 10px;
+  padding: 0.62rem 0.75rem;
+  font: inherit;
+}
+
+.project-row input:focus {
+  outline: 2px solid rgba(231, 216, 164, 0.48);
+  outline-offset: 2px;
+}
+
+.project-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  margin: 0.35rem 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(231, 216, 164, 0.12);
+  border-radius: 14px;
+  background: rgba(5, 7, 12, 0.32);
+}
+
+.project-list strong {
+  color: #fff7df;
+  margin-right: 0.35rem;
+}

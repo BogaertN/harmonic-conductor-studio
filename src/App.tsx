@@ -12,6 +12,10 @@ import {
   getCurrentGestureTimeline,
   getCurrentMusicTimeline,
   getCurrentProjectScore,
+  getCurrentResonanceLevelBundle,
+  listSavedProjects,
+  openProjectByFileName,
+  saveCurrentProjectAs,
   getGeneratedConductorMotionReport,
   getGestureVocabulary,
   getSeedResonanceLevelBundle,
@@ -43,6 +47,8 @@ import {
   type MusicTimelineReport,
   type PlaybackReport,
   type PreviewReport,
+  type ProjectListReport,
+  type ProjectFileReport,
   type ResonanceLevelBundle,
   type StopReport,
   type WavRenderReport
@@ -211,6 +217,9 @@ export default function App() {
   const [mappingReport, setMappingReport] = useState<ConductorMappingReport | null>(null);
   const [motionReport, setMotionReport] = useState<ConductorMotionReport | null>(null);
   const [motionTimeMs, setMotionTimeMs] = useState(0);
+  const [projectFileName, setProjectFileName] = useState("ode_to_joy_mapped_v1.hfield");
+  const [projectReport, setProjectReport] = useState<ProjectFileReport | null>(null);
+  const [projectList, setProjectList] = useState<ProjectListReport | null>(null);
   const [isMotionPlaying, setIsMotionPlaying] = useState(false);
   const motionStartRef = useRef(0);
   const wallClockStartRef = useRef(0);
@@ -273,6 +282,52 @@ export default function App() {
     setIsMotionPlaying(false);
   }
 
+  async function refreshAllCurrentProjectViews() {
+    const currentScore = await getCurrentProjectScore();
+    setSeedMusicScore(currentScore);
+    setResonanceBundle(await getCurrentResonanceLevelBundle());
+    setMusicTimeline(await getCurrentMusicTimeline());
+    setGestureTimeline(await getCurrentGestureTimeline());
+    setMappingReport(await getCurrentConductorMappingReport());
+    setMotionReport(await getCurrentConductorMotionReport());
+    resetMotionAnimation();
+  }
+
+  async function refreshProjectList() {
+    setError(null);
+    try {
+      setProjectList(await listSavedProjects());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function saveProject() {
+    setError(null);
+    try {
+      const saved = await saveCurrentProjectAs(projectFileName);
+      setProjectReport(saved);
+      setProjectList(await listSavedProjects());
+      await refreshAllCurrentProjectViews();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function openProject(fileName?: string) {
+    setError(null);
+    try {
+      const target = fileName ?? projectFileName;
+      const opened = await openProjectByFileName(target);
+      setProjectFileName(opened.file_name);
+      setProjectReport(opened);
+      setProjectList(await listSavedProjects());
+      await refreshAllCurrentProjectViews();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function runPreview() {
     setError(null);
     try {
@@ -295,6 +350,7 @@ export default function App() {
       setMusicTimeline(await getCurrentMusicTimeline());
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
+      setProjectList(await listSavedProjects());
       resetMotionAnimation();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -607,6 +663,35 @@ export default function App() {
             <button className="danger" onClick={stopAudio}>Stop Playback</button>
           </div>
 
+
+          <h2>Project Save/Open v1</h2>
+          <div className="project-row">
+            <input
+              value={projectFileName}
+              onChange={(event) => setProjectFileName(event.target.value)}
+              aria-label="Project file name"
+              placeholder="project_name.hfield"
+            />
+            <button onClick={saveProject}>Save Current .hfield</button>
+            <button onClick={() => openProject()}>Open .hfield</button>
+            <button onClick={refreshProjectList}>List Projects</button>
+          </div>
+
+          {projectList && (
+            <div className="project-list">
+              <strong>Saved Projects: {projectList.project_count}</strong>
+              {projectList.projects.map((project) => (
+                <button
+                  key={project.file_name}
+                  onClick={() => openProject(project.file_name)}
+                  title={project.path}
+                >
+                  Open {project.file_name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <h2>Music Engine v1</h2>
           <div className="button-row">
             <button onClick={loadSeedMusic}>Load Seed Music + Levels</button>
@@ -684,6 +769,21 @@ export default function App() {
           </div>
 
           {error && <pre className="error">{error}</pre>}
+
+
+          {projectReport && (
+            <>
+              <h3>Project File Report</h3>
+              <pre>{JSON.stringify(projectReport, null, 2)}</pre>
+            </>
+          )}
+
+          {projectList && (
+            <>
+              <h3>Project List Report</h3>
+              <pre>{JSON.stringify(projectList, null, 2)}</pre>
+            </>
+          )}
 
           {motionReport && (
             <>

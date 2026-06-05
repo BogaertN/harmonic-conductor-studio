@@ -10,6 +10,7 @@ use hfield_dsp::{
 };
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
 use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
+use hfield_project::{list_hfield_projects, open_hfield_project, save_hfield_project};
 use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
 use hfield_visual::create_conductor_motion_report;
@@ -651,6 +652,61 @@ fn create_seed_music_score() -> FieldScore {
 }
 
 #[tauri::command]
+fn get_current_resonance_level_bundle(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_resonance_level_bundle(&guard))
+        .map_err(|err| format!("current resonance bundle serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn list_saved_projects() -> Result<serde_json::Value, String> {
+    serde_json::to_value(list_hfield_projects(&app_root_dir())?)
+        .map_err(|err| format!("project list serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn save_current_project_as(
+    state: tauri::State<'_, AppState>,
+    file_name: String,
+) -> Result<serde_json::Value, String> {
+    let score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    serde_json::to_value(save_hfield_project(&app_root_dir(), &file_name, &score)?)
+        .map_err(|err| format!("project save report serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn open_project_by_file_name(
+    state: tauri::State<'_, AppState>,
+    file_name: String,
+) -> Result<serde_json::Value, String> {
+    let (score, report) = open_hfield_project(&app_root_dir(), &file_name)?;
+
+    {
+        let mut guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        *guard = score;
+    }
+
+    serde_json::to_value(report)
+        .map_err(|err| format!("project open report serialization failed: {err}"))
+}
+
+#[tauri::command]
 fn get_seed_resonance_level_bundle() -> serde_json::Value {
     let score = seed_music_score();
     serde_json::to_value(create_resonance_level_bundle(&score))
@@ -1050,6 +1106,10 @@ fn main() {
             render_current_project_combined_wav,
             create_default_score,
             create_seed_music_score,
+            get_current_resonance_level_bundle,
+            list_saved_projects,
+            save_current_project_as,
+            open_project_by_file_name,
             get_seed_resonance_level_bundle,
             get_gesture_vocabulary,
             get_audio_device_report,

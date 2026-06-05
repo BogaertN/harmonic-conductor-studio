@@ -10,6 +10,7 @@ members = [
   "crates/hfield-music",
   "crates/hfield-mapping",
   "crates/hfield-visual",
+  "crates/hfield-project",
   "src-tauri"
 ]
 

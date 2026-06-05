@@ -61,6 +61,41 @@ export type StopReport = {
   message: string;
 };
 
+export type ProjectFileReport = {
+  status: string;
+  action: string;
+  project_dir: string;
+  file_name: string;
+  path: string;
+  bytes: number;
+  file_hash: string;
+  score_hash: string;
+  title: string;
+  format: string;
+  version: string;
+  note_count: number;
+  conductor_event_count: number;
+  warnings: string[];
+};
+
+export type ProjectListReport = {
+  status: string;
+  project_dir: string;
+  project_count: number;
+  projects: Array<{
+    file_name: string;
+    path: string;
+    bytes: number;
+    modified_unix_seconds: number | null;
+    title: string | null;
+    score_hash: string | null;
+    note_count: number | null;
+    conductor_event_count: number | null;
+    warnings: string[];
+  }>;
+  warnings: string[];
+};
+
 export type ConductorMotionPoint = {
   time_ms: number;
   time_seconds: number;
@@ -230,6 +265,18 @@ export type ResonanceLevelBundle = {
   professional_boundary: string;
 };
 
+export async function listSavedProjects(): Promise<ProjectListReport> {
+  return await invoke<ProjectListReport>("list_saved_projects");
+}
+
+export async function saveCurrentProjectAs(fileName: string): Promise<ProjectFileReport> {
+  return await invoke<ProjectFileReport>("save_current_project_as", { fileName });
+}
+
+export async function openProjectByFileName(fileName: string): Promise<ProjectFileReport> {
+  return await invoke<ProjectFileReport>("open_project_by_file_name", { fileName });
+}
+
 export async function previewScoreReport(): Promise<PreviewReport> {
   return await invoke<PreviewReport>("preview_score_report");
 }
@@ -240,6 +287,10 @@ export async function previewSeedMusicReport(): Promise<MusicPreviewReport> {
 
 export async function getSeedResonanceLevelBundle(): Promise<ResonanceLevelBundle> {
   return await invoke<ResonanceLevelBundle>("get_seed_resonance_level_bundle");
+}
+
+export async function getCurrentResonanceLevelBundle(): Promise<ResonanceLevelBundle> {
+  return await invoke<ResonanceLevelBundle>("get_current_resonance_level_bundle");
 }
 
 export async function getCurrentConductorMotionReport(): Promise<ConductorMotionReport> {
