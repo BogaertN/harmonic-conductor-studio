@@ -61,6 +61,35 @@ export type StopReport = {
   message: string;
 };
 
+export type ConductorMappingReport = {
+  strategy: string;
+  piece_title: string;
+  source_track_id: string;
+  source_note_count: number;
+  generated_event_count: number;
+  music_duration_ms: number;
+  conductor_duration_ms: number;
+  alignment_delta_ms: number;
+  alignment_status: string;
+  generated_events: Array<{
+    event_index: number;
+    source_note_name: string;
+    source_midi_note: number;
+    source_start_ms: number;
+    source_duration_ms: number;
+    source_movement: string;
+    gesture_id: string;
+    operator: string;
+    field_region: string;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    intensity: number;
+    rationale: string;
+  }>;
+  warnings: string[];
+};
+
 export type MusicTimelineReport = {
   tempo_bpm: number;
   meter: string;
@@ -179,6 +208,26 @@ export async function loadSeedMusicProject(): Promise<unknown> {
 
 export async function getCurrentProjectScore(): Promise<unknown> {
   return await invoke("get_current_project_score");
+}
+
+export async function getCurrentConductorMappingReport(): Promise<ConductorMappingReport> {
+  return await invoke<ConductorMappingReport>("get_current_conductor_mapping_report");
+}
+
+export async function applyGeneratedConductorMappingToCurrentScore(): Promise<ConductorMappingReport> {
+  return await invoke<ConductorMappingReport>("apply_generated_conductor_mapping_to_current_score");
+}
+
+export async function playGeneratedConductorMappingAudio(): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_generated_conductor_mapping_audio");
+}
+
+export async function playGeneratedMappedCombinedAudio(): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_generated_mapped_combined_audio");
+}
+
+export async function renderGeneratedMappedCombinedWav(): Promise<WavRenderReport> {
+  return await invoke<WavRenderReport>("render_generated_mapped_combined_wav");
 }
 
 export async function getCurrentMusicTimeline(): Promise<MusicTimelineReport> {

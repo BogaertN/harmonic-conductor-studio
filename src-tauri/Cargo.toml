@@ -22,3 +22,4 @@ hfield-analysis = { path = "../crates/hfield-analysis" }
 hfield-storage = { path = "../crates/hfield-storage" }
 hfield-resonance = { path = "../crates/hfield-resonance" }
 hfield-music = { path = "../crates/hfield-music" }
+hfield-mapping = { path = "../crates/hfield-mapping" }

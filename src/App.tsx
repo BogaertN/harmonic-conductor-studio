@@ -2,31 +2,37 @@ import { useState } from "react";
 import {
   appendGestureToCurrentScore,
   appendNoteToCurrentTrack,
-  clearCurrentMusicTrack,
-  getCurrentMusicTimeline,
-  playCurrentProjectMusicAudio,
-  renderCurrentProjectMusicWav,
-  resetCurrentMusicToSeed,
+  applyGeneratedConductorMappingToCurrentScore,
   clearCurrentGestureTimeline,
+  clearCurrentMusicTrack,
   createDefaultScore,
   getAudioDeviceReport,
+  getCurrentConductorMappingReport,
   getCurrentGestureTimeline,
+  getCurrentMusicTimeline,
   getGestureVocabulary,
   getSeedResonanceLevelBundle,
   loadSeedMusicProject,
   playCurrentProjectCombinedAudio,
   playCurrentProjectConductorAudio,
+  playCurrentProjectMusicAudio,
   playFirstGestureAudio,
+  playGeneratedConductorMappingAudio,
+  playGeneratedMappedCombinedAudio,
   playSeedCombinedAudio,
   playSeedMusicAudio,
   previewScoreReport,
   previewSeedMusicReport,
   renderCurrentProjectCombinedWav,
+  renderCurrentProjectMusicWav,
   renderFirstGestureWav,
+  renderGeneratedMappedCombinedWav,
   renderSeedCombinedWav,
   renderSeedMusicWav,
   resetCurrentGestureTimelineToStandardPath,
+  resetCurrentMusicToSeed,
   stopPlayback,
+  type ConductorMappingReport,
   type GestureTimelineReport,
   type MusicPreviewReport,
   type MusicTimelineReport,
@@ -63,13 +69,15 @@ export default function App() {
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
   const [resonanceBundle, setResonanceBundle] = useState<ResonanceLevelBundle | null>(null);
-  const [gestureTimeline, setGestureTimeline] = useState<GestureTimelineReport | null>(null);
   const [musicTimeline, setMusicTimeline] = useState<MusicTimelineReport | null>(null);
+  const [gestureTimeline, setGestureTimeline] = useState<GestureTimelineReport | null>(null);
+  const [mappingReport, setMappingReport] = useState<ConductorMappingReport | null>(null);
   const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
   const [musicWavReport, setMusicWavReport] = useState<WavRenderReport | null>(null);
   const [combinedWavReport, setCombinedWavReport] = useState<WavRenderReport | null>(null);
   const [currentProjectWavReport, setCurrentProjectWavReport] = useState<WavRenderReport | null>(null);
   const [currentProjectMusicWavReport, setCurrentProjectMusicWavReport] = useState<WavRenderReport | null>(null);
+  const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [stopReport, setStopReport] = useState<StopReport | null>(null);
   const [deviceReport, setDeviceReport] = useState<unknown>(null);
@@ -93,12 +101,12 @@ export default function App() {
   async function loadSeedMusic() {
     setError(null);
     try {
-      const nextScore = await loadSeedMusicProject();
-      setSeedMusicScore(nextScore);
+      setSeedMusicScore(await loadSeedMusicProject());
       setMusicReport(await previewSeedMusicReport());
       setResonanceBundle(await getSeedResonanceLevelBundle());
       setGestureTimeline(await getCurrentGestureTimeline());
       setMusicTimeline(await getCurrentMusicTimeline());
+      setMappingReport(await getCurrentConductorMappingReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -117,6 +125,7 @@ export default function App() {
     setError(null);
     try {
       setMusicTimeline(await appendNoteToCurrentTrack(trackId, midiNote, durationMs, velocity));
+      setMappingReport(await getCurrentConductorMappingReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -126,6 +135,7 @@ export default function App() {
     setError(null);
     try {
       setMusicTimeline(await clearCurrentMusicTrack(trackId));
+      setMappingReport(await getCurrentConductorMappingReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -135,24 +145,7 @@ export default function App() {
     setError(null);
     try {
       setMusicTimeline(await resetCurrentMusicToSeed());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function playCurrentMusicAudio() {
-    setError(null);
-    try {
-      setPlaybackReport(await playCurrentProjectMusicAudio());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function renderCurrentMusicWav() {
-    setError(null);
-    try {
-      setCurrentProjectMusicWavReport(await renderCurrentProjectMusicWav());
+      setMappingReport(await getCurrentConductorMappingReport());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -194,6 +187,52 @@ export default function App() {
     }
   }
 
+  async function generateMappingReport() {
+    setError(null);
+    try {
+      setMappingReport(await getCurrentConductorMappingReport());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function applyGeneratedMapping() {
+    setError(null);
+    try {
+      setMappingReport(await applyGeneratedConductorMappingToCurrentScore());
+      setGestureTimeline(await getCurrentGestureTimeline());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playGeneratedConductor() {
+    setError(null);
+    try {
+      setPlaybackReport(await playGeneratedConductorMappingAudio());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playGeneratedCombined() {
+    setError(null);
+    try {
+      setPlaybackReport(await playGeneratedMappedCombinedAudio());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function renderGeneratedMappedWav() {
+    setError(null);
+    try {
+      setMappedWavReport(await renderGeneratedMappedCombinedWav());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderWav() {
     setError(null);
     try {
@@ -230,6 +269,15 @@ export default function App() {
     }
   }
 
+  async function renderCurrentMusicWav() {
+    setError(null);
+    try {
+      setCurrentProjectMusicWavReport(await renderCurrentProjectMusicWav());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function playAudio() {
     setError(null);
     try {
@@ -252,6 +300,15 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playSeedCombinedAudio());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playCurrentMusicAudio() {
+    setError(null);
+    try {
+      setPlaybackReport(await playCurrentProjectMusicAudio());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -291,7 +348,7 @@ export default function App() {
         <h1>Harmonic Conductor Studio</h1>
         <p>
           A conducted music system where one source score can open through
-          beginner, note-name, conductor, accessibility, and professional views.
+          beginner, note-name, conductor, accessibility, mapping, and professional views.
         </p>
       </section>
 
@@ -324,7 +381,6 @@ export default function App() {
             <button onClick={renderCombinedWav}>Render Combined WAV</button>
           </div>
 
-
           <h2>Music Note Timeline v1</h2>
           <div className="button-row">
             <button onClick={refreshMusicTimeline}>Refresh Music Timeline</button>
@@ -345,6 +401,15 @@ export default function App() {
                 Append {note.label}
               </button>
             ))}
+          </div>
+
+          <h2>Conductor Mapping v1</h2>
+          <div className="button-row mapping-row">
+            <button onClick={generateMappingReport}>Generate Mapping Report</button>
+            <button onClick={applyGeneratedMapping}>Apply Generated Mapping</button>
+            <button onClick={playGeneratedConductor}>Play Generated Conductor</button>
+            <button onClick={playGeneratedCombined}>Play Generated Music + Conductor</button>
+            <button onClick={renderGeneratedMappedWav}>Render Generated Mapped WAV</button>
           </div>
 
           <h2>Gesture Timeline v1</h2>
@@ -369,6 +434,13 @@ export default function App() {
           </div>
 
           {error && <pre className="error">{error}</pre>}
+
+          {mappingReport && (
+            <>
+              <h3>Conductor Mapping Report</h3>
+              <pre>{JSON.stringify(mappingReport, null, 2)}</pre>
+            </>
+          )}
 
           {musicTimeline && (
             <>
@@ -451,6 +523,13 @@ export default function App() {
             <>
               <h3>Current Project Combined WAV Render</h3>
               <pre>{JSON.stringify(currentProjectWavReport, null, 2)}</pre>
+            </>
+          )}
+
+          {mappedWavReport && (
+            <>
+              <h3>Generated Mapped Combined WAV Render</h3>
+              <pre>{JSON.stringify(mappedWavReport, null, 2)}</pre>
             </>
           )}
         </div>

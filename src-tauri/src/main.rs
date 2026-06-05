@@ -8,6 +8,7 @@ use hfield_dsp::{
     compile_combined_music_and_conductor_preview, compile_music_preview, compile_pitch_preview,
     write_wav_i16, CompiledAudio,
 };
+use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
 use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
 use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
@@ -245,6 +246,95 @@ fn stop_existing_playback(state: &AppState) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn get_current_conductor_mapping_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_conductor_mapping_report(&guard))
+        .map_err(|err| format!("conductor mapping serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn apply_generated_conductor_mapping_to_current_score(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    let report = apply_generated_mapping(&mut guard);
+
+    serde_json::to_value(report)
+        .map_err(|err| format!("conductor mapping serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn play_generated_conductor_mapping_audio(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    apply_generated_mapping(&mut score);
+
+    stop_existing_playback(&state)?;
+    start_native_playback(state, move |sample_rate_hz| {
+        compile_pitch_preview(&score, sample_rate_hz)
+    })
+}
+
+#[tauri::command]
+fn play_generated_mapped_combined_audio(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    apply_generated_mapping(&mut score);
+
+    stop_existing_playback(&state)?;
+    start_native_playback(state, move |sample_rate_hz| {
+        compile_combined_music_and_conductor_preview(&score, sample_rate_hz)
+    })
+}
+
+#[tauri::command]
+fn render_generated_mapped_combined_wav(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    apply_generated_mapping(&mut score);
+
+    let compiled = compile_combined_music_and_conductor_preview(&score, 48_000);
+    Ok(write_rendered_wav_report(
+        "hcs_generated_mapped_combined_v1.wav",
+        compiled,
+    ))
 }
 
 #[tauri::command]
@@ -904,6 +994,11 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            get_current_conductor_mapping_report,
+            apply_generated_conductor_mapping_to_current_score,
+            play_generated_conductor_mapping_audio,
+            play_generated_mapped_combined_audio,
+            render_generated_mapped_combined_wav,
             get_current_music_timeline,
             append_note_to_current_track,
             clear_current_music_track,

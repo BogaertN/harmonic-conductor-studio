@@ -208,3 +208,13 @@ button.danger:hover {
 .music-note-row button {
   min-width: 104px;
 }
+
+
+.mapping-row {
+  border-top: 1px solid rgba(231, 216, 164, 0.18);
+  padding-top: 0.75rem;
+}
+
+.mapping-row button {
+  min-width: 150px;
+}
