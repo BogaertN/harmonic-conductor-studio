@@ -96,6 +96,85 @@ export type ProjectListReport = {
   warnings: string[];
 };
 
+export type NotationLayoutReport = {
+  strategy: string;
+  title: string;
+  tempo_bpm: number;
+  meter: string;
+  tuning_mode: string;
+  beats_per_measure: number;
+  beat_unit: number;
+  quarter_note_ms: number;
+  total_duration_ms: number;
+  total_duration_seconds: number;
+  total_beats: number;
+  measure_count: number;
+  voice_count: number;
+  note_count: number;
+  conductor_cue_count: number;
+  voices: Array<{
+    track_id: string;
+    role: string;
+    display_name: string;
+    staff_y_percent: number;
+    note_count: number;
+    notes: Array<{
+      event_index: number;
+      track_id: string;
+      role: string;
+      midi_note: number;
+      note_name: string;
+      frequency_hz: number;
+      start_ms: number;
+      duration_ms: number;
+      end_ms: number;
+      start_beat: number;
+      duration_beats: number;
+      measure_index: number;
+      beat_in_measure: number;
+      x_percent: number;
+      width_percent: number;
+      y_percent: number;
+      velocity: number;
+      resonance_lane: string;
+    }>;
+  }>;
+  cue_strip: Array<{
+    event_index: number;
+    gesture_id: string;
+    gesture_name: string;
+    operator: string | null;
+    field_region: string;
+    anchor: string;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    start_beat: number;
+    duration_beats: number;
+    measure_index: number;
+    beat_in_measure: number;
+    x_percent: number;
+    width_percent: number;
+    cue_text: string;
+  }>;
+  selected_note: {
+    track_id: string;
+    role: string;
+    midi_note: number;
+    note_name: string;
+    frequency_hz: number;
+    start_ms: number;
+    duration_ms: number;
+    start_beat: number;
+    duration_beats: number;
+    measure_index: number;
+    beat_in_measure: number;
+    velocity: number;
+    resonance_lane: string;
+  } | null;
+  warnings: string[];
+};
+
 export type ConductorMotionPoint = {
   time_ms: number;
   time_seconds: number;
@@ -327,6 +406,10 @@ export async function loadSeedMusicProject(): Promise<unknown> {
 
 export async function getCurrentProjectScore(): Promise<unknown> {
   return await invoke("get_current_project_score");
+}
+
+export async function getCurrentNotationLayout(): Promise<NotationLayoutReport> {
+  return await invoke<NotationLayoutReport>("get_current_notation_layout");
 }
 
 export async function getCurrentMusicTimeline(): Promise<MusicTimelineReport> {

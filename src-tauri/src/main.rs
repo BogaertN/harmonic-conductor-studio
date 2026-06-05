@@ -10,6 +10,7 @@ use hfield_dsp::{
 };
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
 use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
+use hfield_notation::create_notation_layout_report;
 use hfield_project::{list_hfield_projects, open_hfield_project, save_hfield_project};
 use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
@@ -368,6 +369,19 @@ fn render_generated_mapped_combined_wav(
         "hcs_generated_mapped_combined_v1.wav",
         compiled,
     ))
+}
+
+#[tauri::command]
+fn get_current_notation_layout(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_notation_layout_report(&guard))
+        .map_err(|err| format!("notation layout serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -1089,6 +1103,7 @@ fn main() {
             play_generated_conductor_mapping_audio,
             play_generated_mapped_combined_audio,
             render_generated_mapped_combined_wav,
+            get_current_notation_layout,
             get_current_music_timeline,
             append_note_to_current_track,
             clear_current_music_track,

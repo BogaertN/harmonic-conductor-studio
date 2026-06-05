@@ -11,6 +11,7 @@ import {
   getCurrentConductorMotionReport,
   getCurrentGestureTimeline,
   getCurrentMusicTimeline,
+  getCurrentNotationLayout,
   getCurrentProjectScore,
   getCurrentResonanceLevelBundle,
   getGeneratedConductorMotionReport,
@@ -44,6 +45,7 @@ import {
   type GestureTimelineReport,
   type MusicPreviewReport,
   type MusicTimelineReport,
+  type NotationLayoutReport,
   type PlaybackReport,
   type PreviewReport,
   type ProjectFileReport,
@@ -60,6 +62,7 @@ type DiagnosticKey =
   | "motionReport"
   | "mappingReport"
   | "musicTimeline"
+  | "notationLayout"
   | "gestureTimeline"
   | "playbackReport"
   | "stopReport"
@@ -104,6 +107,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "motionReport", label: "Conductor Motion" },
   { key: "mappingReport", label: "Conductor Mapping" },
   { key: "musicTimeline", label: "Music Timeline" },
+  { key: "notationLayout", label: "Notation Layout" },
   { key: "gestureTimeline", label: "Gesture Timeline" },
   { key: "playbackReport", label: "Playback" },
   { key: "stopReport", label: "Stop Report" },
@@ -213,6 +217,7 @@ function StatusChip({ label, value }: { label: string; value: string | number })
 
 
 function NotationSpine({
+  notationLayout,
   musicTimeline,
   gestureTimeline,
   motionReport,
@@ -220,6 +225,7 @@ function NotationSpine({
   modeLabel,
   variant = "full"
 }: {
+  notationLayout?: NotationLayoutReport | null;
   musicTimeline: MusicTimelineReport | null;
   gestureTimeline: GestureTimelineReport | null;
   motionReport: ConductorMotionReport | null;
@@ -227,56 +233,107 @@ function NotationSpine({
   modeLabel: string;
   variant?: "full" | "compact" | "performance" | "compose";
 }) {
-  const lead = musicTimeline?.tracks.find((track) => track.track_id === "lead_voice") ?? null;
-  const depth = musicTimeline?.tracks.find((track) => track.track_id === "depth_voice") ?? null;
-  const field = musicTimeline?.tracks.find((track) => track.track_id === "field_voice") ?? null;
-  const tracks = [
-    { label: "Lead", role: "melody", track: lead },
-    { label: "Depth", role: "bass/depth", track: depth },
-    { label: "Field", role: "harmonic field", track: field }
-  ];
-  const durationMs = Math.max(1, motionReport?.total_duration_ms ?? musicTimeline?.total_duration_ms ?? 1);
+  const fallbackVoices = (musicTimeline?.tracks ?? []).map((track, trackIndex) => ({
+    track_id: track.track_id,
+    role: track.role,
+    display_name: track.track_id === "lead_voice" ? "Lead" : track.track_id === "depth_voice" ? "Depth" : track.track_id === "field_voice" ? "Field" : track.track_id,
+    staff_y_percent: [24, 54, 78][trackIndex] ?? 88,
+    note_count: track.note_count,
+    notes: track.notes.map((note, noteIndex) => ({
+      ...note,
+      event_index: noteIndex + 1,
+      track_id: track.track_id,
+      role: track.role,
+      measure_index: Math.floor(note.start_beat / 4) + 1,
+      beat_in_measure: (note.start_beat % 4) + 1,
+      x_percent: Math.min(96, Math.max(2, note.start_beat * 6)),
+      width_percent: Math.max(3.8, Math.min(18, note.duration_beats * 5.2)),
+      y_percent: Math.min(84, Math.max(14, 66 - (note.midi_note - 60) * 3.6))
+    }))
+  }));
+
+  const fallbackCueStrip = (gestureTimeline?.events ?? []).map((cue) => ({
+    event_index: cue.event_index,
+    gesture_id: cue.gesture_id,
+    gesture_name: cue.gesture_name,
+    operator: cue.operator,
+    field_region: cue.field_region,
+    anchor: cue.anchor,
+    start_ms: cue.start_ms,
+    duration_ms: cue.duration_ms,
+    end_ms: cue.end_ms,
+    start_beat: cue.start_seconds * 1.4,
+    duration_beats: cue.duration_seconds * 1.4,
+    measure_index: Math.floor((cue.start_seconds * 1.4) / 4) + 1,
+    beat_in_measure: ((cue.start_seconds * 1.4) % 4) + 1,
+    x_percent: Math.min(96, Math.max(0, (cue.start_ms / Math.max(1, gestureTimeline?.total_duration_ms ?? 1)) * 100)),
+    width_percent: Math.max(1.2, Math.min(18, (cue.duration_ms / Math.max(1, gestureTimeline?.total_duration_ms ?? 1)) * 100)),
+    cue_text: cue.cue_text
+  }));
+
+  const voices = notationLayout?.voices ?? fallbackVoices;
+  const cueBlocks = notationLayout?.cue_strip ?? fallbackCueStrip;
+  const durationMs = Math.max(1, notationLayout?.total_duration_ms ?? motionReport?.total_duration_ms ?? musicTimeline?.total_duration_ms ?? 1);
   const cursorPercent = Math.min(99, Math.max(0, (motionTimeMs / durationMs) * 100));
   const activeEvent = getActiveEvent(motionReport, motionTimeMs);
-  const cueEvents = gestureTimeline?.events ?? [];
-  const measureCount = Math.max(4, Math.ceil((musicTimeline?.total_duration_seconds ?? 0) / 2.856));
-  const ruler = Array.from({ length: Math.min(8, measureCount) }, (_, index) => index + 1);
+  const measureCount = Math.max(4, notationLayout?.measure_count ?? Math.ceil((musicTimeline?.total_duration_seconds ?? 0) / 2.856));
+  const ruler = Array.from({ length: Math.min(12, measureCount) }, (_, index) => index + 1);
+  const meter = notationLayout?.meter ?? musicTimeline?.meter ?? "4/4";
+  const tempo = notationLayout?.tempo_bpm ?? musicTimeline?.tempo_bpm ?? 84;
+  const noteCount = notationLayout?.note_count ?? musicTimeline?.total_note_count ?? 0;
+
   return (
     <section className={`notation-spine notation-spine-${variant}`} aria-label={`${modeLabel} notation spine`}>
       <div className="notation-spine-header">
-        <div><p className="eyebrow">Persistent Score Spine</p><h3>{modeLabel} Music Reading View</h3></div>
+        <div>
+          <p className="eyebrow">Persistent Score Spine</p>
+          <h3>{modeLabel} Music Reading View</h3>
+        </div>
         <div className="notation-meta-strip">
-          <StatusChip label="Meter" value={musicTimeline?.meter ?? "4/4"} />
-          <StatusChip label="Tempo" value={`${musicTimeline?.tempo_bpm ?? 84} BPM`} />
-          <StatusChip label="Notes" value={musicTimeline?.total_note_count ?? 0} />
+          <StatusChip label="Meter" value={meter} />
+          <StatusChip label="Tempo" value={`${tempo} BPM`} />
+          <StatusChip label="Notes" value={noteCount} />
           <StatusChip label="Cue" value={activeEvent?.gesture_id ?? "—"} />
         </div>
       </div>
+
       <div className="notation-score-window">
         <div className="notation-measure-ruler">{ruler.map((measure) => <span key={measure}>M{measure}</span>)}</div>
         <div className="notation-staff-stack">
-          {tracks.map(({ label, role, track }) => (
-            <div key={label} className="notation-voice-row">
-              <div className="notation-voice-label"><strong>{label}</strong><span>{role}</span></div>
+          {voices.map((voice) => (
+            <div key={voice.track_id} className="notation-voice-row">
+              <div className="notation-voice-label"><strong>{voice.display_name}</strong><span>{voice.role}</span></div>
               <div className="notation-staff-lane">
                 {[0, 1, 2, 3, 4].map((line) => <span key={line} className="notation-staff-line" />)}
-                {(track?.notes ?? []).slice(0, 24).map((note, index) => {
-                  const left = Math.min(94, Math.max(3, 5 + note.start_beat * 5.8));
-                  const top = Math.min(84, Math.max(14, 66 - (note.midi_note - 60) * 3.6));
-                  const width = Math.max(3.8, Math.min(13, note.duration_beats * 5.2));
-                  return (
-                    <span key={`${label}-${note.start_ms}-${note.midi_note}-${index}`} className={`notation-note ${note.resonance_lane}`} style={{ left: `${left}%`, top: `${top}%`, width: `${width}%` }} title={`${note.note_name} · beat ${note.start_beat} · ${note.frequency_hz.toFixed(2)} Hz`}>{note.note_name}</span>
-                  );
-                })}
+                {voice.notes.slice(0, 32).map((note) => (
+                  <span
+                    key={`${voice.track_id}-${note.event_index}-${note.start_ms}-${note.midi_note}`}
+                    className={`notation-note ${note.resonance_lane}`}
+                    style={{ left: `${note.x_percent}%`, top: `${note.y_percent}%`, width: `${note.width_percent}%` }}
+                    title={`${note.note_name} · M${note.measure_index} beat ${note.beat_in_measure} · ${note.frequency_hz.toFixed(2)} Hz`}
+                  >
+                    {note.note_name}
+                  </span>
+                ))}
               </div>
             </div>
           ))}
         </div>
         <div className="notation-playhead" style={{ left: `${cursorPercent}%` }}><span>{Math.round(motionTimeMs)}ms</span></div>
       </div>
+
       <div className="notation-cue-strip">
-        {cueEvents.slice(0, 18).map((cue) => <span key={`${cue.event_index}-${cue.gesture_id}`} className={activeEvent?.gesture_id === cue.gesture_id ? "notation-cue active" : "notation-cue"} title={cue.cue_text}>{cue.gesture_id} · {cue.gesture_name}</span>)}
-        {cueEvents.length === 0 && <span className="notation-cue empty">Load or map a conductor path to show cues.</span>}
+        {cueBlocks.slice(0, 24).map((cue) => (
+          <span
+            key={`${cue.event_index}-${cue.gesture_id}-${cue.start_ms}`}
+            className={activeEvent?.gesture_id === cue.gesture_id ? "notation-cue active" : "notation-cue"}
+            style={{ left: `${cue.x_percent}%`, width: `${cue.width_percent}%` }}
+            title={`${cue.cue_text} · M${cue.measure_index} beat ${cue.beat_in_measure}`}
+          >
+            {cue.gesture_id} · {cue.gesture_name}
+          </span>
+        ))}
+        {cueBlocks.length === 0 && <span className="notation-cue empty">Load or map a conductor path to show cues.</span>}
       </div>
     </section>
   );
@@ -372,6 +429,7 @@ export default function App() {
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
   const [resonanceBundle, setResonanceBundle] = useState<ResonanceLevelBundle | null>(null);
   const [musicTimeline, setMusicTimeline] = useState<MusicTimelineReport | null>(null);
+  const [notationLayout, setNotationLayout] = useState<NotationLayoutReport | null>(null);
   const [gestureTimeline, setGestureTimeline] = useState<GestureTimelineReport | null>(null);
   const [mappingReport, setMappingReport] = useState<ConductorMappingReport | null>(null);
   const [motionReport, setMotionReport] = useState<ConductorMotionReport | null>(null);
@@ -446,6 +504,7 @@ export default function App() {
     setSeedMusicScore(currentScore);
     setResonanceBundle(await getCurrentResonanceLevelBundle());
     setMusicTimeline(await getCurrentMusicTimeline());
+    setNotationLayout(await getCurrentNotationLayout());
     setGestureTimeline(await getCurrentGestureTimeline());
     setMappingReport(await getCurrentConductorMappingReport());
     setMotionReport(await getCurrentConductorMotionReport());
@@ -533,6 +592,7 @@ export default function App() {
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
+      setNotationLayout(await getCurrentNotationLayout());
       setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -546,6 +606,7 @@ export default function App() {
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
+      setNotationLayout(await getCurrentNotationLayout());
       setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -559,6 +620,7 @@ export default function App() {
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
+      setNotationLayout(await getCurrentNotationLayout());
       setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -582,6 +644,7 @@ export default function App() {
       setGestureTimeline(await appendGestureToCurrentScore(gestureId, durationMs, intensity, operator));
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
+      setNotationLayout(await getCurrentNotationLayout());
       setSelectedDiagnostic("gestureTimeline");
       resetMotionAnimation();
     } catch (err) {
@@ -595,6 +658,7 @@ export default function App() {
       setGestureTimeline(await clearCurrentGestureTimeline());
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
+      setNotationLayout(await getCurrentNotationLayout());
       setSelectedDiagnostic("gestureTimeline");
       resetMotionAnimation();
     } catch (err) {
@@ -608,6 +672,7 @@ export default function App() {
       setGestureTimeline(await resetCurrentGestureTimelineToStandardPath());
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
+      setNotationLayout(await getCurrentNotationLayout());
       setSelectedDiagnostic("gestureTimeline");
       resetMotionAnimation();
     } catch (err) {
@@ -840,6 +905,8 @@ export default function App() {
         return mappingReport;
       case "musicTimeline":
         return musicTimeline;
+      case "notationLayout":
+        return notationLayout;
       case "gestureTimeline":
         return gestureTimeline;
       case "playbackReport":
@@ -890,7 +957,7 @@ export default function App() {
   const depthTrack = musicTimeline?.tracks.find((track) => track.track_id === "depth_voice") ?? null;
   const fieldTrack = musicTimeline?.tracks.find((track) => track.track_id === "field_voice") ?? null;
   const activeEvent = getActiveEvent(motionReport, motionTimeMs);
-  const selectedNote = leadTrack?.notes[0] ?? null;
+  const selectedNote = notationLayout?.selected_note ?? leadTrack?.notes[0] ?? null;
   const beginnerBlocks = resonanceBundle?.beginner_view.slice(0, 8) ?? [];
   const conductorCues = resonanceBundle?.conductor_view.slice(0, 8) ?? [];
 
@@ -953,6 +1020,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                notationLayout={notationLayout}
                 modeLabel="Compose"
                 variant="compose"
               />
@@ -1039,6 +1107,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                notationLayout={notationLayout}
                 modeLabel="Conduct"
                 variant="compact"
               />
@@ -1048,6 +1117,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                notationLayout={notationLayout}
                 modeLabel="Perform"
                 variant="performance"
               />
@@ -1090,6 +1160,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                notationLayout={notationLayout}
                 modeLabel="Rehearse"
                 variant="compact"
               />
@@ -1174,6 +1245,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                notationLayout={notationLayout}
                 modeLabel="Project"
                 variant="compact"
               />
@@ -1236,6 +1308,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                notationLayout={notationLayout}
                 modeLabel="Diagnostics"
                 variant="compact"
               />

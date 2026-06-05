@@ -1299,6 +1299,7 @@ dependencies = [
  "hfield-dsp",
  "hfield-mapping",
  "hfield-music",
+ "hfield-notation",
  "hfield-project",
  "hfield-resonance",
  "hfield-storage",
@@ -1394,6 +1395,16 @@ name = "hfield-music"
 version = "0.1.0"
 dependencies = [
  "hfield-domain",
+ "serde",
+]
+
+[[package]]
+name = "hfield-notation"
+version = "0.1.0"
+dependencies = [
+ "hfield-conductor",
+ "hfield-domain",
+ "hfield-music",
  "serde",
 ]
 

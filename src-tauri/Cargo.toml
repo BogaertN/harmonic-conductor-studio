@@ -25,3 +25,4 @@ hfield-music = { path = "../crates/hfield-music" }
 hfield-mapping = { path = "../crates/hfield-mapping" }
 hfield-visual = { path = "../crates/hfield-visual" }
 hfield-project = { path = "../crates/hfield-project" }
+hfield-notation = { path = "../crates/hfield-notation" }
