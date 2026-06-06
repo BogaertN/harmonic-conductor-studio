@@ -9,7 +9,8 @@ use hfield_coordinate::create_hfield_rust_render_manifest;
 use hfield_cymatics::synthesize_hfield_cymatic_reader_surface;
 use hfield_domain::{ConductedPerformance, FieldScore, GestureEvent, GestureTrack, NoteEvent};
 use hfield_dsp::{
-    compile_combined_music_and_conductor_preview, compile_music_preview, compile_pitch_preview,
+    compile_combined_music_and_conductor_preview, compile_deterministic_audio_engine_v2,
+    compile_music_preview, compile_pitch_preview, create_deterministic_audio_engine_v2_report,
     write_wav_i16, CompiledAudio,
 };
 use hfield_field::synthesize_hfield_field;
@@ -1599,6 +1600,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "harmonic_field_score_contract_id": "aiweb.hfield.harmonic_field_score.v1",
         "coupling_profile_engine_contract_id": "aiweb.hfield.coupling_profile_engine.v1",
         "motif_library_annotation_layer_contract_id": "aiweb.hfield.motif_library_annotation_layer.v1",
+        "deterministic_audio_engine_v2_contract_id": "aiweb.hfield.deterministic_audio_engine.v2",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -1802,6 +1804,27 @@ fn get_current_motif_library_annotation_layer_v1_report(
         .map_err(|err| {
             format!("failed to serialize motif library annotation layer v1 report: {err}")
         })
+}
+
+#[tauri::command]
+fn get_current_deterministic_audio_engine_v2_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    serde_json::to_value(create_deterministic_audio_engine_v2_report(&score, 48_000))
+        .map_err(|err| format!("failed to serialize deterministic audio engine v2 report: {err}"))
+}
+
+#[tauri::command]
+fn export_current_deterministic_audio_engine_v2_wav(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let rendered = compile_deterministic_audio_engine_v2(&score, 48_000);
+    Ok(write_rendered_wav_report(
+        "hcs_deterministic_audio_engine_v2.wav",
+        rendered.compiled,
+    ))
 }
 
 #[tauri::command]
@@ -2711,6 +2734,8 @@ fn main() {
             get_current_harmonic_field_score_v1_upgrade_report,
             get_current_coupling_profile_engine_v1_report,
             get_current_motif_library_annotation_layer_v1_report,
+            get_current_deterministic_audio_engine_v2_report,
+            export_current_deterministic_audio_engine_v2_wav,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,

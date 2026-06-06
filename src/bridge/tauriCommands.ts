@@ -201,6 +201,44 @@ export type HfieldMotifLibraryAnnotationLayerV1Report = {
   next_work: string[];
 };
 
+
+
+export type HfieldDeterministicAudioEngineV2Report = {
+  status: string;
+  contract_id: string;
+  profile_id: string;
+  engine_role: string;
+  sample_rate_hz: number;
+  deterministic_policy: unknown;
+  authority_boundaries: {
+    audio_is_rendering: boolean;
+    harmonic_field_score_remains_source: boolean;
+    audio_hash_is_artifact_receipt: boolean;
+    audio_hash_is_source_hash: boolean;
+    open_source_audio_tools_may_encode_or_analyze: boolean;
+    open_source_audio_tools_are_source_authority: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  source_inventory: unknown;
+  render_plan: unknown[];
+  output_summary: {
+    sample_count: number;
+    duration_seconds: number;
+    peak_abs: number;
+    rms: number;
+    nonzero_sample_count: number;
+    clipped_sample_count: number;
+    finite_sample_count: number;
+    pcm_i16_blake3_hash: string;
+  };
+  readiness_gates: unknown;
+  open_source_dependency_policy: unknown;
+  next_work: string[];
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1349,6 +1387,16 @@ export async function getCurrentCouplingProfileEngineV1Report(): Promise<HfieldC
 
 export async function getCurrentMotifLibraryAnnotationLayerV1Report(): Promise<HfieldMotifLibraryAnnotationLayerV1Report> {
   return await invoke<HfieldMotifLibraryAnnotationLayerV1Report>("get_current_motif_library_annotation_layer_v1_report");
+}
+
+
+
+export async function getCurrentDeterministicAudioEngineV2Report(): Promise<HfieldDeterministicAudioEngineV2Report> {
+  return await invoke<HfieldDeterministicAudioEngineV2Report>("get_current_deterministic_audio_engine_v2_report");
+}
+
+export async function exportCurrentDeterministicAudioEngineV2Wav(): Promise<WavRenderReport> {
+  return await invoke<WavRenderReport>("export_current_deterministic_audio_engine_v2_wav");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

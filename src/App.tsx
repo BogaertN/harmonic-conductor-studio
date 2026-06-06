@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import HfieldPhaseFieldViewport from "./components/HfieldPhaseFieldViewport";
 import {
-  appendGestureToCurrentScore,
-  appendNoteToCurrentTrack,
-  applyGeneratedConductorMappingToCurrentScore,
-  clearCurrentGestureTimeline,
-  clearCurrentMusicTrack,
-  createDefaultScore,
-  selectCurrentNotationNote,
-  editCurrentNotationNote,
-  deleteCurrentNotationNote,
+  getCurrentHfieldIdentityVaultReferenceReport,
+  bindCurrentHfieldIdentityVaultReference,
+  getCurrentHfieldPacketContractReport,
+  getCurrentHfieldFieldSynthesisReport,
+  getCurrentForgePacketBridgeStubReport,
+  getCurrentPlayheadCursorReport,
+  getCurrentLoopPhraseReport,
+  playCurrentProjectPhraseCombinedAudio,
+  exportCurrentHfieldProjectJson,
+  exportCurrentHfieldPacketContractJson,
+  exportCurrentHfieldRuntimeCarrierPacketJson,
+  exportCurrentHfieldCymaticSurfaceJson,
+  exportCurrentHfieldRustRenderManifestJson,
+  exportCurrentHfieldReaderBundleJson,
   exportCurrentHfieldCombinedWav,
   exportCurrentHfieldCanonicalBundleManifestJson,
   verifyLatestHfieldExportReplayManifestJson,
@@ -19,87 +24,85 @@ import {
   getCurrentHarmonicFieldScoreV1UpgradeReport,
   getCurrentCouplingProfileEngineV1Report,
   getCurrentMotifLibraryAnnotationLayerV1Report,
-  exportCurrentHfieldCymaticSurfaceJson,
-  exportCurrentHfieldPacketContractJson,
-  exportCurrentHfieldProjectJson,
-  exportCurrentHfieldReaderBundleJson,
-  exportCurrentHfieldRuntimeCarrierPacketJson,
-  exportCurrentHfieldRustRenderManifestJson,
-  getAudioDeviceReport,
-  getCurrentConductorMappingReport,
-  getCurrentConductorMotionReport,
-  getCurrentGestureTimeline,
-  getCurrentHfieldPacketContractReport,
-  getCurrentHfieldFieldSynthesisReport,
-  getCurrentForgePacketBridgeStubReport,
-  getCurrentMusicTimeline,
-  getCurrentNotationLayout,
-  getCurrentPlayheadCursorReport,
-  getPlaybackClockReport,
-  getCurrentLoopPhraseReport,
-  getCurrentProjectScore,
-  getCurrentResonanceLevelBundle,
-  getGeneratedConductorMotionReport,
-  getGestureVocabulary,
+  getCurrentDeterministicAudioEngineV2Report,
+  exportCurrentDeterministicAudioEngineV2Wav,
   listSavedProjects,
-  loadSeedMusicProject,
+  saveCurrentProjectAs,
   openProjectByFileName,
-  nudgeCurrentNotationNoteBeats,
-  positionCurrentNotationNoteMeasureBeat,
-  positionCurrentNotationNoteStartMs,
-  playCurrentProjectCombinedAudio,
-  playCurrentProjectConductorAudio,
-  playCurrentProjectMusicAudio,
-  playCurrentProjectPhraseCombinedAudio,
-  playFirstGestureAudio,
-  playGeneratedConductorMappingAudio,
-  playGeneratedMappedCombinedAudio,
-  playSeedCombinedAudio,
-  playSeedMusicAudio,
   previewScoreReport,
   previewSeedMusicReport,
-  renderCurrentProjectCombinedWav,
-  renderCurrentProjectMusicWav,
-  renderFirstGestureWav,
+  getCurrentResonanceLevelBundle,
+  getCurrentConductorMotionReport,
+  getGeneratedConductorMotionReport,
+  getCurrentConductorMappingReport,
+  applyGeneratedConductorMappingToCurrentScore,
+  playGeneratedConductorMappingAudio,
+  playGeneratedMappedCombinedAudio,
   renderGeneratedMappedCombinedWav,
-  renderSeedCombinedWav,
-  renderSeedMusicWav,
-  resetCurrentGestureTimelineToStandardPath,
+  loadSeedMusicProject,
+  getCurrentProjectScore,
+  getCurrentNotationLayout,
+  selectCurrentNotationNote,
+  editCurrentNotationNote,
+  positionCurrentNotationNoteStartMs,
+  positionCurrentNotationNoteMeasureBeat,
+  nudgeCurrentNotationNoteBeats,
+  deleteCurrentNotationNote,
+  getCurrentMusicTimeline,
+  appendNoteToCurrentTrack,
+  clearCurrentMusicTrack,
   resetCurrentMusicToSeed,
-  saveCurrentProjectAs,
+  playCurrentProjectMusicAudio,
+  renderCurrentProjectMusicWav,
+  getCurrentGestureTimeline,
+  appendGestureToCurrentScore,
+  clearCurrentGestureTimeline,
+  resetCurrentGestureTimelineToStandardPath,
+  playCurrentProjectConductorAudio,
+  playCurrentProjectCombinedAudio,
+  renderCurrentProjectCombinedWav,
+  renderFirstGestureWav,
+  renderSeedMusicWav,
+  renderSeedCombinedWav,
+  playFirstGestureAudio,
+  playSeedMusicAudio,
+  playSeedCombinedAudio,
+  getPlaybackClockReport,
   stopPlayback,
-  type ConductorMappingReport,
-  type ConductorMotionPoint,
-  type ConductorMotionReport,
-  type ExportFileReport,
-  type GestureTimelineReport,
-  type HfieldPacketContractReport,
-  type HfieldFieldSynthesisReport,
-  type ForgePacketBridgeStubReport,
-  type MusicPreviewReport,
-  type LoopPhraseReport,
-  type MusicTimelineReport,
-  type NotationEditReport,
-  type NotationLayoutReport,
-  type PlaybackReport,
-  type PlaybackClockReport,
-  type PlayheadCursorReport,
+  getAudioDeviceReport,
+  getGestureVocabulary,
+  createDefaultScore,
   type PreviewReport,
-  type ProjectFileReport,
-  type ProjectListReport,
-  type ResonanceLevelBundle,
-  type StopReport,
+  type MusicPreviewReport,
   type WavRenderReport,
-  bindCurrentHfieldIdentityVaultReference,
-  getCurrentHfieldIdentityVaultReferenceReport,
-  type HfieldIdentityVaultReferenceBindingReport,
+  type ExportFileReport,
   type HfieldCanonicalBundleManifestExportReport,
-  type HfieldExportReplayVerifierReport,
-  type HfieldSchemaVersionMigrationRegistryReport,
   type HfieldNineGestureConductorEngineReport,
   type HfieldHarmonicFieldScoreV1UpgradeReport,
   type HfieldCouplingProfileEngineV1Report,
   type HfieldMotifLibraryAnnotationLayerV1Report,
+  type HfieldDeterministicAudioEngineV2Report,
+  type HfieldSchemaVersionMigrationRegistryReport,
+  type HfieldExportReplayVerifierReport,
+  type PlaybackReport,
+  type StopReport,
+  type PlaybackClockReport,
+  type HfieldIdentityVaultReferenceBindingReport,
+  type HfieldPacketContractReport,
+  type HfieldFieldSynthesisReport,
+  type ForgePacketBridgeStubReport,
+  type PlayheadCursorReport,
+  type LoopPhraseReport,
+  type ProjectFileReport,
+  type ProjectListReport,
+  type NotationLayoutReport,
+  type NotationEditReport,
+  type ConductorMotionPoint,
+  type ConductorMotionReport,
+  type ConductorMappingReport,
+  type MusicTimelineReport,
+  type GestureTimelineReport,
+  type ResonanceLevelBundle,
 } from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
@@ -143,6 +146,7 @@ type DiagnosticKey =
   | "harmonicFieldScoreV1Upgrade"
   | "couplingProfileEngineV1"
   | "motifLibraryAnnotationLayerV1"
+  | "deterministicAudioEngineV2"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -210,6 +214,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "harmonicFieldScoreV1Upgrade", label: "Harmonic Field Score v1 Upgrade" },
   { key: "couplingProfileEngineV1", label: "Coupling Profile Engine v1" },
   { key: "motifLibraryAnnotationLayerV1", label: "Motif Library + Annotation Layer v1" },
+  { key: "deterministicAudioEngineV2", label: "Deterministic Audio Engine v2" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -622,6 +627,7 @@ export default function App() {
   const [harmonicFieldScoreV1UpgradeReport, setHarmonicFieldScoreV1UpgradeReport] = useState<HfieldHarmonicFieldScoreV1UpgradeReport | null>(null);
   const [couplingProfileEngineV1Report, setCouplingProfileEngineV1Report] = useState<HfieldCouplingProfileEngineV1Report | null>(null);
   const [motifLibraryAnnotationLayerV1Report, setMotifLibraryAnnotationLayerV1Report] = useState<HfieldMotifLibraryAnnotationLayerV1Report | null>(null);
+  const [deterministicAudioEngineV2Report, setDeterministicAudioEngineV2Report] = useState<HfieldDeterministicAudioEngineV2Report | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1403,6 +1409,30 @@ export default function App() {
     }
   }
 
+
+
+
+
+  async function inspectDeterministicAudioEngineV2() {
+    setError(null);
+    try {
+      setDeterministicAudioEngineV2Report(await getCurrentDeterministicAudioEngineV2Report());
+      setSelectedDiagnostic("deterministicAudioEngineV2");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportDeterministicAudioEngineV2Wav() {
+    setError(null);
+    try {
+      setMappedWavReport(await exportCurrentDeterministicAudioEngineV2Wav());
+      setSelectedDiagnostic("mappedWav");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1631,7 +1661,9 @@ export default function App() {
         return couplingProfileEngineV1Report;
       case "motifLibraryAnnotationLayerV1":
         return motifLibraryAnnotationLayerV1Report;
-      case "mappedWav":
+      case "deterministicAudioEngineV2":
+        return deterministicAudioEngineV2Report;
+case "mappedWav":
         return mappedWavReport;
       case "currentScore":
         return seedMusicScore;
@@ -2118,8 +2150,10 @@ export default function App() {
                   <button onClick={inspectHarmonicFieldScoreV1Upgrade} type="button">Inspect Field Score v1</button>
                   <button onClick={inspectCouplingProfileEngineV1} type="button">Inspect Coupling Profile</button>
                   <button onClick={inspectMotifLibraryAnnotationLayerV1} type="button">Inspect Motif Layer</button>
+                  <button onClick={inspectDeterministicAudioEngineV2} type="button">Inspect Audio Engine v2</button>
+                  <button onClick={exportDeterministicAudioEngineV2Wav} type="button">Export Audio v2 WAV</button>
                 </div>
-                <pre>{JSON.stringify(motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">

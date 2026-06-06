@@ -9,3 +9,5 @@ license.workspace = true
 hfield-domain = { path = "../hfield-domain" }
 hfield-conductor = { path = "../hfield-conductor" }
 hound.workspace = true
+serde.workspace = true
+blake3.workspace = true

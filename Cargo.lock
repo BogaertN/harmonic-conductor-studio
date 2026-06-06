@@ -1416,9 +1416,11 @@ dependencies = [
 name = "hfield-dsp"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "hfield-conductor",
  "hfield-domain",
  "hound",
+ "serde",
 ]
 
 [[package]]
