@@ -15,6 +15,7 @@ import {
   verifyLatestHfieldExportReplayManifestJson,
   getHfieldSchemaVersionMigrationRegistryJson,
   inspectCurrentHfieldSchemaMigrationRegistryJson,
+  getCurrentNineGestureConductorEngineReport,
   exportCurrentHfieldCymaticSurfaceJson,
   exportCurrentHfieldPacketContractJson,
   exportCurrentHfieldProjectJson,
@@ -92,6 +93,7 @@ import {
   type HfieldCanonicalBundleManifestExportReport,
   type HfieldExportReplayVerifierReport,
   type HfieldSchemaVersionMigrationRegistryReport,
+  type HfieldNineGestureConductorEngineReport,
 } from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
@@ -131,6 +133,7 @@ type DiagnosticKey =
   | "hfieldCanonicalBundleManifestExport"
   | "hfieldExportReplayVerifier"
   | "hfieldSchemaMigrationRegistry"
+  | "nineGestureConductorEngine"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -194,6 +197,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "hfieldCanonicalBundleManifestExport", label: "Canonical Bundle Manifest Export" },
   { key: "hfieldExportReplayVerifier", label: "Export Replay Verifier" },
   { key: "hfieldSchemaMigrationRegistry", label: "Schema Migration Registry" },
+  { key: "nineGestureConductorEngine", label: "Nine-Gesture Conductor Engine" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -602,6 +606,7 @@ export default function App() {
   const [hfieldCanonicalBundleManifestExportReport, setHfieldCanonicalBundleManifestExportReport] = useState<HfieldCanonicalBundleManifestExportReport | null>(null);
   const [hfieldExportReplayVerifierReport, setHfieldExportReplayVerifierReport] = useState<HfieldExportReplayVerifierReport | null>(null);
   const [hfieldSchemaMigrationRegistryReport, setHfieldSchemaMigrationRegistryReport] = useState<HfieldSchemaVersionMigrationRegistryReport | null>(null);
+  const [nineGestureConductorEngineReport, setNineGestureConductorEngineReport] = useState<HfieldNineGestureConductorEngineReport | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1339,6 +1344,17 @@ export default function App() {
     }
   }
 
+
+  async function inspectNineGestureConductorEngine() {
+    setError(null);
+    try {
+      setNineGestureConductorEngineReport(await getCurrentNineGestureConductorEngineReport());
+      setSelectedDiagnostic("nineGestureConductorEngine");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1559,6 +1575,8 @@ export default function App() {
         return hfieldExportReplayVerifierReport;
       case "hfieldSchemaMigrationRegistry":
         return hfieldSchemaMigrationRegistryReport;
+      case "nineGestureConductorEngine":
+        return nineGestureConductorEngineReport;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -2042,8 +2060,9 @@ export default function App() {
                   <button onClick={exportHfieldCanonicalBundleManifest} type="button">Export Bundle Manifest</button>
                   <button onClick={verifyHfieldExportReplayManifest} type="button">Verify Latest Bundle</button>
                   <button onClick={inspectHfieldSchemaMigrationRegistry} type="button">Inspect Schema Registry</button>
+                  <button onClick={inspectNineGestureConductorEngine} type="button">Inspect Nine-Gesture Engine</button>
                 </div>
-                <pre>{JSON.stringify(hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">

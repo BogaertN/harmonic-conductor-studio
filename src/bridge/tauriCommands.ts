@@ -82,6 +82,32 @@ export type HfieldCanonicalBundleManifestExportReport = {
 
 
 
+
+export type HfieldNineGestureConductorEngineReport = {
+  status: string;
+  contract_id: string;
+  gesture_vocabulary_id: string;
+  engine_role: string;
+  source_score_gesture_vocabulary: string;
+  field_layout_id: string;
+  root_frequency_hz: number;
+  research_basis: unknown;
+  authority_boundaries: {
+    physical_definition_is_core_logic: boolean;
+    candidate_interpretation_is_editable: boolean;
+    forge_operational_meaning_locked: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  field_geometry: unknown;
+  conducting_law: unknown;
+  primitive_count: number;
+  primitives: unknown[];
+  current_score_scan: unknown;
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1210,6 +1236,11 @@ export async function getHfieldSchemaVersionMigrationRegistryJson(): Promise<Hfi
 
 export async function inspectCurrentHfieldSchemaMigrationRegistryJson(): Promise<HfieldSchemaVersionMigrationRegistryReport> {
   return await invoke<HfieldSchemaVersionMigrationRegistryReport>("inspect_current_hfield_schema_migration_registry_json");
+}
+
+
+export async function getCurrentNineGestureConductorEngineReport(): Promise<HfieldNineGestureConductorEngineReport> {
+  return await invoke<HfieldNineGestureConductorEngineReport>("get_current_nine_gesture_conductor_engine_report");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

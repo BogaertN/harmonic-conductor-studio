@@ -2,7 +2,8 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use hfield_analysis::summarize_waveform;
 use hfield_carrier::synthesize_hfield_runtime_carrier_packet_model;
 use hfield_conductor::{
-    create_gesture_timeline_report, is_valid_gesture_id, nine_gesture_vocabulary,
+    create_gesture_timeline_report, create_nine_gesture_conductor_engine_report,
+    is_valid_gesture_id, nine_gesture_vocabulary,
 };
 use hfield_coordinate::create_hfield_rust_render_manifest;
 use hfield_cymatics::synthesize_hfield_cymatic_reader_surface;
@@ -1761,6 +1762,15 @@ fn inspect_current_hfield_schema_migration_registry_json(
 }
 
 #[tauri::command]
+fn get_current_nine_gesture_conductor_engine_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    serde_json::to_value(create_nine_gesture_conductor_engine_report(&score))
+        .map_err(|err| format!("failed to serialize nine-gesture conductor engine report: {err}"))
+}
+
+#[tauri::command]
 fn export_current_hfield_project_json(
     state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
@@ -2663,6 +2673,7 @@ fn main() {
             verify_hfield_export_replay_manifest_json_by_path,
             get_hfield_schema_version_migration_registry_json,
             inspect_current_hfield_schema_migration_registry_json,
+            get_current_nine_gesture_conductor_engine_report,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,
