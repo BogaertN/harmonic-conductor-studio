@@ -19,12 +19,19 @@ type ToneBody = {
   kind: ToneKind;
   frequencyHz: number;
   amplitude: number;
+  startMs: number;
+  durationMs: number;
+  endMs: number;
   x: number;
   y: number;
   z: number;
-  radius: number;
+  zStart: number;
+  zEnd: number;
+  zLength: number;
+  radiusX: number;
+  radiusY: number;
   color: string;
-  angle: number;
+  phase: number;
 };
 
 type BridgeBody = {
@@ -32,17 +39,34 @@ type BridgeBody = {
   x: number;
   y: number;
   z: number;
-  length: number;
-  radius: number;
-  angle: number;
+  zLength: number;
+  radiusX: number;
+  radiusY: number;
   colorA: string;
   colorB: string;
 };
 
-const SCAN_MIN_Z = -3.1;
-const SCAN_MAX_Z = 3.1;
-const FIELD_WIDTH = 7.6;
-const FIELD_HEIGHT = 3.6;
+const SCAN_MIN_Z = -3.65;
+const SCAN_MAX_Z = 3.65;
+const SCAN_DEPTH = SCAN_MAX_Z - SCAN_MIN_Z;
+const FIELD_WIDTH = 8.4;
+const FIELD_HEIGHT = 3.8;
+const MIN_EVENT_MS = 80;
+
+const PITCH_CLASS_COLORS = [
+  "#ff3b30", // C
+  "#ff6b2b", // C#/Db
+  "#ffb000", // D
+  "#f6d84a", // D#/Eb
+  "#e8f66a", // E
+  "#7ee36d", // F
+  "#35d07f", // F#/Gb
+  "#36d6ff", // G
+  "#2f8dff", // G#/Ab
+  "#6657ff", // A
+  "#a56bff", // A#/Bb
+  "#ff73d1", // B
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -90,68 +114,12 @@ function midiToHz(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
-function wavelengthToRgb(wavelength: number): [number, number, number] {
-  let red = 0;
-  let green = 0;
-  let blue = 0;
-
-  if (wavelength >= 380 && wavelength < 440) {
-    red = -(wavelength - 440) / (440 - 380);
-    blue = 1;
-  } else if (wavelength >= 440 && wavelength < 490) {
-    green = (wavelength - 440) / (490 - 440);
-    blue = 1;
-  } else if (wavelength >= 490 && wavelength < 510) {
-    green = 1;
-    blue = -(wavelength - 510) / (510 - 490);
-  } else if (wavelength >= 510 && wavelength < 580) {
-    red = (wavelength - 510) / (580 - 510);
-    green = 1;
-  } else if (wavelength >= 580 && wavelength < 645) {
-    red = 1;
-    green = -(wavelength - 645) / (645 - 580);
-  } else if (wavelength >= 645 && wavelength <= 700) {
-    red = 1;
-  }
-
-  let factor = 1;
-
-  if (wavelength >= 380 && wavelength < 420) {
-    factor = 0.35 + (0.65 * (wavelength - 380)) / (420 - 380);
-  } else if (wavelength > 645 && wavelength <= 700) {
-    factor = 0.35 + (0.65 * (700 - wavelength)) / (700 - 645);
-  }
-
-  const gamma = 0.82;
-  const channel = (value: number) => Math.round(255 * Math.pow(Math.max(0, value * factor), gamma));
-
-  return [channel(red), channel(green), channel(blue)];
-}
-
-function frequencyToCanonicalColor(frequencyHz: number, kind: ToneKind): string {
-  if (kind === "identity") {
-    return "#f6d36b";
-  }
-
-  if (kind === "runtime") {
-    return "#56d6ff";
-  }
-
-  if (kind === "field") {
-    return "#a98bff";
-  }
-
-  const octaveFold = ((Math.log2(Math.max(1, frequencyHz)) % 1) + 1) % 1;
-  const wavelength = 700 - octaveFold * 320;
-  const [red, green, blue] = wavelengthToRgb(wavelength);
-
-  return `#${red.toString(16).padStart(2, "0")}${green.toString(16).padStart(2, "0")}${blue
-    .toString(16)
-    .padStart(2, "0")}`;
+function hzToMidiFloat(frequencyHz: number): number {
+  return 69 + 12 * Math.log2(frequencyHz / 440);
 }
 
 function collectRecords(value: unknown, output: Record<string, unknown>[] = [], depth = 0): Record<string, unknown>[] {
-  if (depth > 7 || output.length > 240) {
+  if (depth > 8 || output.length > 420) {
     return output;
   }
 
@@ -221,7 +189,7 @@ function firstString(record: Record<string, unknown>, keys: string[]): string | 
 function inferKind(record: Record<string, unknown>, label: string): ToneKind {
   const signature = `${Object.keys(record).join(" ")} ${label}`.toLowerCase();
 
-  if (signature.includes("identity") || signature.includes("file carrier") || signature.includes("artifact")) {
+  if (signature.includes("identity") || signature.includes("artifact") || signature.includes("file carrier")) {
     return "identity";
   }
 
@@ -236,25 +204,108 @@ function inferKind(record: Record<string, unknown>, label: string): ToneKind {
   return "field";
 }
 
-function extractToneBodies(props: HfieldVolumetricPacketFieldProps): ToneBody[] {
+function colorForTone(frequencyHz: number, kind: ToneKind): string {
+  if (kind === "identity") {
+    return "#f6d36b";
+  }
+
+  if (kind === "runtime") {
+    return "#56d6ff";
+  }
+
+  if (kind === "field") {
+    return "#a98bff";
+  }
+
+  const midi = hzToMidiFloat(Math.max(1, frequencyHz));
+  const pitchClass = ((Math.round(midi) % 12) + 12) % 12;
+  return PITCH_CLASS_COLORS[pitchClass] ?? "#fff2ad";
+}
+
+function roleLaneY(kind: ToneKind, label: string, amplitude: number): number {
+  const lower = label.toLowerCase();
+
+  if (kind === "identity") {
+    return 2.82;
+  }
+
+  if (lower.includes("depth") || lower.includes("lower") || lower.includes("anchor_5")) {
+    return 0.76 + amplitude * 0.42;
+  }
+
+  if (lower.includes("field") || lower.includes("upper") || lower.includes("anchor_9")) {
+    return 1.78 + amplitude * 0.52;
+  }
+
+  if (lower.includes("lead") || lower.includes("payload") || lower.includes("primary")) {
+    return 1.26 + amplitude * 0.72;
+  }
+
+  return kind === "runtime" ? 1.48 + amplitude * 0.48 : 1.18 + amplitude * 0.68;
+}
+
+function pitchPositionX(frequencyHz: number, label: string, index: number): number {
+  const midi = hzToMidiFloat(Math.max(1, frequencyHz));
+  const pitchClassPosition = (((midi % 12) + 12) % 12) / 12;
+  const octave = Math.floor(midi / 12);
+  const hash = hashString(`${label}:${frequencyHz}:${index}`);
+  const octaveNudge = ((octave % 5) - 2) * 0.12;
+  const stableNudge = ((hash % 1000) / 1000 - 0.5) * 0.18;
+
+  return -FIELD_WIDTH / 2 + pitchClassPosition * FIELD_WIDTH + octaveNudge + stableNudge;
+}
+
+function timeToZ(timeMs: number, totalDurationMs: number): number {
+  const ratio = Math.max(0, Math.min(1, timeMs / Math.max(1, totalDurationMs)));
+  return SCAN_MIN_Z + ratio * SCAN_DEPTH;
+}
+
+function eventOpacity(kind: ToneKind): number {
+  if (kind === "identity") {
+    return 0.22;
+  }
+
+  if (kind === "runtime") {
+    return 0.2;
+  }
+
+  return 0.25;
+}
+
+function extractToneBodies(props: HfieldVolumetricPacketFieldProps): { bodies: ToneBody[]; totalDurationMs: number } {
   const roots = [props.carrierReport, props.fieldReport, props.cymaticReport];
   const records = roots.flatMap((root) => collectRecords(root));
 
   const durationCandidates = records
     .flatMap((record) => [
-      firstNumber(record, ["duration_ms", "total_duration_ms", "duration"]),
+      firstNumber(record, ["total_duration_ms", "duration_ms", "duration"]),
       firstNumber(record, ["end_ms", "stop_ms"]),
     ])
     .filter((value): value is number => value !== null && value > 0);
 
-  const fieldDurationMs = Math.max(8000, ...durationCandidates);
-  const candidates: Array<Omit<ToneBody, "id" | "x" | "y" | "z" | "radius" | "color" | "angle"> & { startMs: number; durationMs: number }> = [];
+  const totalDurationMs = Math.max(8000, ...durationCandidates);
+
+  const candidates: Array<{
+    label: string;
+    kind: ToneKind;
+    frequencyHz: number;
+    amplitude: number;
+    startMs: number;
+    durationMs: number;
+  }> = [];
 
   for (const record of records) {
     let frequencyHz =
-      firstNumber(record, ["payload_frequency_hz", "carrier_frequency_hz", "identity_carrier_hz", "frequency_hz", "frequency"]);
+      firstNumber(record, [
+        "payload_frequency_hz",
+        "carrier_frequency_hz",
+        "identity_carrier_hz",
+        "frequency_hz",
+        "frequency",
+      ]);
 
     const midiNote = firstNumber(record, ["midi_note", "midi", "pitch"]);
+
     if ((frequencyHz === null || frequencyHz <= 0) && midiNote !== null && midiNote >= 0 && midiNote <= 127) {
       frequencyHz = midiToHz(midiNote);
     }
@@ -264,20 +315,40 @@ function extractToneBodies(props: HfieldVolumetricPacketFieldProps): ToneBody[] 
     }
 
     const label =
-      firstString(record, ["label", "note_name", "pitch_name", "pitch", "track_id", "runtime_path", "role", "operator", "gesture_id"]) ??
-      `${Math.round(frequencyHz * 10) / 10} Hz`;
+      firstString(record, [
+        "label",
+        "note_name",
+        "pitch_name",
+        "track_id",
+        "runtime_path",
+        "role",
+        "operator",
+        "gesture_id",
+        "lane",
+      ]) ?? `${Math.round(frequencyHz * 1000) / 1000} Hz`;
 
     const kind = inferKind(record, label);
-    const startMs = Math.max(0, firstNumber(record, ["start_ms", "start_time_ms", "time_ms", "window_start_ms"]) ?? 0);
-    const durationMs = Math.max(350, firstNumber(record, ["duration_ms", "length_ms", "window_duration_ms"]) ?? 1600);
+
+    const startMs = Math.max(
+      0,
+      firstNumber(record, ["start_ms", "start_time_ms", "time_ms", "window_start_ms", "slice_start_ms"]) ?? 0,
+    );
+
+    const durationMs = Math.max(
+      MIN_EVENT_MS,
+      firstNumber(record, ["duration_ms", "length_ms", "window_duration_ms", "slice_duration_ms"]) ??
+        (kind === "identity" ? totalDurationMs : 1000),
+    );
+
     const velocity = firstNumber(record, ["velocity", "amplitude", "intensity", "weight", "energy"]) ?? 0.55;
-    const amplitude = Math.max(0.18, Math.min(1.0, velocity));
+    const amplitude = Math.max(0.12, Math.min(1.0, velocity));
 
     const duplicate = candidates.some(
       (candidate) =>
         Math.abs(candidate.frequencyHz - frequencyHz) < 0.001 &&
         candidate.label === label &&
-        Math.abs(candidate.startMs - startMs) < 3,
+        Math.abs(candidate.startMs - startMs) < 3 &&
+        Math.abs(candidate.durationMs - durationMs) < 3,
     );
 
     if (!duplicate) {
@@ -294,7 +365,7 @@ function extractToneBodies(props: HfieldVolumetricPacketFieldProps): ToneBody[] 
 
   if (candidates.length === 0) {
     candidates.push(
-      { label: "file identity carrier", kind: "identity", frequencyHz: 411.6, amplitude: 0.5, startMs: 0, durationMs: fieldDurationMs },
+      { label: "file identity carrier", kind: "identity", frequencyHz: 411.6, amplitude: 0.5, startMs: 0, durationMs: totalDurationMs },
       { label: "C4 payload", kind: "payload", frequencyHz: 261.626, amplitude: 0.72, startMs: 0, durationMs: 2000 },
       { label: "G4 field path", kind: "runtime", frequencyHz: 391.995, amplitude: 0.48, startMs: 2000, durationMs: 2200 },
       { label: "G3 depth path", kind: "runtime", frequencyHz: 195.998, amplitude: 0.42, startMs: 4200, durationMs: 2200 },
@@ -307,48 +378,56 @@ function extractToneBodies(props: HfieldVolumetricPacketFieldProps): ToneBody[] 
       const kindWeight = (kind: ToneKind) => ({ identity: 0, runtime: 1, payload: 2, field: 3 })[kind];
       return kindWeight(a.kind) - kindWeight(b.kind) || a.startMs - b.startMs || a.frequencyHz - b.frequencyHz;
     })
-    .slice(0, 18);
+    .slice(0, 28);
 
-  return limited.map((candidate, index) => {
-    const pitchFold = ((Math.log2(candidate.frequencyHz / 16.35) % 1) + 1) % 1;
-    const startCenter = candidate.startMs + candidate.durationMs / 2;
-    const timePosition = startCenter / fieldDurationMs;
-    const labelHash = hashString(`${candidate.label}:${candidate.frequencyHz}:${index}`);
-    const jitter = ((labelHash % 1000) / 1000 - 0.5) * 0.52;
+  const bodies = limited.map((candidate, index): ToneBody => {
+    const safeDuration = Math.max(MIN_EVENT_MS, candidate.durationMs);
+    const endMs = Math.min(totalDurationMs, candidate.startMs + safeDuration);
+    const zStart = timeToZ(candidate.startMs, totalDurationMs);
+    const zEnd = timeToZ(endMs, totalDurationMs);
+    const zLength = Math.max(0.14, Math.abs(zEnd - zStart));
+    const z = (zStart + zEnd) / 2;
+    const x = pitchPositionX(candidate.frequencyHz, candidate.label, index);
+    const y = roleLaneY(candidate.kind, candidate.label, candidate.amplitude);
+    const color = colorForTone(candidate.frequencyHz, candidate.kind);
+    const phase = ((hashString(`${candidate.label}:${candidate.startMs}:${candidate.durationMs}`) % 6283) / 1000) % (Math.PI * 2);
 
-    const x = -FIELD_WIDTH / 2 + pitchFold * FIELD_WIDTH + jitter;
-    const z = SCAN_MIN_Z + timePosition * (SCAN_MAX_Z - SCAN_MIN_Z);
-    const y =
+    const radiusBase =
       candidate.kind === "identity"
-        ? 1.55
+        ? 0.42
         : candidate.kind === "runtime"
-          ? 0.82 + candidate.amplitude * 0.75
-          : 0.5 + candidate.amplitude * 1.55;
-
-    const radius =
-      candidate.kind === "identity"
-        ? 0.44
-        : candidate.kind === "runtime"
-          ? 0.34 + candidate.amplitude * 0.28
-          : 0.42 + candidate.amplitude * 0.36;
-
-    const color = frequencyToCanonicalColor(candidate.frequencyHz, candidate.kind);
-    const angle = ((labelHash % 360) * Math.PI) / 180;
+          ? 0.3 + candidate.amplitude * 0.22
+          : 0.34 + candidate.amplitude * 0.28;
 
     return {
-      id: `${candidate.kind}-${index}-${labelHash}`,
+      id: `${candidate.kind}-${index}-${hashString(`${candidate.label}:${candidate.frequencyHz}:${candidate.startMs}`)}`,
       label: candidate.label,
       kind: candidate.kind,
       frequencyHz: candidate.frequencyHz,
       amplitude: candidate.amplitude,
+      startMs: candidate.startMs,
+      durationMs: safeDuration,
+      endMs,
       x,
       y,
       z,
-      radius,
+      zStart,
+      zEnd,
+      zLength,
+      radiusX: radiusBase,
+      radiusY: radiusBase * (0.72 + candidate.amplitude * 0.46),
       color,
-      angle,
+      phase,
     };
   });
+
+  return { bodies, totalDurationMs };
+}
+
+function intervalOverlap(a: ToneBody, b: ToneBody): number {
+  const start = Math.max(Math.min(a.zStart, a.zEnd), Math.min(b.zStart, b.zEnd));
+  const end = Math.min(Math.max(a.zStart, a.zEnd), Math.max(b.zStart, b.zEnd));
+  return Math.max(0, end - start);
 }
 
 function buildBridges(bodies: ToneBody[]): BridgeBody[] {
@@ -363,32 +442,39 @@ function buildBridges(bodies: ToneBody[]): BridgeBody[] {
         continue;
       }
 
-      const dx = b.x - a.x;
-      const dz = b.z - a.z;
-      const dy = b.y - a.y;
-      const distance = Math.sqrt(dx * dx + dz * dz + dy * dy);
-      const threshold = (a.radius + b.radius) * 2.25;
-
-      if (distance > threshold) {
+      const overlap = intervalOverlap(a, b);
+      if (overlap <= 0) {
         continue;
       }
 
-      const pressure = 1 - distance / threshold;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const distanceXY = Math.sqrt(dx * dx + dy * dy);
+      const threshold = (a.radiusX + b.radiusX) * 2.7;
+
+      if (distanceXY > threshold) {
+        continue;
+      }
+
+      const zStart = Math.max(Math.min(a.zStart, a.zEnd), Math.min(b.zStart, b.zEnd));
+      const zEnd = Math.min(Math.max(a.zStart, a.zEnd), Math.max(b.zStart, b.zEnd));
+      const pressure = 1 - distanceXY / threshold;
+
       bridges.push({
         id: `bridge-${a.id}-${b.id}`,
         x: (a.x + b.x) / 2,
         y: (a.y + b.y) / 2,
-        z: (a.z + b.z) / 2,
-        length: Math.max(0.2, distance * 0.56),
-        radius: Math.max(0.05, Math.min(a.radius, b.radius) * (0.22 + pressure * 0.36)),
-        angle: Math.atan2(dz, dx),
+        z: (zStart + zEnd) / 2,
+        zLength: Math.max(0.12, zEnd - zStart),
+        radiusX: Math.max(0.05, Math.min(a.radiusX, b.radiusX) * (0.28 + pressure * 0.54)),
+        radiusY: Math.max(0.04, Math.min(a.radiusY, b.radiusY) * (0.2 + pressure * 0.38)),
         colorA: a.color,
         colorB: b.color,
       });
     }
   }
 
-  return bridges.slice(0, 28);
+  return bridges.slice(0, 36);
 }
 
 function currentPlayheadProgress(playheadReport: unknown): number | null {
@@ -436,18 +522,39 @@ function setOpacityOnGroup(group: THREE.Group | null, opacity: number): void {
   });
 }
 
+function activationForScan(body: ToneBody, scanZ: number): number {
+  const start = Math.min(body.zStart, body.zEnd);
+  const end = Math.max(body.zStart, body.zEnd);
+  const feather = Math.max(0.12, Math.min(0.42, body.zLength * 0.24));
+
+  if (scanZ < start - feather || scanZ > end + feather) {
+    return 0;
+  }
+
+  if (scanZ >= start && scanZ <= end) {
+    const edgeDistance = Math.min(scanZ - start, end - scanZ);
+    return Math.max(0.35, Math.min(1, 0.35 + edgeDistance / feather));
+  }
+
+  if (scanZ < start) {
+    return Math.max(0, 1 - (start - scanZ) / feather) * 0.35;
+  }
+
+  return Math.max(0, 1 - (scanZ - end) / feather) * 0.35;
+}
+
 function ReaderGrid() {
   const gridLines = useMemo(() => {
     const lines: Array<{ id: string; x1: number; x2: number; z1: number; z2: number; opacity: number }> = [];
 
     for (let index = 0; index <= 12; index += 1) {
       const x = -FIELD_WIDTH / 2 + (index / 12) * FIELD_WIDTH;
-      lines.push({ id: `x-${index}`, x1: x, x2: x, z1: SCAN_MIN_Z, z2: SCAN_MAX_Z, opacity: index === 6 ? 0.26 : 0.12 });
+      lines.push({ id: `x-${index}`, x1: x, x2: x, z1: SCAN_MIN_Z, z2: SCAN_MAX_Z, opacity: index === 6 ? 0.3 : 0.13 });
     }
 
-    for (let index = 0; index <= 10; index += 1) {
-      const z = SCAN_MIN_Z + (index / 10) * (SCAN_MAX_Z - SCAN_MIN_Z);
-      lines.push({ id: `z-${index}`, x1: -FIELD_WIDTH / 2, x2: FIELD_WIDTH / 2, z1: z, z2: z, opacity: index === 5 ? 0.26 : 0.12 });
+    for (let index = 0; index <= 16; index += 1) {
+      const z = SCAN_MIN_Z + (index / 16) * SCAN_DEPTH;
+      lines.push({ id: `z-${index}`, x1: -FIELD_WIDTH / 2, x2: FIELD_WIDTH / 2, z1: z, z2: z, opacity: index % 4 === 0 ? 0.22 : 0.1 });
     }
 
     return lines;
@@ -456,8 +563,8 @@ function ReaderGrid() {
   return (
     <group position={[0, -0.03, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[FIELD_WIDTH + 0.85, SCAN_MAX_Z - SCAN_MIN_Z + 0.65, 1, 1]} />
-        <meshStandardMaterial color="#061017" transparent opacity={0.34} roughness={0.62} metalness={0.05} side={THREE.DoubleSide} />
+        <planeGeometry args={[FIELD_WIDTH + 0.95, SCAN_DEPTH + 0.75, 1, 1]} />
+        <meshStandardMaterial color="#061017" transparent opacity={0.36} roughness={0.62} metalness={0.05} side={THREE.DoubleSide} />
       </mesh>
 
       {gridLines.map((line) => {
@@ -482,33 +589,25 @@ function ReaderGrid() {
 }
 
 function ToneBodyMesh({ body }: { body: ToneBody }) {
-  const surfaceOpacity = body.kind === "identity" ? 0.3 : body.kind === "runtime" ? 0.22 : 0.26;
-  const wireOpacity = body.kind === "identity" ? 0.62 : body.kind === "runtime" ? 0.42 : 0.48;
-
   return (
-    <group position={[body.x, body.y, body.z]} rotation={[0, body.angle, 0]}>
-      <mesh scale={[body.radius * 1.12, body.radius * (0.74 + body.amplitude * 0.52), body.radius * 1.12]}>
-        <sphereGeometry args={[1, 40, 24]} />
+    <group position={[body.x, body.y, body.z]} rotation={[0, 0, body.phase * 0.04]}>
+      <mesh scale={[body.radiusX, body.radiusY, body.zLength / 2]}>
+        <sphereGeometry args={[1, 42, 24]} />
         <meshStandardMaterial
           color={body.color}
           transparent
-          opacity={surfaceOpacity}
-          roughness={0.2}
+          opacity={eventOpacity(body.kind)}
+          roughness={0.25}
           metalness={0.08}
           emissive={body.color}
-          emissiveIntensity={body.kind === "identity" ? 0.14 : 0.08}
+          emissiveIntensity={body.kind === "identity" ? 0.18 : 0.1}
           depthWrite={false}
         />
       </mesh>
 
-      <mesh scale={[body.radius * 1.16, body.radius * (0.76 + body.amplitude * 0.54), body.radius * 1.16]}>
-        <sphereGeometry args={[1, 28, 16]} />
-        <meshBasicMaterial color={body.color} transparent opacity={wireOpacity} wireframe depthWrite={false} />
-      </mesh>
-
-      <mesh rotation={[Math.PI / 2, 0, 0]} scale={[body.radius * 1.42, body.radius * 1.42, body.radius * 1.42]}>
-        <torusGeometry args={[0.72, 0.012, 8, 84]} />
-        <meshBasicMaterial color={body.color} transparent opacity={0.38} depthWrite={false} />
+      <mesh scale={[body.radiusX * 1.04, body.radiusY * 1.04, body.zLength / 2 + 0.012]}>
+        <sphereGeometry args={[1, 30, 18]} />
+        <meshBasicMaterial color={body.color} transparent opacity={0.44} wireframe depthWrite={false} />
       </mesh>
     </group>
   );
@@ -516,15 +615,15 @@ function ToneBodyMesh({ body }: { body: ToneBody }) {
 
 function BridgeMesh({ bridge }: { bridge: BridgeBody }) {
   return (
-    <group position={[bridge.x, bridge.y, bridge.z]} rotation={[0, -bridge.angle, 0]}>
-      <mesh scale={[bridge.length, bridge.radius, bridge.radius]}>
+    <group position={[bridge.x, bridge.y, bridge.z]}>
+      <mesh scale={[bridge.radiusX, bridge.radiusY, bridge.zLength / 2]}>
         <sphereGeometry args={[1, 32, 16]} />
         <meshStandardMaterial
           color={bridge.colorA}
           emissive={bridge.colorB}
-          emissiveIntensity={0.08}
+          emissiveIntensity={0.12}
           transparent
-          opacity={0.22}
+          opacity={0.24}
           roughness={0.42}
           metalness={0.03}
           depthWrite={false}
@@ -535,20 +634,20 @@ function BridgeMesh({ bridge }: { bridge: BridgeBody }) {
 }
 
 function SliceIntersection({ body }: { body: ToneBody }) {
-  const rings = [0.62, 0.88, 1.14];
+  const rings = [0.62, 0.88, 1.14, 1.4];
 
   return (
     <group>
       {rings.map((ratio, index) => (
-        <mesh key={`${body.id}-ring-${ratio}`} rotation={[0, 0, 0]} scale={[ratio, ratio, ratio]}>
-          <torusGeometry args={[body.radius * 0.76, 0.012 + index * 0.0025, 8, 96]} />
-          <meshBasicMaterial color={body.color} transparent opacity={0.62 - index * 0.14} depthWrite={false} />
+        <mesh key={`${body.id}-ring-${ratio}`} scale={[ratio, ratio, ratio]}>
+          <torusGeometry args={[body.radiusX * 0.86, 0.012 + index * 0.0025, 8, 112]} />
+          <meshBasicMaterial color={body.color} transparent opacity={0.66 - index * 0.12} depthWrite={false} />
         </mesh>
       ))}
 
-      <mesh scale={[body.radius * 0.18, body.radius * 0.18, body.radius * 0.18]}>
+      <mesh scale={[body.radiusX * 0.18, body.radiusX * 0.18, body.radiusX * 0.18]}>
         <sphereGeometry args={[1, 16, 12]} />
-        <meshBasicMaterial color="#fff7c9" transparent opacity={0.86} depthWrite={false} />
+        <meshBasicMaterial color="#fff7c9" transparent opacity={0.88} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -564,7 +663,7 @@ export default function HfieldVolumetricPacketField({
   const scanRef = useRef<THREE.Group | null>(null);
   const sliceRefs = useRef<Array<THREE.Group | null>>([]);
 
-  const bodies = useMemo(
+  const { bodies, totalDurationMs } = useMemo(
     () => extractToneBodies({ fieldReport, cymaticReport, carrierReport, playheadReport, isPlaying }),
     [fieldReport, cymaticReport, carrierReport, playheadReport, isPlaying],
   );
@@ -573,8 +672,8 @@ export default function HfieldVolumetricPacketField({
   const baseProgress = currentPlayheadProgress(playheadReport);
 
   useFrame(({ clock }) => {
-    const animatedProgress = ((clock.getElapsedTime() * 0.12) % 1 + 1) % 1;
-    const progress = isPlaying ? animatedProgress : baseProgress ?? 0.38;
+    const animatedProgress = ((clock.getElapsedTime() * (1000 / totalDurationMs)) % 1 + 1) % 1;
+    const progress = baseProgress ?? (isPlaying ? animatedProgress : 0);
     const scanZ = THREE.MathUtils.lerp(SCAN_MIN_Z, SCAN_MAX_Z, progress);
 
     if (scanRef.current) {
@@ -583,15 +682,16 @@ export default function HfieldVolumetricPacketField({
 
     bodies.forEach((body, index) => {
       const slice = sliceRefs.current[index] ?? null;
-      const dz = Math.abs(body.z - scanZ);
-      const activation = Math.max(0, 1 - dz / Math.max(0.001, body.radius * 1.8));
+      const activation = activationForScan(body, scanZ);
 
       if (slice) {
-        slice.visible = activation > 0.015;
+        slice.visible = activation > 0.012;
         slice.position.set(body.x, body.y, scanZ);
-        const sliceScale = 0.26 + activation * (1.05 + body.amplitude * 0.55);
+
+        const sliceScale = 0.3 + activation * (1.08 + body.amplitude * 0.64);
         slice.scale.set(sliceScale, sliceScale, sliceScale);
-        setOpacityOnGroup(slice, 0.1 + activation * 0.78);
+
+        setOpacityOnGroup(slice, 0.08 + activation * 0.84);
       }
     });
   });
@@ -599,10 +699,10 @@ export default function HfieldVolumetricPacketField({
   return (
     <group>
       <color attach="background" args={["#02070b"]} />
-      <ambientLight intensity={0.58} />
-      <directionalLight position={[4, 5, 4]} intensity={1.15} />
-      <pointLight position={[0, 2.6, 1.2]} intensity={1.4} color="#c9f9ff" />
-      <pointLight position={[-2.8, 1.8, -1.8]} intensity={0.76} color="#f6d36b" />
+      <ambientLight intensity={0.56} />
+      <directionalLight position={[4, 5, 4]} intensity={1.12} />
+      <pointLight position={[0, 2.8, 1.2]} intensity={1.45} color="#c9f9ff" />
+      <pointLight position={[-3.2, 1.9, -2.2]} intensity={0.76} color="#f6d36b" />
 
       <OrbitControls
         makeDefault
@@ -610,32 +710,30 @@ export default function HfieldVolumetricPacketField({
         enableZoom
         enableRotate
         autoRotate={false}
-        minDistance={1.6}
-        maxDistance={15}
-        target={[0, 1.05, 0]}
+        minDistance={1.45}
+        maxDistance={16}
+        target={[0, 1.25, 0]}
       />
 
       <ReaderGrid />
 
-      <group>
-        {bridges.map((bridge) => (
-          <BridgeMesh key={bridge.id} bridge={bridge} />
-        ))}
+      {bridges.map((bridge) => (
+        <BridgeMesh key={bridge.id} bridge={bridge} />
+      ))}
 
-        {bodies.map((body) => (
-          <ToneBodyMesh key={body.id} body={body} />
-        ))}
-      </group>
+      {bodies.map((body) => (
+        <ToneBodyMesh key={body.id} body={body} />
+      ))}
 
       <group ref={scanRef}>
         <mesh position={[0, FIELD_HEIGHT / 2 - 0.04, 0]}>
-          <boxGeometry args={[FIELD_WIDTH + 0.92, FIELD_HEIGHT, 0.025]} />
+          <boxGeometry args={[FIELD_WIDTH + 1.0, FIELD_HEIGHT, 0.025]} />
           <meshStandardMaterial
             color="#d8fbff"
             emissive="#6ae8ff"
-            emissiveIntensity={0.08}
+            emissiveIntensity={0.1}
             transparent
-            opacity={0.16}
+            opacity={0.18}
             roughness={0.08}
             metalness={0.04}
             side={THREE.DoubleSide}
@@ -644,13 +742,13 @@ export default function HfieldVolumetricPacketField({
         </mesh>
 
         <mesh position={[0, FIELD_HEIGHT - 0.04, 0]}>
-          <boxGeometry args={[FIELD_WIDTH + 1.05, 0.025, 0.07]} />
-          <meshBasicMaterial color="#eaffff" transparent opacity={0.72} depthWrite={false} />
+          <boxGeometry args={[FIELD_WIDTH + 1.08, 0.026, 0.07]} />
+          <meshBasicMaterial color="#eaffff" transparent opacity={0.76} depthWrite={false} />
         </mesh>
 
         <mesh position={[0, 0.02, 0]}>
-          <boxGeometry args={[FIELD_WIDTH + 1.05, 0.025, 0.07]} />
-          <meshBasicMaterial color="#eaffff" transparent opacity={0.42} depthWrite={false} />
+          <boxGeometry args={[FIELD_WIDTH + 1.08, 0.026, 0.07]} />
+          <meshBasicMaterial color="#eaffff" transparent opacity={0.46} depthWrite={false} />
         </mesh>
       </group>
 
@@ -665,16 +763,16 @@ export default function HfieldVolumetricPacketField({
         </group>
       ))}
 
-      <group position={[-FIELD_WIDTH / 2 - 0.35, 0.06, SCAN_MIN_Z - 0.18]}>
+      <group position={[-FIELD_WIDTH / 2 - 0.38, 0.06, SCAN_MIN_Z - 0.22]}>
         <mesh>
-          <boxGeometry args={[0.18, 0.18, 0.18]} />
+          <boxGeometry args={[0.2, 0.2, 0.2]} />
           <meshBasicMaterial color="#f6d36b" transparent opacity={0.92} />
         </mesh>
       </group>
 
-      <group position={[FIELD_WIDTH / 2 + 0.35, 0.06, SCAN_MAX_Z + 0.18]}>
+      <group position={[FIELD_WIDTH / 2 + 0.38, 0.06, SCAN_MAX_Z + 0.22]}>
         <mesh>
-          <boxGeometry args={[0.18, 0.18, 0.18]} />
+          <boxGeometry args={[0.2, 0.2, 0.2]} />
           <meshBasicMaterial color="#56d6ff" transparent opacity={0.92} />
         </mesh>
       </group>

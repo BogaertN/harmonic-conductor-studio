@@ -1834,3 +1834,15 @@ body {
   content: " · volumetric packet field active · tone bodies persist until the glass slider reveals their cymatic slice";
 }
 /* END HFIELD Volumetric Packet Field v1 */
+
+
+/* HFIELD Timed Spatial Tone Binding v1 */
+.field-reader-stage-hint::after {
+  content: " · X = pitch/spatial reference · Y = cymatic displacement/lane · Z = field depth · glass slider = T scan · body length = tone duration";
+  color: rgba(86, 214, 255, 0.82);
+}
+
+.field-reader-focus-active .field-reader-stage-hint::after {
+  content: " · timed spatial tone binding active · bubbles persist for their score duration and light when the glass reader intersects them";
+}
+/* END HFIELD Timed Spatial Tone Binding v1 */
