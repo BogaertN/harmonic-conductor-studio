@@ -11,6 +11,7 @@ import {
   editCurrentNotationNote,
   deleteCurrentNotationNote,
   exportCurrentHfieldCombinedWav,
+  exportCurrentHfieldCanonicalBundleManifestJson,
   exportCurrentHfieldCymaticSurfaceJson,
   exportCurrentHfieldPacketContractJson,
   exportCurrentHfieldProjectJson,
@@ -85,6 +86,7 @@ import {
   bindCurrentHfieldIdentityVaultReference,
   getCurrentHfieldIdentityVaultReferenceReport,
   type HfieldIdentityVaultReferenceBindingReport,
+  type HfieldCanonicalBundleManifestExportReport,
 } from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
@@ -121,6 +123,7 @@ type DiagnosticKey =
   | "hfieldRuntimeCarrierExport"
   | "hfieldPacketContractExport"
   | "hfieldCombinedWavExport"
+  | "hfieldCanonicalBundleManifestExport"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -181,6 +184,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "hfieldRuntimeCarrierExport", label: "Runtime Carrier Export" },
   { key: "hfieldPacketContractExport", label: "Packet Contract Export" },
   { key: "hfieldCombinedWavExport", label: ".hfield Combined WAV Export" },
+  { key: "hfieldCanonicalBundleManifestExport", label: "Canonical Bundle Manifest Export" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -586,6 +590,7 @@ export default function App() {
   const [hfieldRuntimeCarrierExportReport, setHfieldRuntimeCarrierExportReport] = useState<ExportFileReport | null>(null);
   const [hfieldPacketContractExportReport, setHfieldPacketContractExportReport] = useState<ExportFileReport | null>(null);
   const [hfieldCombinedWavExportReport, setHfieldCombinedWavExportReport] = useState<WavRenderReport | null>(null);
+  const [hfieldCanonicalBundleManifestExportReport, setHfieldCanonicalBundleManifestExportReport] = useState<HfieldCanonicalBundleManifestExportReport | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1285,6 +1290,17 @@ export default function App() {
     }
   }
 
+
+  async function exportHfieldCanonicalBundleManifest() {
+    setError(null);
+    try {
+      setHfieldCanonicalBundleManifestExportReport(await exportCurrentHfieldCanonicalBundleManifestJson());
+      setSelectedDiagnostic("hfieldCanonicalBundleManifestExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1499,6 +1515,8 @@ export default function App() {
         return hfieldPacketContractExportReport;
       case "hfieldCombinedWavExport":
         return hfieldCombinedWavExportReport;
+      case "hfieldCanonicalBundleManifestExport":
+        return hfieldCanonicalBundleManifestExportReport;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -1979,8 +1997,9 @@ export default function App() {
                   <button onClick={exportHfieldRuntimeCarrier} type="button">Export Carrier Packet</button>
                   <button onClick={exportHfieldPacketContract} type="button">Export Packet Contract</button>
                   <button onClick={exportHfieldCombinedWav} type="button">Export Combined WAV</button>
+                  <button onClick={exportHfieldCanonicalBundleManifest} type="button">Export Bundle Manifest</button>
                 </div>
-                <pre>{JSON.stringify(hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">

@@ -55,6 +55,31 @@ export type ExportFileReport = {
   created_unix_seconds: number;
 };
 
+
+export type HfieldCanonicalBundleManifestExportReport = {
+  status: string;
+  export_kind: string;
+  manifest_contract_id: string;
+  bundle_id: string;
+  bundle_dir: string;
+  bundle_manifest_hash: string;
+  manifest_file_hash: string;
+  manifest_file: unknown;
+  artifact_count: number;
+  artifact_manifest: unknown[];
+  authority_boundaries: {
+    private_identity_export_disabled: boolean;
+    public_identity_disabled: boolean;
+    economic_processing_disabled: boolean;
+    portable_rights_disabled: boolean;
+    live_identity_vault_write_performed: boolean;
+    forge_mutation_performed: boolean;
+    forge_bridge_execution_mode: string;
+    forge_bridge_live_execution_authorized: boolean;
+  };
+  replay_verifier_fields: unknown;
+};
+
 export type PlaybackReport = {
   status: string;
   message: string;
@@ -1115,6 +1140,11 @@ export async function exportCurrentHfieldReaderBundleJson(): Promise<ExportFileR
 
 export async function exportCurrentHfieldCombinedWav(): Promise<WavRenderReport> {
   return await invoke<WavRenderReport>("export_current_hfield_combined_wav");
+}
+
+
+export async function exportCurrentHfieldCanonicalBundleManifestJson(): Promise<HfieldCanonicalBundleManifestExportReport> {
+  return await invoke<HfieldCanonicalBundleManifestExportReport>("export_current_hfield_canonical_bundle_manifest_json");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

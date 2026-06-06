@@ -1123,6 +1123,74 @@ fn write_current_score_json_export(
     write_json_export_report(export_kind, &file_name, payload)
 }
 
+fn app_relative_export_path(path: &std::path::Path) -> String {
+    match path.strip_prefix(app_root_dir()) {
+        Ok(relative) => relative.to_string_lossy().to_string(),
+        Err(_) => path.to_string_lossy().to_string(),
+    }
+}
+
+fn write_bundle_json_artifact(
+    bundle_dir: &std::path::Path,
+    file_name: &str,
+    artifact_kind: &str,
+    verification_role: &str,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let output_path = bundle_dir.join(file_name);
+    let json_text = serde_json::to_string_pretty(payload)
+        .map_err(|err| format!("failed to serialize bundle JSON artifact {file_name}: {err}"))?;
+
+    std::fs::write(&output_path, json_text.as_bytes())
+        .map_err(|err| format!("failed to write bundle JSON artifact {file_name}: {err}"))?;
+
+    let bytes = std::fs::read(&output_path)
+        .map_err(|err| format!("failed to read bundle JSON artifact {file_name}: {err}"))?;
+    let file_hash = blake3::hash(&bytes).to_hex().to_string();
+
+    Ok(json!({
+        "artifact_kind": artifact_kind,
+        "verification_role": verification_role,
+        "file_name": file_name,
+        "output_path": output_path.to_string_lossy().to_string(),
+        "relative_path": app_relative_export_path(&output_path),
+        "bytes": bytes.len(),
+        "blake3_hash": file_hash
+    }))
+}
+
+fn write_bundle_wav_artifact(
+    bundle_dir: &std::path::Path,
+    file_name: &str,
+    artifact_kind: &str,
+    verification_role: &str,
+    compiled: CompiledAudio,
+) -> Result<serde_json::Value, String> {
+    let output_path = bundle_dir.join(file_name);
+    let summary = summarize_waveform(&compiled.samples);
+
+    write_wav_i16(&output_path, &compiled)
+        .map_err(|err| format!("failed to write bundle WAV artifact {file_name}: {err}"))?;
+
+    let bytes = std::fs::read(&output_path)
+        .map_err(|err| format!("failed to read bundle WAV artifact {file_name}: {err}"))?;
+    let file_hash = blake3::hash(&bytes).to_hex().to_string();
+
+    Ok(json!({
+        "artifact_kind": artifact_kind,
+        "verification_role": verification_role,
+        "file_name": file_name,
+        "output_path": output_path.to_string_lossy().to_string(),
+        "relative_path": app_relative_export_path(&output_path),
+        "bytes": bytes.len(),
+        "blake3_hash": file_hash,
+        "sample_rate_hz": compiled.sample_rate_hz,
+        "sample_count": compiled.samples.len(),
+        "duration_seconds": compiled.samples.len() as f64 / compiled.sample_rate_hz as f64,
+        "waveform_summary": summary
+    }))
+}
+
 #[tauri::command]
 fn export_current_hfield_project_json(
     state: tauri::State<'_, AppState>,
@@ -1215,6 +1283,217 @@ fn export_current_hfield_combined_wav(
     let compiled = compile_combined_music_and_conductor_preview(&score, 48_000);
     let file_name = export_file_name(&score, "combined_audio", "wav");
     Ok(write_rendered_wav_report(&file_name, compiled))
+}
+
+#[tauri::command]
+fn export_current_hfield_canonical_bundle_manifest_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let (canonical_score, migration_report) = canonicalized_hfield_score(&score);
+    assert_hfield_packet_openable(&canonical_score)?;
+
+    let source_score_hash = score_hash_hex(&canonical_score)
+        .map_err(|err| format!("canonical score hash failed: {err}"))?;
+    let short_hash = source_score_hash.chars().take(12).collect::<String>();
+    let created_unix_seconds = unix_timestamp_seconds();
+    let bundle_id = format!(
+        "{}_canonical_bundle_{}_{}",
+        sanitize_export_stem(&canonical_score.title),
+        short_hash,
+        created_unix_seconds
+    );
+    let bundle_dir = export_hfield_dir()?.join("bundles").join(&bundle_id);
+    std::fs::create_dir_all(&bundle_dir)
+        .map_err(|err| format!("failed to create canonical bundle directory: {err}"))?;
+
+    let packet_contract = validate_hfield_packet_contract(&canonical_score);
+    let identity_summary = summarize_hfield_identity_vault_reference_binding(&canonical_score);
+    let runtime_carrier = synthesize_hfield_runtime_carrier_packet_model(&canonical_score);
+    let cymatic_surface = synthesize_hfield_cymatic_reader_surface(&canonical_score);
+    let rust_render_manifest = create_hfield_rust_render_manifest(&canonical_score);
+    let field_synthesis = synthesize_hfield_field(&canonical_score);
+    let forge_bridge_stub = create_forge_packet_bridge_stub_report(&canonical_score);
+
+    let canonical_project_payload = json!({
+        "contract_id": "aiweb.hfield.export.canonical_project.v1",
+        "export_kind": "canonical_project",
+        "migration_report": migration_report,
+        "score": canonical_score
+    });
+
+    let reader_bundle_payload = json!({
+        "contract_id": "aiweb.hfield.reader_export_bundle.v1",
+        "export_kind": "reader_bundle",
+        "score_hash": source_score_hash,
+        "title": canonical_project_payload["score"]["title"].clone(),
+        "format": canonical_project_payload["score"]["format"].clone(),
+        "version": canonical_project_payload["score"]["version"].clone(),
+        "packet_contract": packet_contract,
+        "identity_vault_reference_summary": identity_summary,
+        "runtime_carrier_packet": runtime_carrier,
+        "cymatic_reader_surface": cymatic_surface,
+        "rust_render_manifest": rust_render_manifest,
+        "field_synthesis": field_synthesis,
+        "forge_bridge_stub": forge_bridge_stub
+    });
+
+    let mut artifacts = vec![
+        write_bundle_json_artifact(
+            &bundle_dir,
+            "canonical_project.hfield.json",
+            "canonical_project_json",
+            "source_score_canonicalization_and_hash_verification",
+            &canonical_project_payload,
+        )?,
+        write_bundle_json_artifact(
+            &bundle_dir,
+            "reader_bundle.json",
+            "reader_bundle_json",
+            "portable_reader_bundle_replay_input",
+            &reader_bundle_payload,
+        )?,
+        write_bundle_json_artifact(
+            &bundle_dir,
+            "rust_render_manifest.json",
+            "rust_render_manifest_json",
+            "renderer_geometry_and_coordinate_verification",
+            &reader_bundle_payload["rust_render_manifest"],
+        )?,
+        write_bundle_json_artifact(
+            &bundle_dir,
+            "cymatic_reader_surface.json",
+            "cymatic_reader_surface_json",
+            "score_synthesized_cymatic_surface_verification",
+            &reader_bundle_payload["cymatic_reader_surface"],
+        )?,
+        write_bundle_json_artifact(
+            &bundle_dir,
+            "runtime_carrier_packet.json",
+            "runtime_carrier_packet_json",
+            "carrier_payload_descriptor_verification",
+            &reader_bundle_payload["runtime_carrier_packet"],
+        )?,
+        write_bundle_json_artifact(
+            &bundle_dir,
+            "packet_contract.json",
+            "packet_contract_json",
+            "hfield_packet_contract_gate_verification",
+            &reader_bundle_payload["packet_contract"],
+        )?,
+        write_bundle_json_artifact(
+            &bundle_dir,
+            "identity_vault_reference_summary.json",
+            "identity_vault_reference_summary_json",
+            "reference_only_custody_boundary_verification",
+            &reader_bundle_payload["identity_vault_reference_summary"],
+        )?,
+    ];
+    let canonical_score_for_audio: FieldScore =
+        serde_json::from_value(canonical_project_payload["score"].clone())
+            .map_err(|err| format!("canonical score rehydrate failed for WAV export: {err}"))?;
+    artifacts.push(write_bundle_wav_artifact(
+        &bundle_dir,
+        "combined_audio.wav",
+        "combined_audio_wav",
+        "audio_render_hash_for_later_replay_verifier",
+        compile_combined_music_and_conductor_preview(&canonical_score_for_audio, 48_000),
+    )?);
+
+    let authority_boundaries = json!({
+        "private_identity_export_disabled": reader_bundle_payload["identity_vault_reference_summary"]["private_identity_export_disabled"].clone(),
+        "public_identity_disabled": reader_bundle_payload["identity_vault_reference_summary"]["public_identity_disabled"].clone(),
+        "economic_processing_disabled": reader_bundle_payload["identity_vault_reference_summary"]["economic_processing_disabled"].clone(),
+        "portable_rights_disabled": reader_bundle_payload["identity_vault_reference_summary"]["portable_rights_disabled"].clone(),
+        "live_identity_vault_write_performed": reader_bundle_payload["identity_vault_reference_summary"]["live_identity_vault_write_performed"].clone(),
+        "forge_mutation_performed": reader_bundle_payload["identity_vault_reference_summary"]["forge_mutation_performed"].clone(),
+        "forge_bridge_execution_mode": reader_bundle_payload["forge_bridge_stub"]["execution_mode"].clone(),
+        "forge_bridge_live_execution_authorized": reader_bundle_payload["forge_bridge_stub"]["export_policy"]["live_execution_authorized"].clone()
+    });
+
+    let mut manifest_payload = json!({
+        "contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
+        "export_kind": "canonical_bundle_manifest",
+        "bundle_id": bundle_id,
+        "bundle_manifest_hash": null,
+        "created_unix_seconds": created_unix_seconds,
+        "source_hfield_score_hash": source_score_hash,
+        "canonical_project_json_hash": artifacts[0]["blake3_hash"].clone(),
+        "reader_bundle_json_hash": artifacts[1]["blake3_hash"].clone(),
+        "rust_render_manifest_json_hash": artifacts[2]["blake3_hash"].clone(),
+        "cymatic_surface_json_hash": artifacts[3]["blake3_hash"].clone(),
+        "runtime_carrier_packet_json_hash": artifacts[4]["blake3_hash"].clone(),
+        "packet_contract_json_hash": artifacts[5]["blake3_hash"].clone(),
+        "combined_wav_hash": artifacts[7]["blake3_hash"].clone(),
+        "identity_vault_reference_summary": reader_bundle_payload["identity_vault_reference_summary"].clone(),
+        "authority_boundaries": authority_boundaries,
+        "toolchain_build_info": {
+            "rust_crate": "harmonic-conductor-studio-src-tauri",
+            "rust_crate_version": env!("CARGO_PKG_VERSION"),
+            "cargo_manifest_dir": env!("CARGO_MANIFEST_DIR"),
+            "target_os": std::env::consts::OS,
+            "target_arch": std::env::consts::ARCH,
+            "tauri_app_root": app_root_dir().to_string_lossy().to_string()
+        },
+        "export_paths": {
+            "bundle_dir": bundle_dir.to_string_lossy().to_string(),
+            "bundle_dir_relative": app_relative_export_path(&bundle_dir)
+        },
+        "export_inventory": artifacts,
+        "replay_verifier_fields": {
+            "contract_id": "aiweb.hfield.export_replay_verifier.input.v1",
+            "expected_artifact_count": 8,
+            "required_artifact_kinds": [
+                "canonical_project_json",
+                "reader_bundle_json",
+                "rust_render_manifest_json",
+                "cymatic_reader_surface_json",
+                "runtime_carrier_packet_json",
+                "packet_contract_json",
+                "identity_vault_reference_summary_json",
+                "combined_audio_wav"
+            ],
+            "hash_algorithm": "BLAKE3",
+            "must_recompute_source_score_hash": true,
+            "must_recompute_all_artifact_hashes": true,
+            "must_verify_no_private_identity_export": true,
+            "must_verify_no_live_identity_vault_write": true,
+            "must_verify_no_forge_mutation": true,
+            "must_verify_canonical_project_opens_as_hfield": true,
+            "must_verify_reader_bundle_matches_manifest_hashes": true,
+            "must_verify_audio_hash_matches_manifest": true
+        },
+        "warnings": []
+    });
+
+    let manifest_bytes_for_hash = serde_json::to_vec_pretty(&manifest_payload)
+        .map_err(|err| format!("failed to serialize canonical bundle manifest for hash: {err}"))?;
+    let bundle_manifest_hash = blake3::hash(&manifest_bytes_for_hash).to_hex().to_string();
+    manifest_payload["bundle_manifest_hash"] =
+        serde_json::Value::String(bundle_manifest_hash.clone());
+
+    let manifest_artifact = write_bundle_json_artifact(
+        &bundle_dir,
+        "canonical_bundle_manifest.json",
+        "canonical_bundle_manifest_json",
+        "bundle_hash_inventory_and_replay_seed",
+        &manifest_payload,
+    )?;
+
+    Ok(json!({
+        "status": "ok",
+        "export_kind": "canonical_bundle_manifest",
+        "manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
+        "bundle_id": manifest_payload["bundle_id"].clone(),
+        "bundle_dir": bundle_dir.to_string_lossy().to_string(),
+        "bundle_manifest_hash": bundle_manifest_hash,
+        "manifest_file_hash": manifest_artifact["blake3_hash"].clone(),
+        "manifest_file": manifest_artifact,
+        "artifact_count": 8,
+        "artifact_manifest": manifest_payload["export_inventory"].clone(),
+        "authority_boundaries": manifest_payload["authority_boundaries"].clone(),
+        "replay_verifier_fields": manifest_payload["replay_verifier_fields"].clone()
+    }))
 }
 
 #[tauri::command]
@@ -1810,6 +2089,7 @@ fn main() {
             export_current_hfield_rust_render_manifest_json,
             export_current_hfield_reader_bundle_json,
             export_current_hfield_combined_wav,
+            export_current_hfield_canonical_bundle_manifest_json,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,
