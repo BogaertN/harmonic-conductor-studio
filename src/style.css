@@ -1491,3 +1491,120 @@ body {
 .compact-property-list span {
   font-size: 0.72rem;
 }
+
+/* HFIELD 3D Phase Field Viewport v1 */
+.field-workspace {
+  min-height: 0;
+}
+
+.phase-field-viewport-card {
+  display: grid;
+  grid-template-rows: auto minmax(440px, 1fr) auto;
+  gap: 1rem;
+  min-height: 640px;
+  border: 1px solid rgba(102, 179, 255, 0.22);
+  border-radius: 22px;
+  padding: 1rem;
+  background:
+    radial-gradient(circle at 22% 0%, rgba(84, 214, 255, 0.14), transparent 28%),
+    radial-gradient(circle at 78% 10%, rgba(255, 178, 63, 0.12), transparent 28%),
+    linear-gradient(145deg, rgba(6, 10, 18, 0.98), rgba(7, 11, 20, 0.9));
+  box-shadow: inset 0 0 32px rgba(84, 214, 255, 0.06), 0 24px 80px rgba(0, 0, 0, 0.32);
+}
+
+.phase-field-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.phase-field-header h3 {
+  margin: 0.1rem 0 0.25rem;
+}
+
+.phase-field-viewport-shell {
+  position: relative;
+  min-height: 440px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: #05070c;
+}
+
+.phase-field-viewport-shell canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.phase-field-empty-state {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  min-height: 440px;
+  padding: 2rem;
+  text-align: center;
+  color: rgba(236, 245, 255, 0.82);
+}
+
+.phase-field-empty-state h4 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.phase-field-empty-state p {
+  max-width: 560px;
+  margin: 0;
+}
+
+.phase-field-readout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.phase-field-readout-grid section {
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.phase-field-readout-grid strong,
+.phase-field-readout-grid span {
+  display: block;
+}
+
+.phase-field-readout-grid strong {
+  margin-bottom: 0.3rem;
+  color: rgba(184, 215, 255, 0.78);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.phase-field-readout-grid span {
+  overflow: hidden;
+  color: rgba(247, 250, 255, 0.92);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .phase-field-header {
+    display: grid;
+  }
+
+  .phase-field-readout-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .phase-field-readout-grid {
+    grid-template-columns: 1fr;
+  }
+}

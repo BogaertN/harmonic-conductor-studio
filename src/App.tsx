@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { HfieldPhaseFieldViewport } from "./components/HfieldPhaseFieldViewport";
 import {
   appendGestureToCurrentScore,
   appendNoteToCurrentTrack,
@@ -14,6 +15,7 @@ import {
   getCurrentConductorMotionReport,
   getCurrentGestureTimeline,
   getCurrentHfieldPacketContractReport,
+  getCurrentHfieldFieldSynthesisReport,
   getCurrentForgePacketBridgeStubReport,
   getCurrentMusicTimeline,
   getCurrentNotationLayout,
@@ -55,6 +57,7 @@ import {
   type ConductorMotionReport,
   type GestureTimelineReport,
   type HfieldPacketContractReport,
+  type HfieldFieldSynthesisReport,
   type ForgePacketBridgeStubReport,
   type MusicPreviewReport,
   type LoopPhraseReport,
@@ -71,11 +74,12 @@ import {
   type WavRenderReport
 } from "./bridge/tauriCommands";
 
-type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "project" | "diagnostics";
+type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
 type DiagnosticKey =
   | "projectReport"
   | "projectList"
   | "packetContract"
+  | "fieldSynthesis"
   | "forgeBridgeStub"
   | "playheadCursor"
   | "loopPhraseReport"
@@ -126,6 +130,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "projectReport", label: "Project File Report" },
   { key: "projectList", label: "Project List" },
   { key: "packetContract", label: ".hfield Packet Contract" },
+  { key: "fieldSynthesis", label: ".hfield Field Synthesis" },
   { key: "forgeBridgeStub", label: "Forge Bridge Stub" },
   { key: "playheadCursor", label: "Playhead Cursor" },
   { key: "loopPhraseReport", label: "Loop Phrase" },
@@ -525,6 +530,7 @@ export default function App() {
   const [projectReport, setProjectReport] = useState<ProjectFileReport | null>(null);
   const [projectList, setProjectList] = useState<ProjectListReport | null>(null);
   const [packetContractReport, setPacketContractReport] = useState<HfieldPacketContractReport | null>(null);
+  const [fieldSynthesisReport, setFieldSynthesisReport] = useState<HfieldFieldSynthesisReport | null>(null);
   const [forgeBridgeStubReport, setForgeBridgeStubReport] = useState<ForgePacketBridgeStubReport | null>(null);
   const [playheadCursorReport, setPlayheadCursorReport] = useState<PlayheadCursorReport | null>(null);
   const [loopStartMeasure, setLoopStartMeasure] = useState(1);
@@ -654,10 +660,21 @@ export default function App() {
     setMappingReport(await getCurrentConductorMappingReport());
     setMotionReport(await getCurrentConductorMotionReport());
     setPacketContractReport(await getCurrentHfieldPacketContractReport());
+    setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
     setForgeBridgeStubReport(await getCurrentForgePacketBridgeStubReport());
     setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
     setLoopPhraseReport(await getCurrentLoopPhraseReport(loopStartMeasure, loopEndMeasure));
     resetMotionAnimation();
+  }
+
+  async function refreshFieldSynthesis() {
+    setError(null);
+    try {
+      setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
+      setSelectedDiagnostic("fieldSynthesis");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function refreshProjectList() {
@@ -755,6 +772,7 @@ export default function App() {
     setMotionReport(await getCurrentConductorMotionReport());
     setSeedMusicScore(await getCurrentProjectScore());
     setPlayheadCursorReport(await getCurrentPlayheadCursorReport(editReport.selected_note?.start_ms ?? 0));
+    setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
     setSelectedDiagnostic("notationEditReport");
   }
 
@@ -1229,6 +1247,8 @@ export default function App() {
         return projectList;
       case "packetContract":
         return packetContractReport;
+      case "fieldSynthesis":
+        return fieldSynthesisReport;
       case "forgeBridgeStub":
         return forgeBridgeStubReport;
       case "playheadCursor":
@@ -1289,6 +1309,7 @@ export default function App() {
     activeTab === "conduct" ? "Conduct" :
     activeTab === "rehearse" ? "Rehearse" :
     activeTab === "perform" ? "Perform" :
+    activeTab === "field" ? "Field" :
     activeTab === "project" ? "Project" : "Diagnostics";
 
   const leadTrack = musicTimeline?.tracks.find((track) => track.track_id === "lead_voice") ?? null;
@@ -1337,6 +1358,7 @@ export default function App() {
           <button className={activeTab === "conduct" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("conduct")} type="button">Conduct</button>
           <button className={activeTab === "rehearse" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("rehearse")} type="button">Rehearse</button>
           <button className={activeTab === "perform" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("perform")} type="button">Perform</button>
+          <button className={activeTab === "field" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("field")} type="button">Field</button>
           <button className={activeTab === "project" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("project")} type="button">Project</button>
           <button className={activeTab === "diagnostics" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("diagnostics")} type="button">Diagnostics</button>
         </nav>
@@ -1637,6 +1659,45 @@ export default function App() {
             </div>
           )}
 
+          {activeTab === "field" && (
+            <div className="workspace-panel field-workspace">
+              <div className="workspace-header-row">
+                <div>
+                  <p className="eyebrow">Harmonic Packet Field</p>
+                  <h2>3D Phase Field and Cymatic Trace</h2>
+                  <p className="note">This viewport renders the .hfield packet as a deterministic 9 phase field. Three.js handles the 3D plumbing; the Rust field synthesis engine owns the meaning.</p>
+                </div>
+                <div className="button-row compact-row">
+                  <button onClick={refreshFieldSynthesis} type="button">Refresh Field</button>
+                  <button onClick={playCurrentCombinedAudio} type="button">Play</button>
+                  <button className="danger" onClick={stopAudio} type="button">Stop</button>
+                </div>
+              </div>
+
+              <NotationSpine
+                musicTimeline={musicTimeline}
+                gestureTimeline={gestureTimeline}
+                motionReport={motionReport}
+                motionTimeMs={motionTimeMs}
+                playheadReport={playheadCursorReport}
+                notationLayout={notationLayout}
+                selectedNoteKey={selectedNoteKey}
+                onSelectNote={selectNotationNote}
+                modeLabel="Field"
+                variant="compact"
+              />
+
+              <HfieldPhaseFieldViewport
+                report={fieldSynthesisReport}
+                playheadReport={playheadCursorReport}
+                isPlaying={isMotionPlaying}
+                onRefresh={refreshFieldSynthesis}
+                onPlay={playCurrentCombinedAudio}
+                onStop={stopAudio}
+              />
+            </div>
+          )}
+
           {activeTab === "project" && (
             <div className="workspace-panel project-workspace">
               <div className="workspace-header-row">
@@ -1907,6 +1968,30 @@ export default function App() {
                 <div className="quick-state-grid">
                   <StatusChip label="Playback" value={playbackReport?.status ?? "idle"} />
                   <StatusChip label="Motion" value={isMotionPlaying ? "running" : "ready"} />
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === "field" && (
+            <div className="inspector-stack">
+              <section className="control-section primary-control-section">
+                <h3>Field Synthesis</h3>
+                <div className="button-grid primary-buttons">
+                  <button onClick={refreshFieldSynthesis} type="button">Synthesize Field</button>
+                  <button onClick={playCurrentCombinedAudio} type="button">Play Packet</button>
+                  <button className="danger" onClick={stopAudio} type="button">Stop</button>
+                </div>
+              </section>
+              <section className="control-section">
+                <h3>Packet Field</h3>
+                <div className="property-list">
+                  <span><strong>Status</strong>{fieldSynthesisReport?.status ?? "not synthesized"}</span>
+                  <span><strong>Contract</strong>{fieldSynthesisReport?.field_contract_id ?? "—"}</span>
+                  <span><strong>Events</strong>{fieldSynthesisReport?.harmonic_events.length ?? "—"}</span>
+                  <span><strong>Samples</strong>{fieldSynthesisReport?.cymatic_wave_samples.length ?? "—"}</span>
+                  <span><strong>Trace</strong>{fieldSynthesisReport?.field_trace.length ?? "—"}</span>
+                  <span><strong>Hash</strong>{fieldSynthesisReport?.deterministic_field_hash.slice(0, 16) ?? "—"}</span>
                 </div>
               </section>
             </div>
