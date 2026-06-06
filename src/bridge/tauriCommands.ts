@@ -80,6 +80,25 @@ export type HfieldCanonicalBundleManifestExportReport = {
   replay_verifier_fields: unknown;
 };
 
+
+export type HfieldExportReplayVerifierReport = {
+  status: "ok" | "failed" | string;
+  replay_verifier_contract_id: string;
+  verified_unix_seconds: number;
+  manifest_path: string;
+  manifest_file_hash: string;
+  manifest_file_bytes: number;
+  bundle_id: unknown;
+  source_hfield_score_hash: unknown;
+  expected_artifact_count: number;
+  verified_artifact_count: number;
+  checks: unknown[];
+  artifact_reports: unknown[];
+  failures: string[];
+  warnings: string[];
+  authority_result: unknown;
+};
+
 export type PlaybackReport = {
   status: string;
   message: string;
@@ -1145,6 +1164,15 @@ export async function exportCurrentHfieldCombinedWav(): Promise<WavRenderReport>
 
 export async function exportCurrentHfieldCanonicalBundleManifestJson(): Promise<HfieldCanonicalBundleManifestExportReport> {
   return await invoke<HfieldCanonicalBundleManifestExportReport>("export_current_hfield_canonical_bundle_manifest_json");
+}
+
+
+export async function verifyLatestHfieldExportReplayManifestJson(): Promise<HfieldExportReplayVerifierReport> {
+  return await invoke<HfieldExportReplayVerifierReport>("verify_latest_hfield_export_replay_manifest_json");
+}
+
+export async function verifyHfieldExportReplayManifestJsonByPath(manifestPath: string): Promise<HfieldExportReplayVerifierReport> {
+  return await invoke<HfieldExportReplayVerifierReport>("verify_hfield_export_replay_manifest_json_by_path", { manifestPath });
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

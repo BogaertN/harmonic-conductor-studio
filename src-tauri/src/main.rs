@@ -1191,6 +1191,403 @@ fn write_bundle_wav_artifact(
     }))
 }
 
+fn read_hfield_replay_json_file(path: &std::path::Path) -> Result<serde_json::Value, String> {
+    let bytes = std::fs::read(path)
+        .map_err(|err| format!("failed to read replay JSON {}: {err}", path.display()))?;
+    serde_json::from_slice(&bytes)
+        .map_err(|err| format!("failed to parse replay JSON {}: {err}", path.display()))
+}
+
+fn read_hfield_replay_file_hash(path: &std::path::Path) -> Result<(String, usize), String> {
+    let bytes = std::fs::read(path)
+        .map_err(|err| format!("failed to read replay artifact {}: {err}", path.display()))?;
+    Ok((blake3::hash(&bytes).to_hex().to_string(), bytes.len()))
+}
+
+fn json_str_field<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a str> {
+    value.get(key).and_then(serde_json::Value::as_str)
+}
+
+fn json_bool_field(value: &serde_json::Value, key: &str) -> Option<bool> {
+    value.get(key).and_then(serde_json::Value::as_bool)
+}
+
+fn push_hfield_replay_check(
+    checks: &mut Vec<serde_json::Value>,
+    failures: &mut Vec<String>,
+    check_id: &str,
+    passed: bool,
+    detail: String,
+) {
+    if !passed {
+        failures.push(format!("{check_id}: {detail}"));
+    }
+
+    checks.push(json!({
+        "check_id": check_id,
+        "passed": passed,
+        "detail": detail
+    }));
+}
+
+fn latest_hfield_canonical_bundle_manifest_path() -> Result<std::path::PathBuf, String> {
+    let bundles_dir = export_hfield_dir()?.join("bundles");
+    if !bundles_dir.exists() {
+        return Err(format!(
+            "bundle directory does not exist yet: {}. Export a canonical bundle manifest first.",
+            bundles_dir.display()
+        ));
+    }
+
+    let mut candidates: Vec<(std::time::SystemTime, std::path::PathBuf)> = Vec::new();
+    for entry in std::fs::read_dir(&bundles_dir).map_err(|err| {
+        format!(
+            "failed to read bundle directory {}: {err}",
+            bundles_dir.display()
+        )
+    })? {
+        let entry = entry.map_err(|err| format!("failed to read bundle directory entry: {err}"))?;
+        let path = entry.path().join("canonical_bundle_manifest.json");
+        if path.is_file() {
+            let modified = std::fs::metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or(std::time::UNIX_EPOCH);
+            candidates.push((modified, path));
+        }
+    }
+
+    candidates.sort_by_key(|right| std::cmp::Reverse(right.0));
+    candidates
+        .into_iter()
+        .map(|(_, path)| path)
+        .next()
+        .ok_or_else(|| {
+            format!(
+                "no canonical_bundle_manifest.json files found under {}. Export a bundle first.",
+                bundles_dir.display()
+            )
+        })
+}
+
+fn resolve_hfield_replay_artifact_path(
+    manifest_dir: &std::path::Path,
+    artifact: &serde_json::Value,
+) -> Result<std::path::PathBuf, String> {
+    let file_name = json_str_field(artifact, "file_name")
+        .ok_or_else(|| "artifact missing file_name".to_string())?;
+    let bundle_local_path = manifest_dir.join(file_name);
+
+    if bundle_local_path.is_file() {
+        return Ok(bundle_local_path);
+    }
+
+    if let Some(output_path) = json_str_field(artifact, "output_path") {
+        let path = std::path::PathBuf::from(output_path);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+
+    Err(format!(
+        "artifact file not found for {file_name}; checked {} and output_path fallback",
+        bundle_local_path.display()
+    ))
+}
+
+fn verify_hfield_canonical_bundle_manifest_file(
+    manifest_path: &std::path::Path,
+) -> Result<serde_json::Value, String> {
+    let manifest = read_hfield_replay_json_file(manifest_path)?;
+    let manifest_dir = manifest_path
+        .parent()
+        .ok_or_else(|| format!("manifest path has no parent: {}", manifest_path.display()))?;
+    let (manifest_file_hash, manifest_file_bytes) = read_hfield_replay_file_hash(manifest_path)?;
+
+    let mut checks: Vec<serde_json::Value> = Vec::new();
+    let mut failures: Vec<String> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
+
+    push_hfield_replay_check(
+        &mut checks,
+        &mut failures,
+        "manifest_contract_id",
+        json_str_field(&manifest, "contract_id")
+            == Some("aiweb.hfield.canonical_bundle_manifest.v1"),
+        format!(
+            "contract_id={}",
+            json_str_field(&manifest, "contract_id").unwrap_or("<missing>")
+        ),
+    );
+
+    let bundle_manifest_hash_ok = json_str_field(&manifest, "bundle_manifest_hash")
+        .map(|hash| hash.len() == 64 && hash.chars().all(|ch| ch.is_ascii_hexdigit()))
+        .unwrap_or(false);
+    push_hfield_replay_check(
+        &mut checks,
+        &mut failures,
+        "bundle_manifest_hash_present",
+        bundle_manifest_hash_ok,
+        "bundle_manifest_hash must be a 64-character BLAKE3 hex seed hash".to_string(),
+    );
+
+    let artifact_array = manifest
+        .get("export_inventory")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "manifest export_inventory is missing or not an array".to_string())?;
+
+    let expected_count = manifest
+        .get("replay_verifier_fields")
+        .and_then(|fields| fields.get("expected_artifact_count"))
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(8) as usize;
+
+    push_hfield_replay_check(
+        &mut checks,
+        &mut failures,
+        "expected_artifact_count",
+        artifact_array.len() == expected_count,
+        format!(
+            "found {} artifacts; expected {expected_count}",
+            artifact_array.len()
+        ),
+    );
+
+    let required_kinds = [
+        "canonical_project_json",
+        "reader_bundle_json",
+        "rust_render_manifest_json",
+        "cymatic_reader_surface_json",
+        "runtime_carrier_packet_json",
+        "packet_contract_json",
+        "identity_vault_reference_summary_json",
+        "combined_audio_wav",
+    ];
+
+    let mut seen_kinds = std::collections::BTreeSet::new();
+    let mut artifact_hashes = std::collections::BTreeMap::new();
+    let mut artifact_paths = std::collections::BTreeMap::new();
+    let mut artifact_reports = Vec::new();
+
+    for artifact in artifact_array {
+        let artifact_kind = json_str_field(artifact, "artifact_kind").unwrap_or("<missing>");
+        let expected_hash = json_str_field(artifact, "blake3_hash").unwrap_or("<missing>");
+        seen_kinds.insert(artifact_kind.to_string());
+
+        match resolve_hfield_replay_artifact_path(manifest_dir, artifact) {
+            Ok(path) => match read_hfield_replay_file_hash(&path) {
+                Ok((actual_hash, bytes)) => {
+                    let passed = actual_hash == expected_hash;
+                    push_hfield_replay_check(
+                        &mut checks,
+                        &mut failures,
+                        &format!("artifact_hash::{artifact_kind}"),
+                        passed,
+                        format!(
+                            "{} expected={} actual={} bytes={bytes}",
+                            path.display(),
+                            expected_hash,
+                            actual_hash
+                        ),
+                    );
+                    artifact_hashes.insert(artifact_kind.to_string(), actual_hash.clone());
+                    artifact_paths.insert(artifact_kind.to_string(), path.clone());
+                    artifact_reports.push(json!({
+                        "artifact_kind": artifact_kind,
+                        "path": path.to_string_lossy().to_string(),
+                        "expected_hash": expected_hash,
+                        "actual_hash": actual_hash,
+                        "bytes": bytes,
+                        "hash_match": passed
+                    }));
+                }
+                Err(err) => {
+                    push_hfield_replay_check(
+                        &mut checks,
+                        &mut failures,
+                        &format!("artifact_read::{artifact_kind}"),
+                        false,
+                        err,
+                    );
+                }
+            },
+            Err(err) => {
+                push_hfield_replay_check(
+                    &mut checks,
+                    &mut failures,
+                    &format!("artifact_path::{artifact_kind}"),
+                    false,
+                    err,
+                );
+            }
+        }
+    }
+
+    for required_kind in required_kinds {
+        push_hfield_replay_check(
+            &mut checks,
+            &mut failures,
+            &format!("required_artifact::{required_kind}"),
+            seen_kinds.contains(required_kind),
+            format!("required artifact kind {required_kind} present"),
+        );
+    }
+
+    let manifest_hash_fields = [
+        ("canonical_project_json", "canonical_project_json_hash"),
+        ("reader_bundle_json", "reader_bundle_json_hash"),
+        (
+            "rust_render_manifest_json",
+            "rust_render_manifest_json_hash",
+        ),
+        ("cymatic_reader_surface_json", "cymatic_surface_json_hash"),
+        (
+            "runtime_carrier_packet_json",
+            "runtime_carrier_packet_json_hash",
+        ),
+        ("packet_contract_json", "packet_contract_json_hash"),
+        ("combined_audio_wav", "combined_wav_hash"),
+    ];
+
+    for (artifact_kind, manifest_field) in manifest_hash_fields {
+        let manifest_hash = json_str_field(&manifest, manifest_field).unwrap_or("<missing>");
+        let actual_hash = artifact_hashes
+            .get(artifact_kind)
+            .map(String::as_str)
+            .unwrap_or("<missing>");
+        push_hfield_replay_check(
+            &mut checks,
+            &mut failures,
+            &format!("manifest_hash_field::{manifest_field}"),
+            manifest_hash == actual_hash,
+            format!("{manifest_field}={manifest_hash}; artifact {artifact_kind}={actual_hash}"),
+        );
+    }
+
+    if let Some(canonical_project_path) = artifact_paths.get("canonical_project_json") {
+        let canonical_project = read_hfield_replay_json_file(canonical_project_path)?;
+        let score_value = canonical_project
+            .get("score")
+            .ok_or_else(|| "canonical_project.hfield.json missing score".to_string())?;
+        let score: FieldScore = serde_json::from_value(score_value.clone()).map_err(|err| {
+            format!(
+                "failed to deserialize canonical score from {}: {err}",
+                canonical_project_path.display()
+            )
+        })?;
+        let (canonical_score, _) = canonicalized_hfield_score(&score);
+        assert_hfield_packet_openable(&canonical_score)?;
+        let recomputed_score_hash = score_hash_hex(&canonical_score)
+            .map_err(|err| format!("failed to recompute canonical score hash: {err}"))?;
+        let manifest_score_hash =
+            json_str_field(&manifest, "source_hfield_score_hash").unwrap_or("<missing>");
+        push_hfield_replay_check(
+            &mut checks,
+            &mut failures,
+            "source_hfield_score_hash_recomputed",
+            recomputed_score_hash == manifest_score_hash,
+            format!(
+                "manifest source_hfield_score_hash={manifest_score_hash}; recomputed={recomputed_score_hash}"
+            ),
+        );
+    } else {
+        push_hfield_replay_check(
+            &mut checks,
+            &mut failures,
+            "source_hfield_score_hash_recomputed",
+            false,
+            "canonical_project_json artifact path unavailable".to_string(),
+        );
+    }
+
+    if let Some(reader_bundle_path) = artifact_paths.get("reader_bundle_json") {
+        let reader_bundle = read_hfield_replay_json_file(reader_bundle_path)?;
+        let reader_score_hash = json_str_field(&reader_bundle, "score_hash").unwrap_or("<missing>");
+        let manifest_score_hash =
+            json_str_field(&manifest, "source_hfield_score_hash").unwrap_or("<missing>");
+        push_hfield_replay_check(
+            &mut checks,
+            &mut failures,
+            "reader_bundle_score_hash_matches_manifest",
+            reader_score_hash == manifest_score_hash,
+            format!("reader_bundle.score_hash={reader_score_hash}; manifest={manifest_score_hash}"),
+        );
+    } else {
+        push_hfield_replay_check(
+            &mut checks,
+            &mut failures,
+            "reader_bundle_score_hash_matches_manifest",
+            false,
+            "reader_bundle_json artifact path unavailable".to_string(),
+        );
+    }
+
+    let authority_boundaries = manifest
+        .get("authority_boundaries")
+        .unwrap_or(&serde_json::Value::Null);
+    let authority_expectations = [
+        ("private_identity_export_disabled", true),
+        ("public_identity_disabled", true),
+        ("economic_processing_disabled", true),
+        ("portable_rights_disabled", true),
+        ("live_identity_vault_write_performed", false),
+        ("forge_mutation_performed", false),
+        ("forge_bridge_live_execution_authorized", false),
+    ];
+
+    for (field, expected) in authority_expectations {
+        let actual = json_bool_field(authority_boundaries, field);
+        push_hfield_replay_check(
+            &mut checks,
+            &mut failures,
+            &format!("authority_boundary::{field}"),
+            actual == Some(expected),
+            format!("{field} actual={actual:?} expected={expected}"),
+        );
+    }
+
+    if json_str_field(authority_boundaries, "forge_bridge_execution_mode") != Some("reference_only")
+    {
+        warnings.push("forge_bridge_execution_mode is not reference_only".to_string());
+    }
+
+    let status = if failures.is_empty() { "ok" } else { "failed" };
+
+    Ok(json!({
+        "status": status,
+        "replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
+        "verified_unix_seconds": unix_timestamp_seconds(),
+        "manifest_path": manifest_path.to_string_lossy().to_string(),
+        "manifest_file_hash": manifest_file_hash,
+        "manifest_file_bytes": manifest_file_bytes,
+        "bundle_id": manifest.get("bundle_id").cloned().unwrap_or(serde_json::Value::Null),
+        "source_hfield_score_hash": manifest.get("source_hfield_score_hash").cloned().unwrap_or(serde_json::Value::Null),
+        "expected_artifact_count": expected_count,
+        "verified_artifact_count": artifact_reports.len(),
+        "checks": checks,
+        "artifact_reports": artifact_reports,
+        "failures": failures,
+        "warnings": warnings,
+        "authority_result": {
+            "no_private_identity_export_required": true,
+            "no_live_identity_vault_write_required": true,
+            "no_forge_mutation_required": true
+        }
+    }))
+}
+
+#[tauri::command]
+fn verify_latest_hfield_export_replay_manifest_json() -> Result<serde_json::Value, String> {
+    let manifest_path = latest_hfield_canonical_bundle_manifest_path()?;
+    verify_hfield_canonical_bundle_manifest_file(&manifest_path)
+}
+
+#[tauri::command]
+fn verify_hfield_export_replay_manifest_json_by_path(
+    manifest_path: String,
+) -> Result<serde_json::Value, String> {
+    verify_hfield_canonical_bundle_manifest_file(&std::path::PathBuf::from(manifest_path))
+}
+
 #[tauri::command]
 fn export_current_hfield_project_json(
     state: tauri::State<'_, AppState>,
@@ -2090,6 +2487,8 @@ fn main() {
             export_current_hfield_reader_bundle_json,
             export_current_hfield_combined_wav,
             export_current_hfield_canonical_bundle_manifest_json,
+            verify_latest_hfield_export_replay_manifest_json,
+            verify_hfield_export_replay_manifest_json_by_path,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,
