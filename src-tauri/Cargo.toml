@@ -29,3 +29,4 @@ hfield-notation = { path = "../crates/hfield-notation" }
 hfield-packet = { path = "../crates/hfield-packet" }
 hfield-forge-bridge = { path = "../crates/hfield-forge-bridge" }
 hfield-playhead = { path = "../crates/hfield-playhead" }
+hfield-loop = { path = "../crates/hfield-loop" }

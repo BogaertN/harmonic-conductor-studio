@@ -230,6 +230,65 @@ export type PlayheadCursorReport = {
   warnings: string[];
 };
 
+export type LoopPhraseReport = {
+  strategy: string;
+  status: string;
+  title: string;
+  phrase_id: string;
+  requested_start_measure: number;
+  requested_end_measure: number;
+  start_measure: number;
+  end_measure: number;
+  total_measure_count: number;
+  beats_per_measure: number;
+  beat_unit: number;
+  tempo_bpm: number;
+  quarter_note_ms: number;
+  start_ms: number;
+  end_ms: number;
+  duration_ms: number;
+  start_beat: number;
+  end_beat: number;
+  start_cursor_x_percent: number;
+  end_cursor_x_percent: number;
+  included_note_count: number;
+  included_conductor_cue_count: number;
+  notes: Array<{
+    event_index: number;
+    track_id: string;
+    role: string;
+    midi_note: number;
+    note_name: string;
+    frequency_hz: number;
+    original_start_ms: number;
+    original_end_ms: number;
+    clipped_start_ms: number;
+    clipped_end_ms: number;
+    phrase_start_ms: number;
+    phrase_duration_ms: number;
+    measure_index: number;
+    beat_in_measure: number;
+    velocity: number;
+  }>;
+  conductor_cues: Array<{
+    event_index: number;
+    gesture_id: string;
+    operator: string | null;
+    original_start_ms: number;
+    original_end_ms: number;
+    clipped_start_ms: number;
+    clipped_end_ms: number;
+    phrase_start_ms: number;
+    phrase_duration_ms: number;
+    measure_index: number;
+    beat_in_measure: number;
+    intensity: number;
+  }>;
+  playhead_geometry_policy: string;
+  loop_ready: boolean;
+  warnings: string[];
+};
+
 export type ProjectFileReport = {
   status: string;
   action: string;
@@ -538,6 +597,15 @@ export async function getCurrentForgePacketBridgeStubReport(): Promise<ForgePack
 
 export async function getCurrentPlayheadCursorReport(timeMs: number): Promise<PlayheadCursorReport> {
   return await invoke<PlayheadCursorReport>("get_current_playhead_cursor_report", { timeMs });
+}
+
+
+export async function getCurrentLoopPhraseReport(startMeasure: number, endMeasure: number): Promise<LoopPhraseReport> {
+  return await invoke<LoopPhraseReport>("get_current_loop_phrase_report", { startMeasure, endMeasure });
+}
+
+export async function playCurrentProjectPhraseCombinedAudio(startMeasure: number, endMeasure: number): Promise<PlaybackReport> {
+  return await invoke<PlaybackReport>("play_current_project_phrase_combined_audio", { startMeasure, endMeasure });
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

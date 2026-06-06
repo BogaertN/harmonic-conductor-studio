@@ -9,6 +9,7 @@ use hfield_dsp::{
     write_wav_i16, CompiledAudio,
 };
 use hfield_forge_bridge::create_forge_packet_bridge_stub_report;
+use hfield_loop::{create_loop_phrase_report, extract_loop_phrase_score};
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
 use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
 use hfield_notation::{
@@ -282,6 +283,72 @@ fn get_current_hfield_packet_contract_report(
 
     serde_json::to_value(validate_hfield_packet_contract(&guard))
         .map_err(|err| format!(".hfield packet contract serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn get_current_loop_phrase_report(
+    state: tauri::State<'_, AppState>,
+    start_measure: u32,
+    end_measure: u32,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_loop_phrase_report(
+        &guard,
+        start_measure,
+        end_measure,
+    ))
+    .map_err(|err| format!("loop phrase report serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn play_current_project_phrase_combined_audio(
+    state: tauri::State<'_, AppState>,
+    start_measure: u32,
+    end_measure: u32,
+) -> Result<serde_json::Value, String> {
+    let score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    let (phrase_score, phrase_report) =
+        extract_loop_phrase_score(&score, start_measure, end_measure)?;
+
+    stop_existing_playback(&state)?;
+    let mut playback_report = start_native_playback(state, move |sample_rate_hz| {
+        compile_combined_music_and_conductor_preview(&phrase_score, sample_rate_hz)
+    })?;
+
+    if let Some(object) = playback_report.as_object_mut() {
+        object.insert(
+            "message".to_string(),
+            json!("native phrase playback started"),
+        );
+        object.insert("phrase_id".to_string(), json!(phrase_report.phrase_id));
+        object.insert(
+            "phrase_start_measure".to_string(),
+            json!(phrase_report.start_measure),
+        );
+        object.insert(
+            "phrase_end_measure".to_string(),
+            json!(phrase_report.end_measure),
+        );
+        object.insert("phrase_start_ms".to_string(), json!(phrase_report.start_ms));
+        object.insert("phrase_end_ms".to_string(), json!(phrase_report.end_ms));
+        object.insert(
+            "phrase_duration_ms".to_string(),
+            json!(phrase_report.duration_ms),
+        );
+    }
+
+    Ok(playback_report)
 }
 
 #[tauri::command]
@@ -1268,6 +1335,8 @@ fn main() {
             get_current_hfield_packet_contract_report,
             get_current_forge_packet_bridge_stub_report,
             get_current_playhead_cursor_report,
+            get_current_loop_phrase_report,
+            play_current_project_phrase_combined_audio,
             get_current_conductor_motion_report,
             get_generated_conductor_motion_report,
             get_current_conductor_mapping_report,

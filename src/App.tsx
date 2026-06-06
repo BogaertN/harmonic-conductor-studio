@@ -18,6 +18,7 @@ import {
   getCurrentMusicTimeline,
   getCurrentNotationLayout,
   getCurrentPlayheadCursorReport,
+  getCurrentLoopPhraseReport,
   getCurrentProjectScore,
   getCurrentResonanceLevelBundle,
   getGeneratedConductorMotionReport,
@@ -31,6 +32,7 @@ import {
   playCurrentProjectCombinedAudio,
   playCurrentProjectConductorAudio,
   playCurrentProjectMusicAudio,
+  playCurrentProjectPhraseCombinedAudio,
   playFirstGestureAudio,
   playGeneratedConductorMappingAudio,
   playGeneratedMappedCombinedAudio,
@@ -55,6 +57,7 @@ import {
   type HfieldPacketContractReport,
   type ForgePacketBridgeStubReport,
   type MusicPreviewReport,
+  type LoopPhraseReport,
   type MusicTimelineReport,
   type NotationEditReport,
   type NotationLayoutReport,
@@ -75,6 +78,7 @@ type DiagnosticKey =
   | "packetContract"
   | "forgeBridgeStub"
   | "playheadCursor"
+  | "loopPhraseReport"
   | "motionReport"
   | "mappingReport"
   | "musicTimeline"
@@ -124,6 +128,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "packetContract", label: ".hfield Packet Contract" },
   { key: "forgeBridgeStub", label: "Forge Bridge Stub" },
   { key: "playheadCursor", label: "Playhead Cursor" },
+  { key: "loopPhraseReport", label: "Loop Phrase" },
   { key: "motionReport", label: "Conductor Motion" },
   { key: "mappingReport", label: "Conductor Mapping" },
   { key: "musicTimeline", label: "Music Timeline" },
@@ -243,6 +248,7 @@ function NotationSpine({
   gestureTimeline,
   motionReport,
   motionTimeMs,
+  loopPhraseReport,
   playheadReport,
   modeLabel,
   selectedNoteKey,
@@ -255,6 +261,7 @@ function NotationSpine({
   motionReport: ConductorMotionReport | null;
   motionTimeMs: number;
   playheadReport?: PlayheadCursorReport | null;
+  loopPhraseReport?: LoopPhraseReport | null;
   modeLabel: string;
   selectedNoteKey?: string | null;
   onSelectNote?: (trackId: string, eventIndex: number) => void;
@@ -303,15 +310,30 @@ function NotationSpine({
   const durationMs = Math.max(1, notationLayout?.total_duration_ms ?? motionReport?.total_duration_ms ?? musicTimeline?.total_duration_ms ?? 1);
   const activeEvent = getActiveEvent(motionReport, motionTimeMs);
   const cursorPercent = Math.min(99, Math.max(0, playheadReport?.score_cursor_x_percent ?? (motionTimeMs / durationMs) * 100));
-  const activeNoteKeys = new Set((playheadReport?.active_notes ?? []).map((note) => `${note.track_id}:${note.event_index}`));
+  const activeNotes = playheadReport?.active_notes ?? [];
+  const allNotationNotes = voices.flatMap((voice) => voice.notes);
+  const findNotationNote = (trackId: string, eventIndex: number) =>
+    allNotationNotes.find((note) => note.track_id === trackId && note.event_index === eventIndex) ?? null;
+  const activeGeometryNote = activeNotes
+    .map((note) => findNotationNote(note.track_id, note.event_index))
+    .find((note): note is NonNullable<typeof note> => Boolean(note));
+  const nextGeometryNote = playheadReport?.next_note
+    ? findNotationNote(playheadReport.next_note.track_id, playheadReport.next_note.event_index)
+    : null;
+  const geometryCursorPercent = activeGeometryNote?.x_percent ?? nextGeometryNote?.x_percent ?? null;
+  const activeNoteKeys = new Set(activeNotes.map((note) => `${note.track_id}:${note.event_index}`));
   const activeCueIndex = playheadReport?.active_conductor_cue?.event_index ?? null;
   const activeCueLabel = playheadReport?.active_gesture_id ?? activeEvent?.gesture_id ?? "—";
   const playheadLabel = playheadReport ? `M${playheadReport.current_measure} · beat ${playheadReport.current_beat_in_measure}` : `${Math.round(motionTimeMs)}ms`;
+  const phraseStartPercent = Math.max(0, Math.min(100, loopPhraseReport?.start_cursor_x_percent ?? 0));
+  const phraseEndPercent = Math.max(phraseStartPercent, Math.min(100, loopPhraseReport?.end_cursor_x_percent ?? 0));
+  const phraseWidthPercent = Math.max(0.5, phraseEndPercent - phraseStartPercent);
   const measureCount = Math.max(4, notationLayout?.measure_count ?? Math.ceil((musicTimeline?.total_duration_seconds ?? 0) / 2.856));
   const ruler = Array.from({ length: Math.min(12, measureCount) }, (_, index) => index + 1);
   const meter = notationLayout?.meter ?? musicTimeline?.meter ?? "4/4";
   const tempo = notationLayout?.tempo_bpm ?? musicTimeline?.tempo_bpm ?? 84;
   const noteCount = notationLayout?.note_count ?? musicTimeline?.total_note_count ?? 0;
+  const syncedCursorPercent = Math.min(99, Math.max(0, geometryCursorPercent ?? cursorPercent));
 
   return (
     <section className={`notation-spine notation-spine-${variant}`} aria-label={`${modeLabel} notation spine`}>
@@ -337,6 +359,14 @@ function NotationSpine({
               <div className="notation-voice-label"><strong>{voice.display_name}</strong><span>{voice.role}</span></div>
               <div className="notation-staff-lane">
                 {[0, 1, 2, 3, 4].map((line) => <span key={line} className="notation-staff-line" />)}
+                {loopPhraseReport && (
+                  <span
+                    className="notation-loop-window"
+                    style={{ left: `${phraseStartPercent}%`, width: `${phraseWidthPercent}%` }}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="notation-lane-playhead" style={{ left: `${syncedCursorPercent}%` }} aria-hidden="true" />
                 {voice.notes.slice(0, 32).map((note) => {
                   const noteKey = `${note.track_id}:${note.event_index}`;
                   const noteClasses = ["notation-note", note.resonance_lane];
@@ -364,7 +394,7 @@ function NotationSpine({
             </div>
           ))}
         </div>
-        <div className="notation-playhead" style={{ left: `${cursorPercent}%` }}><span>{playheadLabel}</span></div>
+        <div className="notation-playhead" style={{ left: `${syncedCursorPercent}%` }}><span>{playheadLabel}</span></div>
       </div>
 
       <div className="notation-cue-strip">
@@ -497,6 +527,10 @@ export default function App() {
   const [packetContractReport, setPacketContractReport] = useState<HfieldPacketContractReport | null>(null);
   const [forgeBridgeStubReport, setForgeBridgeStubReport] = useState<ForgePacketBridgeStubReport | null>(null);
   const [playheadCursorReport, setPlayheadCursorReport] = useState<PlayheadCursorReport | null>(null);
+  const [loopStartMeasure, setLoopStartMeasure] = useState(1);
+  const [loopEndMeasure, setLoopEndMeasure] = useState(2);
+  const [loopPhraseReport, setLoopPhraseReport] = useState<LoopPhraseReport | null>(null);
+  const [motionPlaybackEndMs, setMotionPlaybackEndMs] = useState<number | null>(null);
   const [isMotionPlaying, setIsMotionPlaying] = useState(false);
   const motionStartRef = useRef(0);
   const playheadReportRequestRef = useRef(-10000);
@@ -525,10 +559,11 @@ export default function App() {
 
     const tick = (now: number) => {
       const elapsed = now - wallClockStartRef.current;
-      const nextTime = Math.min(motionStartRef.current + elapsed, motionReport.total_duration_ms);
+      const playbackLimitMs = motionPlaybackEndMs ?? motionReport.total_duration_ms;
+      const nextTime = Math.min(motionStartRef.current + elapsed, playbackLimitMs);
       setMotionTimeMs(nextTime);
 
-      if (nextTime >= motionReport.total_duration_ms) {
+      if (nextTime >= playbackLimitMs) {
         setIsMotionPlaying(false);
         return;
       }
@@ -542,7 +577,7 @@ export default function App() {
     return () => {
       cancelAnimationFrame(animationFrame);
     };
-  }, [isMotionPlaying, motionReport]);
+  }, [isMotionPlaying, motionReport, motionPlaybackEndMs]);
 
   // Rust-owned playhead cursor sync. The UI clock supplies time; Rust computes
   // measure, beat, active notes, and active conductor cue for that instant.
@@ -576,6 +611,7 @@ export default function App() {
 
   function startMotionAnimation() {
     motionStartRef.current = motionTimeMs;
+    setMotionPlaybackEndMs(null);
     setIsMotionPlaying(true);
   }
 
@@ -587,6 +623,7 @@ export default function App() {
   function resetMotionAnimation() {
     motionStartRef.current = 0;
     setMotionTimeMs(0);
+    setMotionPlaybackEndMs(null);
     setIsMotionPlaying(false);
   }
 
@@ -619,6 +656,7 @@ export default function App() {
     setPacketContractReport(await getCurrentHfieldPacketContractReport());
     setForgeBridgeStubReport(await getCurrentForgePacketBridgeStubReport());
     setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
+    setLoopPhraseReport(await getCurrentLoopPhraseReport(loopStartMeasure, loopEndMeasure));
     resetMotionAnimation();
   }
 
@@ -971,6 +1009,7 @@ export default function App() {
   async function playGeneratedConductor() {
     setError(null);
     try {
+      setMotionPlaybackEndMs(null);
       setPlaybackReport(await playGeneratedConductorMappingAudio());
       setMotionReport(await getGeneratedConductorMotionReport());
       setSelectedDiagnostic("playbackReport");
@@ -984,6 +1023,7 @@ export default function App() {
   async function playGeneratedCombined() {
     setError(null);
     try {
+      setMotionPlaybackEndMs(null);
       setPlaybackReport(await playGeneratedMappedCombinedAudio());
       setMotionReport(await getGeneratedConductorMotionReport());
       setSelectedDiagnostic("playbackReport");
@@ -1087,6 +1127,7 @@ export default function App() {
   async function playCurrentMusicAudio() {
     setError(null);
     try {
+      setMotionPlaybackEndMs(null);
       setPlaybackReport(await playCurrentProjectMusicAudio());
       setMotionReport(await getCurrentConductorMotionReport());
       setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
@@ -1101,6 +1142,7 @@ export default function App() {
   async function playCurrentConductorAudio() {
     setError(null);
     try {
+      setMotionPlaybackEndMs(null);
       setPlaybackReport(await playCurrentProjectConductorAudio());
       setMotionReport(await getCurrentConductorMotionReport());
       setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
@@ -1115,6 +1157,7 @@ export default function App() {
   async function playCurrentCombinedAudio() {
     setError(null);
     try {
+      setMotionPlaybackEndMs(null);
       setPlaybackReport(await playCurrentProjectCombinedAudio());
       setMotionReport(await getCurrentConductorMotionReport());
       setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
@@ -1126,6 +1169,36 @@ export default function App() {
     }
   }
 
+
+
+  async function refreshLoopPhrase() {
+    setError(null);
+    try {
+      const nextReport = await getCurrentLoopPhraseReport(loopStartMeasure, loopEndMeasure);
+      setLoopPhraseReport(nextReport);
+      setSelectedDiagnostic("loopPhraseReport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function playLoopPhraseCombined() {
+    setError(null);
+    try {
+      const nextReport = await getCurrentLoopPhraseReport(loopStartMeasure, loopEndMeasure);
+      setLoopPhraseReport(nextReport);
+      setPlaybackReport(await playCurrentProjectPhraseCombinedAudio(loopStartMeasure, loopEndMeasure));
+      setMotionReport(await getCurrentConductorMotionReport());
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(nextReport.start_ms));
+      setSelectedDiagnostic("loopPhraseReport");
+      motionStartRef.current = nextReport.start_ms;
+      setMotionTimeMs(nextReport.start_ms);
+      setMotionPlaybackEndMs(nextReport.end_ms);
+      setIsMotionPlaying(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
   async function stopAudio() {
     setError(null);
     try {
@@ -1146,6 +1219,7 @@ export default function App() {
   const alignmentStatus = mappingReport?.alignment_status ?? "not generated";
   const packetStatus = packetContractReport?.status ?? "not checked";
   const currentMeasureBeat = playheadCursorReport ? `M${playheadCursorReport.current_measure} beat ${playheadCursorReport.current_beat_in_measure}` : "—";
+  const currentLoopLabel = loopPhraseReport ? `${loopPhraseReport.phrase_id}` : `M${loopStartMeasure}-M${loopEndMeasure}`;
 
   function diagnosticPayload() {
     switch (selectedDiagnostic) {
@@ -1159,6 +1233,8 @@ export default function App() {
         return forgeBridgeStubReport;
       case "playheadCursor":
         return playheadCursorReport;
+      case "loopPhraseReport":
+        return loopPhraseReport;
       case "motionReport":
         return motionReport;
       case "mappingReport":
@@ -1239,6 +1315,7 @@ export default function App() {
           <StatusChip label="Project" value={currentProjectStatus} />
           <StatusChip label="Duration" value={formatMs(currentDuration)} />
           <StatusChip label="Playhead" value={currentMeasureBeat} />
+          <StatusChip label="Loop" value={currentLoopLabel} />
           <StatusChip label="Notes" value={currentNoteCount} />
           <StatusChip label="Gestures" value={currentGestureCount} />
           <StatusChip label="Alignment" value={alignmentStatus} />
@@ -1249,6 +1326,7 @@ export default function App() {
           <button onClick={loadSeedMusic} type="button">Load</button>
           <button onClick={applyGeneratedMapping} type="button">Map</button>
           <button onClick={playCurrentCombinedAudio} type="button">Play</button>
+          <button onClick={playLoopPhraseCombined} type="button">Phrase</button>
           <button className="danger" onClick={stopAudio} type="button">Stop</button>
         </div>
       </header>
@@ -1265,6 +1343,39 @@ export default function App() {
 
         <section className="main-workspace" aria-label={`${activeModeLabel} workspace`}>
           {error && <pre className="error workspace-error">{error}</pre>}
+
+
+          <section className="control-section phrase-loop-section">
+            <h3>Loop / Phrase</h3>
+            <div className="phrase-loop-grid">
+              <label>
+                <span>Start M</span>
+                <input
+                  value={loopStartMeasure}
+                  onChange={(event) => setLoopStartMeasure(Number(event.target.value))}
+                  inputMode="numeric"
+                />
+              </label>
+              <label>
+                <span>End M</span>
+                <input
+                  value={loopEndMeasure}
+                  onChange={(event) => setLoopEndMeasure(Number(event.target.value))}
+                  inputMode="numeric"
+                />
+              </label>
+            </div>
+            <div className="button-row">
+              <button onClick={refreshLoopPhrase} type="button">Set Phrase</button>
+              <button onClick={playLoopPhraseCombined} type="button">Play Phrase</button>
+            </div>
+            <div className="property-list compact-property-list">
+              <span><strong>Phrase</strong>{loopPhraseReport?.phrase_id ?? currentLoopLabel}</span>
+              <span><strong>Window</strong>{loopPhraseReport ? `${loopPhraseReport.start_ms}–${loopPhraseReport.end_ms} ms` : "—"}</span>
+              <span><strong>Notes</strong>{loopPhraseReport?.included_note_count ?? "—"}</span>
+              <span><strong>Cues</strong>{loopPhraseReport?.included_conductor_cue_count ?? "—"}</span>
+            </div>
+          </section>
 
           {activeTab === "compose" && (
             <div className="workspace-panel compose-workspace">
@@ -1287,6 +1398,7 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 playheadReport={playheadCursorReport}
+                loopPhraseReport={loopPhraseReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1391,6 +1503,7 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 playheadReport={playheadCursorReport}
+                loopPhraseReport={loopPhraseReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1404,6 +1517,7 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 playheadReport={playheadCursorReport}
+                loopPhraseReport={loopPhraseReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1450,6 +1564,7 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 playheadReport={playheadCursorReport}
+                loopPhraseReport={loopPhraseReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1538,6 +1653,7 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 playheadReport={playheadCursorReport}
+                loopPhraseReport={loopPhraseReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1604,6 +1720,7 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 playheadReport={playheadCursorReport}
+                loopPhraseReport={loopPhraseReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}

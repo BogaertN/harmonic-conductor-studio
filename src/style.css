@@ -1434,3 +1434,60 @@ body {
 .notation-cue.active {
   box-shadow: 0 0 0 2px rgba(255, 247, 207, 0.74), 0 0 24px rgba(130, 210, 255, 0.42);
 }
+
+
+/* Loop / Phrase Core v1 */
+.notation-loop-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(180, 154, 255, 0.72);
+  border-right: 1px solid rgba(180, 154, 255, 0.50);
+  background: linear-gradient(90deg, rgba(168, 142, 255, 0.12), rgba(231, 216, 164, 0.06));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.notation-lane-playhead {
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  width: 2px;
+  transform: translateX(-1px);
+  background: var(--mode-accent, #e7d8a4);
+  box-shadow: 0 0 16px var(--mode-accent, #e7d8a4);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.notation-playhead {
+  opacity: 0.42;
+}
+
+.phrase-loop-section {
+  border-color: rgba(180, 154, 255, 0.34);
+  background: linear-gradient(180deg, rgba(107, 87, 196, 0.16), rgba(5, 7, 12, 0.36));
+}
+
+.phrase-loop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-bottom: 0.6rem;
+}
+
+.phrase-loop-grid label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: #e7d8a4;
+  font-weight: 800;
+}
+
+.phrase-loop-grid input {
+  width: 100%;
+}
+
+.compact-property-list span {
+  font-size: 0.72rem;
+}
