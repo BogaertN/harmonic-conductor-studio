@@ -17,6 +17,7 @@ import {
   exportCurrentHfieldReaderBundleJson,
   exportCurrentHfieldCombinedWav,
   exportCurrentHfieldCanonicalBundleManifestJson,
+  exportCurrentHfieldCanonicalBundleManifestV2Json,
   verifyLatestHfieldExportReplayManifestJson,
   getHfieldSchemaVersionMigrationRegistryJson,
   inspectCurrentHfieldSchemaMigrationRegistryJson,
@@ -1366,6 +1367,17 @@ export default function App() {
     }
   }
 
+  async function exportHfieldCanonicalBundleManifestV2() {
+    setError(null);
+    try {
+      setHfieldCanonicalBundleManifestExportReport(await exportCurrentHfieldCanonicalBundleManifestV2Json());
+      setSelectedDiagnostic("hfieldCanonicalBundleManifestExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+
 
   async function verifyHfieldExportReplayManifest() {
     setError(null);
@@ -2265,6 +2277,7 @@ export default function App() {
                   <button onClick={exportHfieldPacketContract} type="button">Export Packet Contract</button>
                   <button onClick={exportHfieldCombinedWav} type="button">Export Combined WAV</button>
                   <button onClick={exportHfieldCanonicalBundleManifest} type="button">Export Bundle Manifest</button>
+                  <button onClick={exportHfieldCanonicalBundleManifestV2} type="button">Export Bundle Manifest v2</button>
                   <button onClick={verifyHfieldExportReplayManifest} type="button">Verify Latest Bundle</button>
                   <button onClick={inspectHfieldSchemaMigrationRegistry} type="button">Inspect Schema Registry</button>
                   <button onClick={inspectNineGestureConductorEngine} type="button">Inspect Nine-Gesture Engine</button>

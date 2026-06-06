@@ -1477,6 +1477,10 @@ export async function exportCurrentHfieldCanonicalBundleManifestJson(): Promise<
   return await invoke<HfieldCanonicalBundleManifestExportReport>("export_current_hfield_canonical_bundle_manifest_json");
 }
 
+export async function exportCurrentHfieldCanonicalBundleManifestV2Json(): Promise<HfieldCanonicalBundleManifestExportReport> {
+  return await invoke<HfieldCanonicalBundleManifestExportReport>("export_current_hfield_canonical_bundle_manifest_v2_json");
+}
+
 
 export async function verifyLatestHfieldExportReplayManifestJson(): Promise<HfieldExportReplayVerifierReport> {
   return await invoke<HfieldExportReplayVerifierReport>("verify_latest_hfield_export_replay_manifest_json");

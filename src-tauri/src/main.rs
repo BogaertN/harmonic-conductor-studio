@@ -1926,6 +1926,347 @@ fn export_current_syllable_shaped_expression_v1_json(
     })
 }
 
+const HFIELD_CANONICAL_BUNDLE_MANIFEST_V2_CONTRACT_ID: &str =
+    "aiweb.hfield.canonical_bundle_manifest.v2";
+const HFIELD_CANONICAL_BUNDLE_MANIFEST_V2_PROFILE_ID: &str =
+    "all_locked_hcs_layers_through_syllable_expression_v1";
+
+fn hfield_bundle_v2_unix_timestamp_seconds() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn hfield_bundle_v2_json_hash(value: &serde_json::Value) -> Result<String, String> {
+    let bytes = serde_json::to_vec_pretty(value)
+        .map_err(|err| format!("failed to serialize v2 bundle json for hash: {err}"))?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+fn hfield_bundle_v2_score_hash(score: &FieldScore) -> Result<String, String> {
+    let bytes = serde_json::to_vec_pretty(score)
+        .map_err(|err| format!("failed to serialize .hfield score for v2 hash: {err}"))?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+fn hfield_bundle_v2_write_json_artifact(
+    bundle_dir: &std::path::Path,
+    file_name: &str,
+    artifact_kind: &str,
+    verification_role: &str,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    std::fs::create_dir_all(bundle_dir).map_err(|err| {
+        format!(
+            "failed to create v2 bundle dir {}: {err}",
+            bundle_dir.display()
+        )
+    })?;
+    let output_path = bundle_dir.join(file_name);
+    let json_text = serde_json::to_string_pretty(payload)
+        .map_err(|err| format!("failed to serialize v2 artifact {file_name}: {err}"))?;
+    std::fs::write(&output_path, json_text.as_bytes()).map_err(|err| {
+        format!(
+            "failed to write v2 artifact {}: {err}",
+            output_path.display()
+        )
+    })?;
+    let hash = blake3::hash(json_text.as_bytes()).to_hex().to_string();
+    Ok(serde_json::json!({
+        "artifact_kind": artifact_kind,
+        "verification_role": verification_role,
+        "file_name": file_name,
+        "relative_path": app_relative_export_path(&output_path),
+        "absolute_path": output_path.to_string_lossy().to_string(),
+        "byte_len": json_text.len(),
+        "blake3_hash": hash,
+        "format": "json",
+        "required_for_replay": true
+    }))
+}
+
+fn hfield_bundle_v2_artifact_payloads(
+    score: &FieldScore,
+) -> Result<Vec<(&'static str, &'static str, &'static str, serde_json::Value)>, String> {
+    Ok(vec![
+        (
+            "canonical_project.hfield.json",
+            "canonical_project_hfield_json",
+            "source_harmonic_field_score",
+            serde_json::to_value(score)
+                .map_err(|err| format!("failed to serialize canonical score: {err}"))?,
+        ),
+        (
+            "harmonic_field_score_v1_report.json",
+            "harmonic_field_score_v1_report_json",
+            "source_object_governance_report",
+            serde_json::to_value(
+                hfield_domain::create_harmonic_field_score_v1_upgrade_report(score),
+            )
+            .map_err(|err| format!("failed to serialize harmonic field score report: {err}"))?,
+        ),
+        (
+            "coupling_profile_engine_v1_report.json",
+            "coupling_profile_engine_v1_report_json",
+            "source_to_renderer_coupling_report",
+            serde_json::to_value(hfield_domain::create_coupling_profile_engine_v1_report(
+                score,
+            ))
+            .map_err(|err| format!("failed to serialize coupling profile report: {err}"))?,
+        ),
+        (
+            "motif_library_annotation_layer_v1_report.json",
+            "motif_library_annotation_layer_v1_report_json",
+            "motif_and_annotation_governance_report",
+            serde_json::to_value(
+                hfield_domain::create_motif_library_annotation_layer_v1_report(score),
+            )
+            .map_err(|err| format!("failed to serialize motif layer report: {err}"))?,
+        ),
+        (
+            "nine_gesture_conductor_engine_v1_report.json",
+            "nine_gesture_conductor_engine_v1_report_json",
+            "gesture_vocabulary_and_physical_motion_law_report",
+            serde_json::to_value(
+                hfield_conductor::create_nine_gesture_conductor_engine_report(score),
+            )
+            .map_err(|err| format!("failed to serialize nine gesture report: {err}"))?,
+        ),
+        (
+            "true_conductor_gesture_reference_manifest_v1.json",
+            "true_conductor_gesture_reference_manifest_v1_json",
+            "rust_owned_true_gesture_path_reference_manifest",
+            serde_json::to_value(
+                hfield_conductor::create_true_conductor_gesture_reference_manifest_v1_report(score),
+            )
+            .map_err(|err| format!("failed to serialize true gesture manifest: {err}"))?,
+        ),
+        (
+            "deterministic_audio_engine_v2_report.json",
+            "deterministic_audio_engine_v2_report_json",
+            "deterministic_audio_receipt_report",
+            serde_json::to_value(hfield_dsp::create_deterministic_audio_engine_v2_report(
+                score, 48_000,
+            ))
+            .map_err(|err| format!("failed to serialize deterministic audio v2 report: {err}"))?,
+        ),
+        (
+            "gesture_aware_field_renderer_v2_report.json",
+            "gesture_aware_field_renderer_v2_report_json",
+            "gesture_aware_3d_field_renderer_report",
+            serde_json::to_value(
+                hfield_field::synthesize_gesture_aware_field_renderer_v2_report(score),
+            )
+            .map_err(|err| format!("failed to serialize gesture-aware renderer report: {err}"))?,
+        ),
+        (
+            "cymatic_reader_surface_v1_report.json",
+            "cymatic_reader_surface_v1_report_json",
+            "deterministic_cymatic_reader_surface_report",
+            serde_json::to_value(hfield_cymatics::synthesize_hfield_cymatic_reader_surface(
+                score,
+            ))
+            .map_err(|err| format!("failed to serialize cymatic reader surface report: {err}"))?,
+        ),
+        (
+            "cymatic_field_model_v2_report.json",
+            "cymatic_field_model_v2_report_json",
+            "synthetic_cymatic_field_model_report",
+            serde_json::to_value(hfield_cymatics::synthesize_cymatic_field_model_v2_report(
+                score,
+            ))
+            .map_err(|err| format!("failed to serialize cymatic field model v2 report: {err}"))?,
+        ),
+        (
+            "syllable_shaped_expression_v1_report.json",
+            "syllable_shaped_expression_v1_report_json",
+            "syllable_expression_envelope_report",
+            serde_json::to_value(hfield_domain::create_syllable_shaped_expression_v1_report(
+                score,
+            ))
+            .map_err(|err| format!("failed to serialize syllable expression report: {err}"))?,
+        ),
+    ])
+}
+
+#[tauri::command]
+fn export_current_hfield_canonical_bundle_manifest_v2_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let created_unix_seconds = hfield_bundle_v2_unix_timestamp_seconds();
+    let source_hfield_score_hash = hfield_bundle_v2_score_hash(&score)?;
+    let bundle_id = format!(
+        "hfield_canonical_bundle_v2_{}_{}",
+        created_unix_seconds,
+        &source_hfield_score_hash[..12.min(source_hfield_score_hash.len())]
+    );
+    let bundle_dir = app_root_dir()
+        .join("exports")
+        .join("canonical_bundle_v2")
+        .join(&bundle_id);
+
+    let mut artifact_manifest = Vec::new();
+    for (file_name, artifact_kind, verification_role, payload) in
+        hfield_bundle_v2_artifact_payloads(&score)?
+    {
+        artifact_manifest.push(hfield_bundle_v2_write_json_artifact(
+            &bundle_dir,
+            file_name,
+            artifact_kind,
+            verification_role,
+            &payload,
+        )?);
+    }
+
+    let deterministic_audio_receipt_hash = artifact_manifest
+        .iter()
+        .find(|artifact| {
+            artifact.get("artifact_kind")
+                == Some(&serde_json::json!(
+                    "deterministic_audio_engine_v2_report_json"
+                ))
+        })
+        .and_then(|artifact| artifact.get("blake3_hash"))
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let gesture_renderer_receipt_hash = artifact_manifest
+        .iter()
+        .find(|artifact| {
+            artifact.get("artifact_kind")
+                == Some(&serde_json::json!(
+                    "gesture_aware_field_renderer_v2_report_json"
+                ))
+        })
+        .and_then(|artifact| artifact.get("blake3_hash"))
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let cymatic_model_receipt_hash = artifact_manifest
+        .iter()
+        .find(|artifact| {
+            artifact.get("artifact_kind")
+                == Some(&serde_json::json!("cymatic_field_model_v2_report_json"))
+        })
+        .and_then(|artifact| artifact.get("blake3_hash"))
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let syllable_expression_receipt_hash = artifact_manifest
+        .iter()
+        .find(|artifact| {
+            artifact.get("artifact_kind")
+                == Some(&serde_json::json!(
+                    "syllable_shaped_expression_v1_report_json"
+                ))
+        })
+        .and_then(|artifact| artifact.get("blake3_hash"))
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+
+    let no_live_identity_vault_write = score.provenance.identity_vault.vault_record_ref.is_none();
+    let no_private_identity_export = !score.provenance.raw_private_identity_exported;
+    let no_forge_mutation = score.packet.forge_bridge.status == "reserved"
+        && score.packet.forge_bridge.forge_runtime_ref.is_none();
+
+    let mut manifest_payload = serde_json::json!({
+        "status": "ok",
+        "contract_id": HFIELD_CANONICAL_BUNDLE_MANIFEST_V2_CONTRACT_ID,
+        "manifest_contract_id": HFIELD_CANONICAL_BUNDLE_MANIFEST_V2_CONTRACT_ID,
+        "profile_id": HFIELD_CANONICAL_BUNDLE_MANIFEST_V2_PROFILE_ID,
+        "supersedes_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
+        "schema_version": "2.0.0",
+        "export_kind": "canonical_bundle_manifest_v2",
+        "bundle_id": bundle_id,
+        "bundle_dir": bundle_dir.to_string_lossy().to_string(),
+        "created_unix_seconds": created_unix_seconds,
+        "source_hfield_score_hash": source_hfield_score_hash,
+        "artifact_count": artifact_manifest.len(),
+        "export_inventory": artifact_manifest,
+        "artifact_contracts_bound": [
+            "aiweb.hfield.harmonic_field_score.v1",
+            "aiweb.hfield.coupling_profile_engine.v1",
+            "aiweb.hfield.motif_library_annotation_layer.v1",
+            "aiweb.hfield.nine_gesture_conductor_engine.v1",
+            "aiweb.hfield.true_conductor_gesture_reference_manifest.v1",
+            "aiweb.hfield.deterministic_audio_engine.v2",
+            "aiweb.hfield.gesture_aware_field_renderer.v2",
+            "aiweb.hfield.cymatic_field_model.v2",
+            "aiweb.hfield.syllable_shaped_expression.v1"
+        ],
+        "receipt_hashes": {
+            "deterministic_audio_engine_v2_report_hash": deterministic_audio_receipt_hash,
+            "gesture_aware_field_renderer_v2_report_hash": gesture_renderer_receipt_hash,
+            "cymatic_field_model_v2_report_hash": cymatic_model_receipt_hash,
+            "syllable_shaped_expression_v1_report_hash": syllable_expression_receipt_hash
+        },
+        "authority_boundaries": {
+            "harmonic_field_score_remains_source_authority": true,
+            "bundle_manifest_is_source_authority": false,
+            "bundle_manifest_is_replay_and_custody_receipt": true,
+            "renderer_outputs_are_source_authority": false,
+            "audio_outputs_are_source_authority": false,
+            "syllable_shapes_are_language_semantics": false,
+            "cymatic_outputs_are_physical_sensor_measurements": false,
+            "private_identity_export_disabled": no_private_identity_export,
+            "public_identity_disabled": score.provenance.disclosure_class == "private_reference_only",
+            "economic_processing_disabled": true,
+            "portable_rights_disabled": true,
+            "live_identity_vault_write_performed": !no_live_identity_vault_write,
+            "forge_mutation_performed": !no_forge_mutation,
+            "forge_bridge_execution_mode": score.packet.forge_bridge.status.clone(),
+            "forge_bridge_live_execution_authorized": false
+        },
+        "replay_verifier_fields": {
+            "hash_algorithm": "BLAKE3",
+            "artifact_inventory_field": "export_inventory",
+            "artifact_hash_field": "blake3_hash",
+            "manifest_hash_excludes_manifest_hash_field": true,
+            "must_verify_artifact_count": true,
+            "must_verify_all_artifact_hashes": true,
+            "must_verify_no_private_identity_export": true,
+            "must_verify_no_live_identity_vault_write": true,
+            "must_verify_no_forge_mutation": true,
+            "must_verify_no_physical_sensor_claim_without_calibration": true,
+            "must_verify_no_language_semantics_from_syllable_shapes": true
+        },
+        "next_work": [
+            "SQLite Motif/Project Library v1 stores local projects, motifs, receipts, and approval states after this bundle can seal itself.",
+            "Production Packaging v1 produces Linux release artifacts and notices after storage has a local custody base.",
+            "Forge Adapter v1 remains blocked until HCS sealed bundles replay cleanly."
+        ],
+        "warnings": []
+    });
+
+    let bundle_manifest_hash = hfield_bundle_v2_json_hash(&manifest_payload)?;
+    manifest_payload["bundle_manifest_hash"] =
+        serde_json::Value::String(bundle_manifest_hash.clone());
+
+    let manifest_artifact = hfield_bundle_v2_write_json_artifact(
+        &bundle_dir,
+        "canonical_bundle_manifest_v2.json",
+        "canonical_bundle_manifest_v2_json",
+        "bundle_hash_inventory_and_replay_seed_v2",
+        &manifest_payload,
+    )?;
+
+    Ok(serde_json::json!({
+        "status": "ok",
+        "export_kind": "canonical_bundle_manifest_v2",
+        "manifest_contract_id": HFIELD_CANONICAL_BUNDLE_MANIFEST_V2_CONTRACT_ID,
+        "bundle_id": manifest_payload["bundle_id"].clone(),
+        "bundle_dir": bundle_dir.to_string_lossy().to_string(),
+        "bundle_manifest_hash": bundle_manifest_hash,
+        "manifest_file_hash": manifest_artifact["blake3_hash"].clone(),
+        "manifest_file": manifest_artifact,
+        "artifact_count": manifest_payload["artifact_count"].clone(),
+        "artifact_manifest": manifest_payload["export_inventory"].clone(),
+        "authority_boundaries": manifest_payload["authority_boundaries"].clone(),
+        "replay_verifier_fields": manifest_payload["replay_verifier_fields"].clone(),
+        "receipt_hashes": manifest_payload["receipt_hashes"].clone(),
+        "next_work": manifest_payload["next_work"].clone()
+    }))
+}
+
 #[tauri::command]
 fn export_current_hfield_project_json(
     state: tauri::State<'_, AppState>,
@@ -2825,6 +3166,7 @@ fn main() {
             export_current_hfield_reader_bundle_json,
             export_current_hfield_combined_wav,
             export_current_hfield_canonical_bundle_manifest_json,
+            export_current_hfield_canonical_bundle_manifest_v2_json,
             verify_latest_hfield_export_replay_manifest_json,
             verify_hfield_export_replay_manifest_json_by_path,
             get_hfield_schema_version_migration_registry_json,
