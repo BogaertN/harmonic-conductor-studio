@@ -21,7 +21,9 @@ use hfield_notation::{
     nudge_notation_note_by_beats, position_notation_note_measure_beat,
     position_notation_note_start_ms, select_notation_note,
 };
-use hfield_packet::validate_hfield_packet_contract;
+use hfield_packet::{
+    assert_hfield_packet_openable, canonicalized_hfield_score, validate_hfield_packet_contract,
+};
 use hfield_playhead::create_playhead_cursor_report;
 use hfield_project::{list_hfield_projects, open_hfield_project, save_hfield_project};
 use hfield_resonance::create_resonance_level_bundle;
@@ -33,7 +35,7 @@ use std::sync::{
     mpsc, Arc, Mutex,
 };
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 struct ActivePlayback {
     stop_flag: Arc<AtomicBool>,
@@ -989,6 +991,200 @@ fn get_current_resonance_level_bundle(
         .map_err(|err| format!("current resonance bundle serialization failed: {err}"))
 }
 
+fn current_score_snapshot(state: &tauri::State<'_, AppState>) -> Result<FieldScore, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    Ok(guard.clone())
+}
+
+fn export_hfield_dir() -> Result<std::path::PathBuf, String> {
+    let output_dir = app_root_dir().join("exports").join("hfield");
+    std::fs::create_dir_all(&output_dir)
+        .map_err(|err| format!("failed to create .hfield export directory: {err}"))?;
+    Ok(output_dir)
+}
+
+fn unix_timestamp_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn sanitize_export_stem(input: &str) -> String {
+    let mut cleaned = input
+        .trim()
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+
+    while cleaned.contains("__") {
+        cleaned = cleaned.replace("__", "_");
+    }
+
+    cleaned = cleaned.trim_matches('_').to_string();
+
+    if cleaned.is_empty() {
+        "hfield_reader_packet".to_string()
+    } else {
+        cleaned.chars().take(64).collect()
+    }
+}
+
+fn export_file_name(score: &FieldScore, export_kind: &str, extension: &str) -> String {
+    let stem = sanitize_export_stem(&score.title);
+    let score_hash = score_hash_hex(score).unwrap_or_else(|_| "hash_unavailable".to_string());
+    let short_hash = score_hash.chars().take(12).collect::<String>();
+    let timestamp = unix_timestamp_seconds();
+
+    format!("{stem}_{export_kind}_{short_hash}_{timestamp}.{extension}")
+}
+
+fn write_json_export_report(
+    export_kind: &str,
+    file_name: &str,
+    payload: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let output_dir = export_hfield_dir()?;
+    let output_path = output_dir.join(file_name);
+
+    let json_text = serde_json::to_string_pretty(&payload)
+        .map_err(|err| format!("failed to serialize export JSON: {err}"))?;
+
+    std::fs::write(&output_path, json_text.as_bytes())
+        .map_err(|err| format!("failed to write export JSON: {err}"))?;
+
+    let bytes = std::fs::read(&output_path)
+        .map_err(|err| format!("failed to read export JSON after write: {err}"))?;
+    let file_hash = blake3::hash(&bytes).to_hex().to_string();
+
+    Ok(json!({
+        "status": "ok",
+        "export_kind": export_kind,
+        "file_name": file_name,
+        "output_path": output_path.to_string_lossy().to_string(),
+        "export_dir": output_dir.to_string_lossy().to_string(),
+        "bytes": bytes.len(),
+        "file_hash": file_hash,
+        "created_unix_seconds": unix_timestamp_seconds()
+    }))
+}
+
+fn write_current_score_json_export(
+    state: tauri::State<'_, AppState>,
+    export_kind: &str,
+    extension: &str,
+    payload_builder: impl FnOnce(&FieldScore) -> Result<serde_json::Value, String>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let payload = payload_builder(&score)?;
+    let file_name = export_file_name(&score, export_kind, extension);
+    write_json_export_report(export_kind, &file_name, payload)
+}
+
+#[tauri::command]
+fn export_current_hfield_project_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(state, "canonical_project", "hfield.json", |score| {
+        let (canonical_score, migration_report) = canonicalized_hfield_score(score);
+        assert_hfield_packet_openable(&canonical_score)?;
+
+        Ok(json!({
+            "contract_id": "aiweb.hfield.export.canonical_project.v1",
+            "export_kind": "canonical_project",
+            "migration_report": migration_report,
+            "score": canonical_score
+        }))
+    })
+}
+
+#[tauri::command]
+fn export_current_hfield_packet_contract_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(state, "packet_contract", "json", |score| {
+        serde_json::to_value(validate_hfield_packet_contract(score))
+            .map_err(|err| format!("packet contract export serialization failed: {err}"))
+    })
+}
+
+#[tauri::command]
+fn export_current_hfield_runtime_carrier_packet_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(state, "runtime_carrier_packet", "json", |score| {
+        serde_json::to_value(synthesize_hfield_runtime_carrier_packet_model(score))
+            .map_err(|err| format!("runtime carrier packet export serialization failed: {err}"))
+    })
+}
+
+#[tauri::command]
+fn export_current_hfield_cymatic_surface_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(state, "cymatic_reader_surface", "json", |score| {
+        serde_json::to_value(synthesize_hfield_cymatic_reader_surface(score))
+            .map_err(|err| format!("cymatic surface export serialization failed: {err}"))
+    })
+}
+
+#[tauri::command]
+fn export_current_hfield_rust_render_manifest_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(state, "rust_render_manifest", "json", |score| {
+        serde_json::to_value(create_hfield_rust_render_manifest(score))
+            .map_err(|err| format!("rust render manifest export serialization failed: {err}"))
+    })
+}
+
+#[tauri::command]
+fn export_current_hfield_reader_bundle_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(state, "reader_bundle", "json", |score| {
+        let (canonical_score, migration_report) = canonicalized_hfield_score(score);
+        assert_hfield_packet_openable(&canonical_score)?;
+
+        Ok(json!({
+            "contract_id": "aiweb.hfield.reader_export_bundle.v1",
+            "export_kind": "reader_bundle",
+            "score_hash": score_hash_hex(&canonical_score)
+                .unwrap_or_else(|_| "hash_unavailable".to_string()),
+            "title": canonical_score.title,
+            "format": canonical_score.format,
+            "version": canonical_score.version,
+            "migration_report": migration_report,
+            "packet_contract": validate_hfield_packet_contract(&canonical_score),
+            "runtime_carrier_packet": synthesize_hfield_runtime_carrier_packet_model(&canonical_score),
+            "cymatic_reader_surface": synthesize_hfield_cymatic_reader_surface(&canonical_score),
+            "rust_render_manifest": create_hfield_rust_render_manifest(&canonical_score),
+            "field_synthesis": synthesize_hfield_field(&canonical_score),
+            "forge_bridge_stub": create_forge_packet_bridge_stub_report(&canonical_score)
+        }))
+    })
+}
+
+#[tauri::command]
+fn export_current_hfield_combined_wav(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let compiled = compile_combined_music_and_conductor_preview(&score, 48_000);
+    let file_name = export_file_name(&score, "combined_audio", "wav");
+    Ok(write_rendered_wav_report(&file_name, compiled))
+}
+
 #[tauri::command]
 fn list_saved_projects() -> Result<serde_json::Value, String> {
     serde_json::to_value(list_hfield_projects(&app_root_dir())?)
@@ -1573,6 +1769,13 @@ fn main() {
             create_default_score,
             create_seed_music_score,
             get_current_resonance_level_bundle,
+            export_current_hfield_project_json,
+            export_current_hfield_packet_contract_json,
+            export_current_hfield_runtime_carrier_packet_json,
+            export_current_hfield_cymatic_surface_json,
+            export_current_hfield_rust_render_manifest_json,
+            export_current_hfield_reader_bundle_json,
+            export_current_hfield_combined_wav,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,

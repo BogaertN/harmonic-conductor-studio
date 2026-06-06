@@ -10,6 +10,13 @@ import {
   selectCurrentNotationNote,
   editCurrentNotationNote,
   deleteCurrentNotationNote,
+  exportCurrentHfieldCombinedWav,
+  exportCurrentHfieldCymaticSurfaceJson,
+  exportCurrentHfieldPacketContractJson,
+  exportCurrentHfieldProjectJson,
+  exportCurrentHfieldReaderBundleJson,
+  exportCurrentHfieldRuntimeCarrierPacketJson,
+  exportCurrentHfieldRustRenderManifestJson,
   getAudioDeviceReport,
   getCurrentConductorMappingReport,
   getCurrentConductorMotionReport,
@@ -56,6 +63,7 @@ import {
   type ConductorMappingReport,
   type ConductorMotionPoint,
   type ConductorMotionReport,
+  type ExportFileReport,
   type GestureTimelineReport,
   type HfieldPacketContractReport,
   type HfieldFieldSynthesisReport,
@@ -102,6 +110,13 @@ type DiagnosticKey =
   | "combinedWav"
   | "currentProjectMusicWav"
   | "currentProjectCombinedWav"
+  | "hfieldProjectJsonExport"
+  | "hfieldReaderBundleExport"
+  | "hfieldRenderManifestExport"
+  | "hfieldCymaticSurfaceExport"
+  | "hfieldRuntimeCarrierExport"
+  | "hfieldPacketContractExport"
+  | "hfieldCombinedWavExport"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -154,6 +169,13 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "combinedWav", label: "Combined WAV" },
   { key: "currentProjectMusicWav", label: "Current Music WAV" },
   { key: "currentProjectCombinedWav", label: "Current Combined WAV" },
+  { key: "hfieldProjectJsonExport", label: ".hfield Project JSON Export" },
+  { key: "hfieldReaderBundleExport", label: "Reader Bundle Export" },
+  { key: "hfieldRenderManifestExport", label: "Rust Render Manifest Export" },
+  { key: "hfieldCymaticSurfaceExport", label: "Cymatic Surface Export" },
+  { key: "hfieldRuntimeCarrierExport", label: "Runtime Carrier Export" },
+  { key: "hfieldPacketContractExport", label: "Packet Contract Export" },
+  { key: "hfieldCombinedWavExport", label: ".hfield Combined WAV Export" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -551,6 +573,13 @@ export default function App() {
   const [combinedWavReport, setCombinedWavReport] = useState<WavRenderReport | null>(null);
   const [currentProjectWavReport, setCurrentProjectWavReport] = useState<WavRenderReport | null>(null);
   const [currentProjectMusicWavReport, setCurrentProjectMusicWavReport] = useState<WavRenderReport | null>(null);
+  const [hfieldProjectJsonExportReport, setHfieldProjectJsonExportReport] = useState<ExportFileReport | null>(null);
+  const [hfieldReaderBundleExportReport, setHfieldReaderBundleExportReport] = useState<ExportFileReport | null>(null);
+  const [hfieldRenderManifestExportReport, setHfieldRenderManifestExportReport] = useState<ExportFileReport | null>(null);
+  const [hfieldCymaticSurfaceExportReport, setHfieldCymaticSurfaceExportReport] = useState<ExportFileReport | null>(null);
+  const [hfieldRuntimeCarrierExportReport, setHfieldRuntimeCarrierExportReport] = useState<ExportFileReport | null>(null);
+  const [hfieldPacketContractExportReport, setHfieldPacketContractExportReport] = useState<ExportFileReport | null>(null);
+  const [hfieldCombinedWavExportReport, setHfieldCombinedWavExportReport] = useState<WavRenderReport | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1156,6 +1185,77 @@ export default function App() {
     }
   }
 
+
+  async function exportHfieldProjectJson() {
+    setError(null);
+    try {
+      setHfieldProjectJsonExportReport(await exportCurrentHfieldProjectJson());
+      setSelectedDiagnostic("hfieldProjectJsonExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportHfieldReaderBundle() {
+    setError(null);
+    try {
+      setHfieldReaderBundleExportReport(await exportCurrentHfieldReaderBundleJson());
+      setSelectedDiagnostic("hfieldReaderBundleExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportHfieldRenderManifest() {
+    setError(null);
+    try {
+      setHfieldRenderManifestExportReport(await exportCurrentHfieldRustRenderManifestJson());
+      setSelectedDiagnostic("hfieldRenderManifestExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportHfieldCymaticSurface() {
+    setError(null);
+    try {
+      setHfieldCymaticSurfaceExportReport(await exportCurrentHfieldCymaticSurfaceJson());
+      setSelectedDiagnostic("hfieldCymaticSurfaceExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportHfieldRuntimeCarrier() {
+    setError(null);
+    try {
+      setHfieldRuntimeCarrierExportReport(await exportCurrentHfieldRuntimeCarrierPacketJson());
+      setSelectedDiagnostic("hfieldRuntimeCarrierExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportHfieldPacketContract() {
+    setError(null);
+    try {
+      setHfieldPacketContractExportReport(await exportCurrentHfieldPacketContractJson());
+      setSelectedDiagnostic("hfieldPacketContractExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportHfieldCombinedWav() {
+    setError(null);
+    try {
+      setHfieldCombinedWavExportReport(await exportCurrentHfieldCombinedWav());
+      setSelectedDiagnostic("hfieldCombinedWavExport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1354,6 +1454,20 @@ export default function App() {
         return currentProjectMusicWavReport;
       case "currentProjectCombinedWav":
         return currentProjectWavReport;
+      case "hfieldProjectJsonExport":
+        return hfieldProjectJsonExportReport;
+      case "hfieldReaderBundleExport":
+        return hfieldReaderBundleExportReport;
+      case "hfieldRenderManifestExport":
+        return hfieldRenderManifestExportReport;
+      case "hfieldCymaticSurfaceExport":
+        return hfieldCymaticSurfaceExportReport;
+      case "hfieldRuntimeCarrierExport":
+        return hfieldRuntimeCarrierExportReport;
+      case "hfieldPacketContractExport":
+        return hfieldPacketContractExportReport;
+      case "hfieldCombinedWavExport":
+        return hfieldCombinedWavExportReport;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -1804,6 +1918,21 @@ export default function App() {
                   <button onClick={refreshProjectList} type="button">List Projects</button>
                 </div>
               </div>
+
+              <section className="report-card hfield-export-panel">
+                <h3>Reader Packet Exports</h3>
+                <p className="note">Writes local files under exports/hfield or exports/audio. These exports do not mutate Forge.</p>
+                <div className="project-row export-button-row">
+                  <button onClick={exportHfieldProjectJson} type="button">Export Project JSON</button>
+                  <button onClick={exportHfieldReaderBundle} type="button">Export Reader Bundle</button>
+                  <button onClick={exportHfieldRenderManifest} type="button">Export Render Manifest</button>
+                  <button onClick={exportHfieldCymaticSurface} type="button">Export Cymatic Surface</button>
+                  <button onClick={exportHfieldRuntimeCarrier} type="button">Export Carrier Packet</button>
+                  <button onClick={exportHfieldPacketContract} type="button">Export Packet Contract</button>
+                  <button onClick={exportHfieldCombinedWav} type="button">Export Combined WAV</button>
+                </div>
+                <pre>{JSON.stringify(hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+              </section>
 
               <div className="project-grid">
                 <section className="report-card">

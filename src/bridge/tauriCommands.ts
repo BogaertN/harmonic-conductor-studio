@@ -44,6 +44,17 @@ export type WavRenderReport = {
   waveform_summary: WaveformSummary;
 };
 
+export type ExportFileReport = {
+  status: string;
+  export_kind: string;
+  file_name: string;
+  output_path: string;
+  export_dir: string;
+  bytes: number;
+  file_hash: string;
+  created_unix_seconds: number;
+};
+
 export type PlaybackReport = {
   status: string;
   message: string;
@@ -1042,6 +1053,35 @@ export async function getCurrentLoopPhraseReport(startMeasure: number, endMeasur
 
 export async function playCurrentProjectPhraseCombinedAudio(startMeasure: number, endMeasure: number): Promise<PlaybackReport> {
   return await invoke<PlaybackReport>("play_current_project_phrase_combined_audio", { startMeasure, endMeasure });
+}
+
+
+export async function exportCurrentHfieldProjectJson(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_hfield_project_json");
+}
+
+export async function exportCurrentHfieldPacketContractJson(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_hfield_packet_contract_json");
+}
+
+export async function exportCurrentHfieldRuntimeCarrierPacketJson(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_hfield_runtime_carrier_packet_json");
+}
+
+export async function exportCurrentHfieldCymaticSurfaceJson(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_hfield_cymatic_surface_json");
+}
+
+export async function exportCurrentHfieldRustRenderManifestJson(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_hfield_rust_render_manifest_json");
+}
+
+export async function exportCurrentHfieldReaderBundleJson(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_hfield_reader_bundle_json");
+}
+
+export async function exportCurrentHfieldCombinedWav(): Promise<WavRenderReport> {
+  return await invoke<WavRenderReport>("export_current_hfield_combined_wav");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

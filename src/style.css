@@ -1878,3 +1878,25 @@ body {
   color: rgba(86, 214, 255, 0.86);
 }
 /* END HFIELD Single Clock Playback Scan Sync v1 */
+
+
+/* HFIELD Reader Packet Save Open Export v1 */
+.hfield-export-panel {
+  grid-column: 1 / -1;
+  border-color: rgba(86, 214, 255, 0.22);
+}
+
+.export-button-row {
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0.7rem 0;
+}
+
+.export-button-row button {
+  min-width: 168px;
+}
+
+.hfield-export-panel pre {
+  max-height: 220px;
+}
+/* END HFIELD Reader Packet Save Open Export v1 */
