@@ -18,6 +18,12 @@ import {
   exportCurrentHfieldCombinedWav,
   exportCurrentHfieldCanonicalBundleManifestJson,
   exportCurrentHfieldCanonicalBundleManifestV2Json,
+  getHcsSqliteMotifProjectLibraryV1Report,
+  saveCurrentHcsSqliteProjectLibraryV1,
+  listHcsSqliteProjectLibraryV1,
+  saveCurrentHcsSqliteMotifsV1,
+  listHcsSqliteMotifsV1,
+  saveCurrentHcsSqliteReceiptV1,
   verifyLatestHfieldExportReplayManifestJson,
   getHfieldSchemaVersionMigrationRegistryJson,
   inspectCurrentHfieldSchemaMigrationRegistryJson,
@@ -96,6 +102,7 @@ import {
   type HfieldCymaticFieldModelV2Report,
   type HfieldSyllableShapedExpressionV1Report,
   type HfieldSchemaVersionMigrationRegistryReport,
+  type HcsSqliteMotifProjectLibraryV1Report,
   type HfieldExportReplayVerifierReport,
   type PlaybackReport,
   type StopReport,
@@ -164,6 +171,7 @@ type DiagnosticKey =
   | "gestureAwareFieldRendererV2"
   | "cymaticFieldModelV2"
   | "syllableShapedExpressionV1"
+  | "hcsSqliteMotifProjectLibraryV1"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -236,6 +244,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "gestureAwareFieldRendererV2", label: "Gesture-Aware Field Renderer v2" },
   { key: "cymaticFieldModelV2", label: "Cymatic Field Model v2" },
   { key: "syllableShapedExpressionV1", label: "Syllable-Shaped Expression v1" },
+  { key: "hcsSqliteMotifProjectLibraryV1", label: "SQLite Motif / Project Library v1" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -657,6 +666,7 @@ export default function App() {
   const [cymaticFieldModelV2ExportReport, setCymaticFieldModelV2ExportReport] = useState<ExportFileReport | null>(null);
   const [syllableShapedExpressionV1Report, setSyllableShapedExpressionV1Report] = useState<HfieldSyllableShapedExpressionV1Report | null>(null);
   const [syllableShapedExpressionV1ExportReport, setSyllableShapedExpressionV1ExportReport] = useState<ExportFileReport | null>(null);
+  const [hcsSqliteLibraryV1Report, setHcsSqliteLibraryV1Report] = useState<HcsSqliteMotifProjectLibraryV1Report | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1558,6 +1568,67 @@ export default function App() {
     }
   }
 
+  
+  async function inspectHcsSqliteMotifProjectLibraryV1() {
+    setError(null);
+    try {
+      setHcsSqliteLibraryV1Report(await getHcsSqliteMotifProjectLibraryV1Report());
+      setSelectedDiagnostic("hcsSqliteMotifProjectLibraryV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function saveCurrentProjectToHcsSqliteLibraryV1() {
+    setError(null);
+    try {
+      setHcsSqliteLibraryV1Report(await saveCurrentHcsSqliteProjectLibraryV1());
+      setSelectedDiagnostic("hcsSqliteMotifProjectLibraryV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function listHcsSqliteProjectsV1() {
+    setError(null);
+    try {
+      setHcsSqliteLibraryV1Report(await listHcsSqliteProjectLibraryV1());
+      setSelectedDiagnostic("hcsSqliteMotifProjectLibraryV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function saveCurrentMotifsToHcsSqliteLibraryV1() {
+    setError(null);
+    try {
+      setHcsSqliteLibraryV1Report(await saveCurrentHcsSqliteMotifsV1());
+      setSelectedDiagnostic("hcsSqliteMotifProjectLibraryV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function listHcsSqliteMotifBatchesV1() {
+    setError(null);
+    try {
+      setHcsSqliteLibraryV1Report(await listHcsSqliteMotifsV1());
+      setSelectedDiagnostic("hcsSqliteMotifProjectLibraryV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function saveCurrentReceiptToHcsSqliteLibraryV1() {
+    setError(null);
+    try {
+      setHcsSqliteLibraryV1Report(await saveCurrentHcsSqliteReceiptV1());
+      setSelectedDiagnostic("hcsSqliteMotifProjectLibraryV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1796,6 +1867,8 @@ export default function App() {
         return cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report;
       case "syllableShapedExpressionV1":
         return syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report;
+      case "hcsSqliteMotifProjectLibraryV1":
+        return hcsSqliteLibraryV1Report;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -2278,6 +2351,12 @@ export default function App() {
                   <button onClick={exportHfieldCombinedWav} type="button">Export Combined WAV</button>
                   <button onClick={exportHfieldCanonicalBundleManifest} type="button">Export Bundle Manifest</button>
                   <button onClick={exportHfieldCanonicalBundleManifestV2} type="button">Export Bundle Manifest v2</button>
+                  <button onClick={inspectHcsSqliteMotifProjectLibraryV1} type="button">Inspect SQLite Library</button>
+                  <button onClick={saveCurrentProjectToHcsSqliteLibraryV1} type="button">Save Project to SQLite</button>
+                  <button onClick={listHcsSqliteProjectsV1} type="button">List SQLite Projects</button>
+                  <button onClick={saveCurrentMotifsToHcsSqliteLibraryV1} type="button">Save Motifs to SQLite</button>
+                  <button onClick={listHcsSqliteMotifBatchesV1} type="button">List SQLite Motifs</button>
+                  <button onClick={saveCurrentReceiptToHcsSqliteLibraryV1} type="button">Save SQLite Receipt</button>
                   <button onClick={verifyHfieldExportReplayManifest} type="button">Verify Latest Bundle</button>
                   <button onClick={inspectHfieldSchemaMigrationRegistry} type="button">Inspect Schema Registry</button>
                   <button onClick={inspectNineGestureConductorEngine} type="button">Inspect Nine-Gesture Engine</button>
@@ -2295,7 +2374,7 @@ export default function App() {
                   <button onClick={inspectSyllableShapedExpressionV1} type="button">Inspect Syllable Expression</button>
                   <button onClick={exportSyllableShapedExpressionV1Json} type="button">Export Syllable Expression JSON</button>
                 </div>
-                <pre>{JSON.stringify(syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report ?? cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report ?? gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(hcsSqliteLibraryV1Report ?? syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report ?? cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report ?? gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">

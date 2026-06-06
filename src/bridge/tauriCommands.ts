@@ -365,6 +365,27 @@ export type HfieldSyllableShapedExpressionV1Report = {
   next_work: string[];
 };
 
+
+export type HcsSqliteMotifProjectLibraryV1Report = {
+  status: string;
+  contract_id: string;
+  profile_id?: string;
+  schema_version?: string;
+  db_path?: string;
+  storage_scope?: unknown;
+  actual_music_capacity?: unknown;
+  counts?: unknown;
+  authority_boundaries?: unknown;
+  last_action?: unknown;
+  projects?: unknown[];
+  motifs?: unknown[];
+  project_count?: number;
+  motif_count?: number;
+  actual_music_supported?: boolean;
+  next_work?: string[];
+  [key: string]: unknown;
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1481,6 +1502,35 @@ export async function exportCurrentHfieldCanonicalBundleManifestV2Json(): Promis
   return await invoke<HfieldCanonicalBundleManifestExportReport>("export_current_hfield_canonical_bundle_manifest_v2_json");
 }
 
+
+
+export async function getHcsSqliteMotifProjectLibraryV1Report(): Promise<HcsSqliteMotifProjectLibraryV1Report> {
+  return await invoke<HcsSqliteMotifProjectLibraryV1Report>("get_hcs_sqlite_motif_project_library_v1_report");
+}
+
+export async function saveCurrentHcsSqliteProjectLibraryV1(): Promise<HcsSqliteMotifProjectLibraryV1Report> {
+  return await invoke<HcsSqliteMotifProjectLibraryV1Report>("save_current_hcs_sqlite_project_library_v1");
+}
+
+export async function listHcsSqliteProjectLibraryV1(): Promise<HcsSqliteMotifProjectLibraryV1Report> {
+  return await invoke<HcsSqliteMotifProjectLibraryV1Report>("list_hcs_sqlite_project_library_v1");
+}
+
+export async function openHcsSqliteProjectFromLibraryV1(projectId: string): Promise<HcsSqliteMotifProjectLibraryV1Report> {
+  return await invoke<HcsSqliteMotifProjectLibraryV1Report>("open_hcs_sqlite_project_from_library_v1", { projectId });
+}
+
+export async function saveCurrentHcsSqliteMotifsV1(): Promise<HcsSqliteMotifProjectLibraryV1Report> {
+  return await invoke<HcsSqliteMotifProjectLibraryV1Report>("save_current_hcs_sqlite_motifs_v1");
+}
+
+export async function listHcsSqliteMotifsV1(): Promise<HcsSqliteMotifProjectLibraryV1Report> {
+  return await invoke<HcsSqliteMotifProjectLibraryV1Report>("list_hcs_sqlite_motifs_v1");
+}
+
+export async function saveCurrentHcsSqliteReceiptV1(): Promise<HcsSqliteMotifProjectLibraryV1Report> {
+  return await invoke<HcsSqliteMotifProjectLibraryV1Report>("save_current_hcs_sqlite_receipt_v1");
+}
 
 export async function verifyLatestHfieldExportReplayManifestJson(): Promise<HfieldExportReplayVerifierReport> {
   return await invoke<HfieldExportReplayVerifierReport>("verify_latest_hfield_export_replay_manifest_json");

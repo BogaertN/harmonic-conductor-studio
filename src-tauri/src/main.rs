@@ -1611,6 +1611,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "gesture_aware_field_renderer_v2_contract_id": "aiweb.hfield.gesture_aware_field_renderer.v2",
         "cymatic_field_model_v2_contract_id": "aiweb.hfield.cymatic_field_model.v2",
         "syllable_shaped_expression_v1_contract_id": "aiweb.hfield.syllable_shaped_expression.v1",
+        "sqlite_motif_project_library_v1_contract_id": "aiweb.hfield.sqlite_motif_project_library.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -2265,6 +2266,567 @@ fn export_current_hfield_canonical_bundle_manifest_v2_json(
         "receipt_hashes": manifest_payload["receipt_hashes"].clone(),
         "next_work": manifest_payload["next_work"].clone()
     }))
+}
+
+const HCS_SQLITE_MOTIF_PROJECT_LIBRARY_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.sqlite_motif_project_library.v1";
+const HCS_SQLITE_MOTIF_PROJECT_LIBRARY_V1_PROFILE_ID: &str =
+    "local_project_motif_receipt_storage_v1";
+
+fn hcs_sqlite_library_v1_db_path() -> Result<std::path::PathBuf, String> {
+    let library_dir = app_root_dir().join("library");
+    std::fs::create_dir_all(&library_dir)
+        .map_err(|err| format!("failed to create HCS SQLite library directory: {err}"))?;
+    Ok(library_dir.join("hcs_motif_project_library_v1.sqlite3"))
+}
+
+fn hcs_sqlite_library_v1_connect() -> Result<rusqlite::Connection, String> {
+    let db_path = hcs_sqlite_library_v1_db_path()?;
+    let conn = rusqlite::Connection::open(&db_path).map_err(|err| {
+        format!(
+            "failed to open HCS SQLite library at {}: {err}",
+            db_path.display()
+        )
+    })?;
+    hcs_sqlite_library_v1_init_schema(&conn)?;
+    Ok(conn)
+}
+
+fn hcs_sqlite_library_v1_init_schema(conn: &rusqlite::Connection) -> Result<(), String> {
+    conn.execute_batch(
+        r#"
+        PRAGMA foreign_keys = ON;
+        PRAGMA journal_mode = WAL;
+        CREATE TABLE IF NOT EXISTS hcs_library_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_unix_seconds INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS hcs_projects (
+            project_id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            score_hash TEXT NOT NULL,
+            score_json TEXT NOT NULL,
+            music_track_count INTEGER NOT NULL,
+            note_event_count INTEGER NOT NULL,
+            conductor_event_count INTEGER NOT NULL,
+            total_duration_ms INTEGER NOT NULL,
+            score_byte_len INTEGER NOT NULL,
+            actual_music_payload INTEGER NOT NULL,
+            source_contract_id TEXT NOT NULL,
+            custody_state TEXT NOT NULL,
+            private_identity_exported INTEGER NOT NULL,
+            forge_mutation_performed INTEGER NOT NULL,
+            created_unix_seconds INTEGER NOT NULL,
+            updated_unix_seconds INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_hcs_projects_updated ON hcs_projects(updated_unix_seconds DESC);
+        CREATE INDEX IF NOT EXISTS idx_hcs_projects_score_hash ON hcs_projects(score_hash);
+        CREATE TABLE IF NOT EXISTS hcs_motifs (
+            motif_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            motif_kind TEXT NOT NULL,
+            source_score_hash TEXT NOT NULL,
+            approval_state TEXT NOT NULL,
+            motif_json TEXT NOT NULL,
+            note_event_count INTEGER NOT NULL,
+            gesture_event_count INTEGER NOT NULL,
+            candidate_count INTEGER NOT NULL,
+            created_unix_seconds INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_hcs_motifs_project ON hcs_motifs(project_id);
+        CREATE INDEX IF NOT EXISTS idx_hcs_motifs_source_hash ON hcs_motifs(source_score_hash);
+        CREATE TABLE IF NOT EXISTS hcs_receipts (
+            receipt_id TEXT PRIMARY KEY,
+            receipt_kind TEXT NOT NULL,
+            source_score_hash TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            payload_hash TEXT NOT NULL,
+            created_unix_seconds INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_hcs_receipts_source_hash ON hcs_receipts(source_score_hash);
+        INSERT OR IGNORE INTO hcs_library_metadata(key, value, updated_unix_seconds)
+        VALUES('contract_id', 'aiweb.hfield.sqlite_motif_project_library.v1', 0);
+        "#,
+    )
+    .map_err(|err| format!("failed to initialize HCS SQLite library schema: {err}"))
+}
+
+fn hcs_sqlite_library_v1_now() -> i64 {
+    unix_timestamp_seconds() as i64
+}
+
+fn hcs_sqlite_library_v1_note_event_count(score: &FieldScore) -> usize {
+    score
+        .music
+        .tracks
+        .iter()
+        .map(|track| track.notes.len())
+        .sum()
+}
+
+fn hcs_sqlite_library_v1_music_track_count(score: &FieldScore) -> usize {
+    score.music.tracks.len()
+}
+
+fn hcs_sqlite_library_v1_conductor_event_count(score: &FieldScore) -> usize {
+    score.conductor.primary_hand_track.events.len()
+        + score
+            .conductor
+            .expressive_hand_track
+            .as_ref()
+            .map(|track| track.events.len())
+            .unwrap_or(0)
+}
+
+fn hcs_sqlite_library_v1_total_duration_ms(score: &FieldScore) -> u32 {
+    let music_end = score
+        .music
+        .tracks
+        .iter()
+        .flat_map(|track| track.notes.iter())
+        .map(|note| note.start_ms.saturating_add(note.duration_ms))
+        .max()
+        .unwrap_or(0);
+    let primary_end = score
+        .conductor
+        .primary_hand_track
+        .events
+        .iter()
+        .map(|event| event.start_ms.saturating_add(event.duration_ms))
+        .max()
+        .unwrap_or(0);
+    let expressive_end = score
+        .conductor
+        .expressive_hand_track
+        .as_ref()
+        .and_then(|track| {
+            track
+                .events
+                .iter()
+                .map(|event| event.start_ms.saturating_add(event.duration_ms))
+                .max()
+        })
+        .unwrap_or(0);
+    music_end.max(primary_end).max(expressive_end)
+}
+
+fn hcs_sqlite_library_v1_score_hash(score: &FieldScore) -> Result<String, String> {
+    score_hash_hex(score).map_err(|err| format!("failed to hash score for SQLite library: {err}"))
+}
+
+fn hcs_sqlite_library_v1_project_id(score: &FieldScore) -> Result<String, String> {
+    let score_hash = hcs_sqlite_library_v1_score_hash(score)?;
+    let short_hash = score_hash.chars().take(16).collect::<String>();
+    Ok(format!(
+        "hcs_project_{}_{}",
+        hcs_sqlite_library_v1_now(),
+        short_hash
+    ))
+}
+
+fn hcs_sqlite_count(conn: &rusqlite::Connection, sql: &str) -> Result<i64, String> {
+    conn.query_row(sql, [], |row| row.get::<_, i64>(0))
+        .map_err(|err| format!("failed SQLite count query `{sql}`: {err}"))
+}
+
+fn hcs_sqlite_library_v1_report_payload(
+    conn: &rusqlite::Connection,
+    last_action: Option<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    let db_path = hcs_sqlite_library_v1_db_path()?;
+    let project_count = hcs_sqlite_count(conn, "SELECT COUNT(*) FROM hcs_projects")?;
+    let motif_count = hcs_sqlite_count(conn, "SELECT COUNT(*) FROM hcs_motifs")?;
+    let receipt_count = hcs_sqlite_count(conn, "SELECT COUNT(*) FROM hcs_receipts")?;
+    let total_note_events = hcs_sqlite_count(
+        conn,
+        "SELECT COALESCE(SUM(note_event_count), 0) FROM hcs_projects",
+    )?;
+    let projects_with_actual_music = hcs_sqlite_count(
+        conn,
+        "SELECT COUNT(*) FROM hcs_projects WHERE actual_music_payload = 1",
+    )?;
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_SQLITE_MOTIF_PROJECT_LIBRARY_V1_CONTRACT_ID,
+        "profile_id": HCS_SQLITE_MOTIF_PROJECT_LIBRARY_V1_PROFILE_ID,
+        "schema_version": "1.0.0",
+        "db_path": db_path.to_string_lossy().to_string(),
+        "storage_scope": {
+            "stores_full_hfield_score_json": true,
+            "stores_actual_music_tracks": true,
+            "stores_note_events": true,
+            "stores_conductor_events": true,
+            "stores_motif_candidate_batches": true,
+            "stores_local_custody_receipts": true,
+            "stores_audio_binary_inside_sqlite": false,
+            "audio_remains_deterministic_export_or_render_artifact": true
+        },
+        "actual_music_capacity": {
+            "note_event_count_across_projects": total_note_events,
+            "projects_with_actual_music_payload": projects_with_actual_music,
+            "meaning": "SQLite stores the complete FieldScore JSON, including music.tracks[*].notes, so multi-track compositions can be saved and reopened instead of collapsing to a single monotone preview."
+        },
+        "counts": {
+            "projects": project_count,
+            "motif_batches": motif_count,
+            "receipts": receipt_count
+        },
+        "authority_boundaries": {
+            "sqlite_library_is_source_authority": false,
+            "harmonic_field_score_remains_source_authority": true,
+            "sqlite_library_is_local_storage_and_index": true,
+            "private_identity_export_disabled": true,
+            "live_identity_vault_write_performed": false,
+            "forge_mutation_performed": false,
+            "health_or_sensor_claim_authorized": false,
+            "open_source_sqlite_is_storage_engine_not_hfield_authority": true
+        },
+        "last_action": last_action.unwrap_or(serde_json::Value::Null),
+        "next_work": [
+            "Production Packaging v1 should package the app without shipping user SQLite databases.",
+            "Forge Adapter v1 remains blocked until sealed HFIELD bundles and local library receipts replay cleanly.",
+            "Future library revisions may add search, tagging, and explicit user approval states for motif promotion."
+        ]
+    }))
+}
+
+#[tauri::command]
+fn get_hcs_sqlite_motif_project_library_v1_report() -> Result<serde_json::Value, String> {
+    let conn = hcs_sqlite_library_v1_connect()?;
+    hcs_sqlite_library_v1_report_payload(
+        &conn,
+        Some(json!({
+            "action": "inspect_library",
+            "message": "SQLite library schema is initialized and ready for full HFIELD project storage."
+        })),
+    )
+}
+
+#[tauri::command]
+fn save_current_hcs_sqlite_project_library_v1(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let conn = hcs_sqlite_library_v1_connect()?;
+    let project_id = hcs_sqlite_library_v1_project_id(&score)?;
+    let score_hash = hcs_sqlite_library_v1_score_hash(&score)?;
+    let score_json = serde_json::to_string_pretty(&score)
+        .map_err(|err| format!("failed to serialize current score for SQLite library: {err}"))?;
+    let now = hcs_sqlite_library_v1_now();
+    let note_event_count = hcs_sqlite_library_v1_note_event_count(&score);
+    let actual_music_payload = note_event_count > 0;
+    let no_forge_mutation = score.packet.forge_bridge.status == "reserved"
+        && score.packet.forge_bridge.forge_runtime_ref.is_none();
+
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO hcs_projects(
+            project_id, title, score_hash, score_json, music_track_count, note_event_count,
+            conductor_event_count, total_duration_ms, score_byte_len, actual_music_payload,
+            source_contract_id, custody_state, private_identity_exported, forge_mutation_performed,
+            created_unix_seconds, updated_unix_seconds
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+        "#,
+        rusqlite::params![
+            project_id,
+            score.title,
+            score_hash,
+            score_json,
+            hcs_sqlite_library_v1_music_track_count(&score) as i64,
+            note_event_count as i64,
+            hcs_sqlite_library_v1_conductor_event_count(&score) as i64,
+            hcs_sqlite_library_v1_total_duration_ms(&score) as i64,
+            serde_json::to_string(&score)
+                .map_err(|err| format!("failed to measure serialized score size: {err}"))?
+                .len() as i64,
+            i64::from(actual_music_payload),
+            score.format,
+            score.provenance.custody_model,
+            i64::from(score.provenance.raw_private_identity_exported),
+            i64::from(!no_forge_mutation),
+            now,
+            now
+        ],
+    )
+    .map_err(|err| format!("failed to save current project into SQLite library: {err}"))?;
+
+    hcs_sqlite_library_v1_report_payload(
+        &conn,
+        Some(json!({
+            "action": "save_current_project",
+            "project_id": project_id,
+            "score_hash": score_hash,
+            "note_event_count": note_event_count,
+            "actual_music_payload": actual_music_payload,
+            "stored_full_field_score_json": true
+        })),
+    )
+}
+
+#[tauri::command]
+fn list_hcs_sqlite_project_library_v1() -> Result<serde_json::Value, String> {
+    let conn = hcs_sqlite_library_v1_connect()?;
+    let db_path = hcs_sqlite_library_v1_db_path()?;
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT project_id, title, score_hash, music_track_count, note_event_count,
+                   conductor_event_count, total_duration_ms, actual_music_payload,
+                   created_unix_seconds, updated_unix_seconds
+            FROM hcs_projects
+            ORDER BY updated_unix_seconds DESC
+            LIMIT 200
+            "#,
+        )
+        .map_err(|err| format!("failed to prepare SQLite project list: {err}"))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(json!({
+                "project_id": row.get::<_, String>(0)?,
+                "title": row.get::<_, String>(1)?,
+                "score_hash": row.get::<_, String>(2)?,
+                "music_track_count": row.get::<_, i64>(3)?,
+                "note_event_count": row.get::<_, i64>(4)?,
+                "conductor_event_count": row.get::<_, i64>(5)?,
+                "total_duration_ms": row.get::<_, i64>(6)?,
+                "actual_music_payload": row.get::<_, i64>(7)? == 1,
+                "created_unix_seconds": row.get::<_, i64>(8)?,
+                "updated_unix_seconds": row.get::<_, i64>(9)?
+            }))
+        })
+        .map_err(|err| format!("failed to query SQLite projects: {err}"))?;
+
+    let mut projects = Vec::new();
+    for row in rows {
+        projects.push(row.map_err(|err| format!("failed to read SQLite project row: {err}"))?);
+    }
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_SQLITE_MOTIF_PROJECT_LIBRARY_V1_CONTRACT_ID,
+        "db_path": db_path.to_string_lossy().to_string(),
+        "project_count": projects.len(),
+        "projects": projects,
+        "actual_music_supported": true
+    }))
+}
+
+#[tauri::command]
+fn open_hcs_sqlite_project_from_library_v1(
+    state: tauri::State<'_, AppState>,
+    project_id: String,
+) -> Result<serde_json::Value, String> {
+    let conn = hcs_sqlite_library_v1_connect()?;
+    let (score_json, stored_hash): (String, String) = conn
+        .query_row(
+            "SELECT score_json, score_hash FROM hcs_projects WHERE project_id = ?1",
+            rusqlite::params![project_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .map_err(|err| format!("failed to open SQLite project from library: {err}"))?;
+    let score: FieldScore = serde_json::from_str(&score_json)
+        .map_err(|err| format!("stored SQLite project is not valid FieldScore JSON: {err}"))?;
+    let computed_hash = hcs_sqlite_library_v1_score_hash(&score)?;
+    if computed_hash != stored_hash {
+        return Err(format!(
+            "stored project hash mismatch: stored {stored_hash}, computed {computed_hash}"
+        ));
+    }
+    if score.provenance.raw_private_identity_exported {
+        return Err(
+            "refusing to open project with raw private identity export flag set".to_string(),
+        );
+    }
+
+    {
+        let mut guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        *guard = score.clone();
+    }
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_SQLITE_MOTIF_PROJECT_LIBRARY_V1_CONTRACT_ID,
+        "action": "open_project_from_sqlite_library",
+        "project_id": project_id,
+        "score_hash": computed_hash,
+        "title": score.title,
+        "music_track_count": hcs_sqlite_library_v1_music_track_count(&score),
+        "note_event_count": hcs_sqlite_library_v1_note_event_count(&score),
+        "actual_music_payload": hcs_sqlite_library_v1_note_event_count(&score) > 0
+    }))
+}
+
+#[tauri::command]
+fn save_current_hcs_sqlite_motifs_v1(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let conn = hcs_sqlite_library_v1_connect()?;
+    let source_score_hash = hcs_sqlite_library_v1_score_hash(&score)?;
+    let project_id = format!(
+        "hcs_project_ref_{}",
+        source_score_hash.chars().take(16).collect::<String>()
+    );
+    let motif_report = hfield_domain::create_motif_library_annotation_layer_v1_report(&score);
+    let motif_value = serde_json::to_value(&motif_report)
+        .map_err(|err| format!("failed to serialize motif report for SQLite library: {err}"))?;
+    let candidate_count = motif_value
+        .get("motif_candidates")
+        .and_then(|value| value.as_array())
+        .map(|array| array.len())
+        .unwrap_or(0);
+    let motif_json = serde_json::to_string_pretty(&motif_value)
+        .map_err(|err| format!("failed to stringify motif report for SQLite library: {err}"))?;
+    let now = hcs_sqlite_library_v1_now();
+    let motif_id = format!(
+        "hcs_motif_batch_{}_{}",
+        now,
+        source_score_hash.chars().take(16).collect::<String>()
+    );
+
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO hcs_motifs(
+            motif_id, project_id, motif_kind, source_score_hash, approval_state, motif_json,
+            note_event_count, gesture_event_count, candidate_count, created_unix_seconds
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        "#,
+        rusqlite::params![
+            motif_id,
+            project_id,
+            "motif_candidate_batch_v1",
+            source_score_hash,
+            "discovery_candidate_batch",
+            motif_json,
+            hcs_sqlite_library_v1_note_event_count(&score) as i64,
+            hcs_sqlite_library_v1_conductor_event_count(&score) as i64,
+            candidate_count as i64,
+            now
+        ],
+    )
+    .map_err(|err| format!("failed to save motif batch into SQLite library: {err}"))?;
+
+    hcs_sqlite_library_v1_report_payload(
+        &conn,
+        Some(json!({
+            "action": "save_current_motif_candidates",
+            "motif_id": motif_id,
+            "source_score_hash": source_score_hash,
+            "candidate_count": candidate_count,
+            "approval_state": "discovery_candidate_batch"
+        })),
+    )
+}
+
+#[tauri::command]
+fn list_hcs_sqlite_motifs_v1() -> Result<serde_json::Value, String> {
+    let conn = hcs_sqlite_library_v1_connect()?;
+    let db_path = hcs_sqlite_library_v1_db_path()?;
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT motif_id, project_id, motif_kind, source_score_hash, approval_state,
+                   note_event_count, gesture_event_count, candidate_count, created_unix_seconds
+            FROM hcs_motifs
+            ORDER BY created_unix_seconds DESC
+            LIMIT 200
+            "#,
+        )
+        .map_err(|err| format!("failed to prepare SQLite motif list: {err}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(json!({
+                "motif_id": row.get::<_, String>(0)?,
+                "project_id": row.get::<_, String>(1)?,
+                "motif_kind": row.get::<_, String>(2)?,
+                "source_score_hash": row.get::<_, String>(3)?,
+                "approval_state": row.get::<_, String>(4)?,
+                "note_event_count": row.get::<_, i64>(5)?,
+                "gesture_event_count": row.get::<_, i64>(6)?,
+                "candidate_count": row.get::<_, i64>(7)?,
+                "created_unix_seconds": row.get::<_, i64>(8)?
+            }))
+        })
+        .map_err(|err| format!("failed to query SQLite motifs: {err}"))?;
+
+    let mut motifs = Vec::new();
+    for row in rows {
+        motifs.push(row.map_err(|err| format!("failed to read SQLite motif row: {err}"))?);
+    }
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_SQLITE_MOTIF_PROJECT_LIBRARY_V1_CONTRACT_ID,
+        "db_path": db_path.to_string_lossy().to_string(),
+        "motif_count": motifs.len(),
+        "motifs": motifs
+    }))
+}
+
+#[tauri::command]
+fn save_current_hcs_sqlite_receipt_v1(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let conn = hcs_sqlite_library_v1_connect()?;
+    let source_score_hash = hcs_sqlite_library_v1_score_hash(&score)?;
+    let payload = json!({
+        "contract_id": HCS_SQLITE_MOTIF_PROJECT_LIBRARY_V1_CONTRACT_ID,
+        "receipt_kind": "local_current_score_custody_receipt_v1",
+        "source_score_hash": source_score_hash,
+        "title": score.title,
+        "music_track_count": hcs_sqlite_library_v1_music_track_count(&score),
+        "note_event_count": hcs_sqlite_library_v1_note_event_count(&score),
+        "conductor_event_count": hcs_sqlite_library_v1_conductor_event_count(&score),
+        "total_duration_ms": hcs_sqlite_library_v1_total_duration_ms(&score),
+        "actual_music_payload": hcs_sqlite_library_v1_note_event_count(&score) > 0,
+        "private_identity_exported": score.provenance.raw_private_identity_exported,
+        "live_identity_vault_write_performed": false,
+        "forge_mutation_performed": false,
+        "canonical_bundle_manifest_v2_expected": true
+    });
+    let payload_json = serde_json::to_string_pretty(&payload)
+        .map_err(|err| format!("failed to serialize SQLite receipt payload: {err}"))?;
+    let payload_hash = blake3::hash(payload_json.as_bytes()).to_hex().to_string();
+    let now = hcs_sqlite_library_v1_now();
+    let receipt_id = format!(
+        "hcs_receipt_{}_{}",
+        now,
+        payload_hash.chars().take(16).collect::<String>()
+    );
+
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO hcs_receipts(
+            receipt_id, receipt_kind, source_score_hash, payload_json, payload_hash, created_unix_seconds
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "#,
+        rusqlite::params![
+            receipt_id,
+            "local_current_score_custody_receipt_v1",
+            source_score_hash,
+            payload_json,
+            payload_hash,
+            now
+        ],
+    )
+    .map_err(|err| format!("failed to save SQLite custody receipt: {err}"))?;
+
+    hcs_sqlite_library_v1_report_payload(
+        &conn,
+        Some(json!({
+            "action": "save_current_receipt",
+            "receipt_id": receipt_id,
+            "payload_hash": payload_hash,
+            "receipt_kind": "local_current_score_custody_receipt_v1"
+        })),
+    )
 }
 
 #[tauri::command]
@@ -3167,6 +3729,13 @@ fn main() {
             export_current_hfield_combined_wav,
             export_current_hfield_canonical_bundle_manifest_json,
             export_current_hfield_canonical_bundle_manifest_v2_json,
+            get_hcs_sqlite_motif_project_library_v1_report,
+            save_current_hcs_sqlite_project_library_v1,
+            list_hcs_sqlite_project_library_v1,
+            open_hcs_sqlite_project_from_library_v1,
+            save_current_hcs_sqlite_motifs_v1,
+            list_hcs_sqlite_motifs_v1,
+            save_current_hcs_sqlite_receipt_v1,
             verify_latest_hfield_export_replay_manifest_json,
             verify_hfield_export_replay_manifest_json_by_path,
             get_hfield_schema_version_migration_registry_json,

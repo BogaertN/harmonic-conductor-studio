@@ -11,3 +11,6 @@ exports/audio/*.wav
 /projects/*.hfield.tmp
 projects/*.hfield
 exports/
+library/
+library/*.sqlite3
+library/*.sqlite3-*
