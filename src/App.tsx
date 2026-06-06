@@ -6,6 +6,9 @@ import {
   clearCurrentGestureTimeline,
   clearCurrentMusicTrack,
   createDefaultScore,
+  selectCurrentNotationNote,
+  editCurrentNotationNote,
+  deleteCurrentNotationNote,
   getAudioDeviceReport,
   getCurrentConductorMappingReport,
   getCurrentConductorMotionReport,
@@ -45,6 +48,7 @@ import {
   type GestureTimelineReport,
   type MusicPreviewReport,
   type MusicTimelineReport,
+  type NotationEditReport,
   type NotationLayoutReport,
   type PlaybackReport,
   type PreviewReport,
@@ -63,6 +67,7 @@ type DiagnosticKey =
   | "mappingReport"
   | "musicTimeline"
   | "notationLayout"
+  | "notationEditReport"
   | "gestureTimeline"
   | "playbackReport"
   | "stopReport"
@@ -108,6 +113,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "mappingReport", label: "Conductor Mapping" },
   { key: "musicTimeline", label: "Music Timeline" },
   { key: "notationLayout", label: "Notation Layout" },
+  { key: "notationEditReport", label: "Notation Note Edit" },
   { key: "gestureTimeline", label: "Gesture Timeline" },
   { key: "playbackReport", label: "Playback" },
   { key: "stopReport", label: "Stop Report" },
@@ -223,6 +229,8 @@ function NotationSpine({
   motionReport,
   motionTimeMs,
   modeLabel,
+  selectedNoteKey,
+  onSelectNote,
   variant = "full"
 }: {
   notationLayout?: NotationLayoutReport | null;
@@ -231,6 +239,8 @@ function NotationSpine({
   motionReport: ConductorMotionReport | null;
   motionTimeMs: number;
   modeLabel: string;
+  selectedNoteKey?: string | null;
+  onSelectNote?: (trackId: string, eventIndex: number) => void;
   variant?: "full" | "compact" | "performance" | "compose";
 }) {
   const fallbackVoices = (musicTimeline?.tracks ?? []).map((track, trackIndex) => ({
@@ -305,16 +315,21 @@ function NotationSpine({
               <div className="notation-voice-label"><strong>{voice.display_name}</strong><span>{voice.role}</span></div>
               <div className="notation-staff-lane">
                 {[0, 1, 2, 3, 4].map((line) => <span key={line} className="notation-staff-line" />)}
-                {voice.notes.slice(0, 32).map((note) => (
-                  <span
-                    key={`${voice.track_id}-${note.event_index}-${note.start_ms}-${note.midi_note}`}
-                    className={`notation-note ${note.resonance_lane}`}
-                    style={{ left: `${note.x_percent}%`, top: `${note.y_percent}%`, width: `${note.width_percent}%` }}
-                    title={`${note.note_name} · M${note.measure_index} beat ${note.beat_in_measure} · ${note.frequency_hz.toFixed(2)} Hz`}
-                  >
-                    {note.note_name}
-                  </span>
-                ))}
+                {voice.notes.slice(0, 32).map((note) => {
+                  const noteKey = `${note.track_id}:${note.event_index}`;
+                  return (
+                    <button
+                      key={`${voice.track_id}-${note.event_index}-${note.start_ms}-${note.midi_note}`}
+                      className={selectedNoteKey === noteKey ? `notation-note selected ${note.resonance_lane}` : `notation-note ${note.resonance_lane}`}
+                      style={{ left: `${note.x_percent}%`, top: `${note.y_percent}%`, width: `${note.width_percent}%` }}
+                      title={`${note.note_name} · M${note.measure_index} beat ${note.beat_in_measure} · ${note.frequency_hz.toFixed(2)} Hz`}
+                      onClick={() => onSelectNote?.(note.track_id, note.event_index)}
+                      type="button"
+                    >
+                      {note.note_name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -430,6 +445,12 @@ export default function App() {
   const [resonanceBundle, setResonanceBundle] = useState<ResonanceLevelBundle | null>(null);
   const [musicTimeline, setMusicTimeline] = useState<MusicTimelineReport | null>(null);
   const [notationLayout, setNotationLayout] = useState<NotationLayoutReport | null>(null);
+  const [notationEditReport, setNotationEditReport] = useState<NotationEditReport | null>(null);
+  const [selectedNotationNote, setSelectedNotationNote] = useState<NotationLayoutReport["selected_note"]>(null);
+  const [noteEditMidi, setNoteEditMidi] = useState("64");
+  const [noteEditDurationMs, setNoteEditDurationMs] = useState("714");
+  const [noteEditVelocity, setNoteEditVelocity] = useState("0.8");
+  const [noteEditTrackId, setNoteEditTrackId] = useState("lead_voice");
   const [gestureTimeline, setGestureTimeline] = useState<GestureTimelineReport | null>(null);
   const [mappingReport, setMappingReport] = useState<ConductorMappingReport | null>(null);
   const [motionReport, setMotionReport] = useState<ConductorMotionReport | null>(null);
@@ -499,12 +520,26 @@ export default function App() {
     setIsMotionPlaying(false);
   }
 
+  function setSelectedNoteForEditing(note: NotationLayoutReport["selected_note"]) {
+    setSelectedNotationNote(note);
+    if (!note) {
+      return;
+    }
+
+    setNoteEditMidi(String(note.midi_note));
+    setNoteEditDurationMs(String(note.duration_ms));
+    setNoteEditVelocity(String(Math.round(note.velocity * 100) / 100));
+    setNoteEditTrackId(note.track_id);
+  }
+
   async function refreshAllCurrentProjectViews() {
     const currentScore = await getCurrentProjectScore();
     setSeedMusicScore(currentScore);
     setResonanceBundle(await getCurrentResonanceLevelBundle());
     setMusicTimeline(await getCurrentMusicTimeline());
-    setNotationLayout(await getCurrentNotationLayout());
+    const nextNotationLayout = await getCurrentNotationLayout();
+    setNotationLayout(nextNotationLayout);
+    setSelectedNoteForEditing(nextNotationLayout.selected_note);
     setGestureTimeline(await getCurrentGestureTimeline());
     setMappingReport(await getCurrentConductorMappingReport());
     setMotionReport(await getCurrentConductorMotionReport());
@@ -585,6 +620,74 @@ export default function App() {
     }
   }
 
+
+  async function selectNotationNote(trackId: string, eventIndex: number) {
+    setError(null);
+    try {
+      const selected = await selectCurrentNotationNote(trackId, eventIndex);
+      setSelectedNoteForEditing(selected);
+      setSelectedDiagnostic("notationEditReport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function editSelectedNotationNote() {
+    setError(null);
+    if (!selectedNotationNote) {
+      setError("Select a notation note before editing.");
+      return;
+    }
+
+    try {
+      const editReport = await editCurrentNotationNote(
+        selectedNotationNote.track_id,
+        selectedNotationNote.event_index,
+        Number(noteEditMidi),
+        Number(noteEditDurationMs),
+        Number(noteEditVelocity),
+        noteEditTrackId
+      );
+
+      setNotationEditReport(editReport);
+      setNotationLayout(editReport.layout);
+      setSelectedNoteForEditing(editReport.selected_note ?? editReport.layout.selected_note);
+      setMusicTimeline(await getCurrentMusicTimeline());
+      setMappingReport(await getCurrentConductorMappingReport());
+      setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setSelectedDiagnostic("notationEditReport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function deleteSelectedNotationNote() {
+    setError(null);
+    if (!selectedNotationNote) {
+      setError("Select a notation note before deleting.");
+      return;
+    }
+
+    try {
+      const editReport = await deleteCurrentNotationNote(
+        selectedNotationNote.track_id,
+        selectedNotationNote.event_index
+      );
+
+      setNotationEditReport(editReport);
+      setNotationLayout(editReport.layout);
+      setSelectedNoteForEditing(editReport.selected_note ?? editReport.layout.selected_note);
+      setMusicTimeline(await getCurrentMusicTimeline());
+      setMappingReport(await getCurrentConductorMappingReport());
+      setMotionReport(await getCurrentConductorMotionReport());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setSelectedDiagnostic("notationEditReport");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function appendMusicNote(trackId: string, midiNote: number, durationMs: number, velocity: number) {
     setError(null);
     try {
@@ -592,7 +695,9 @@ export default function App() {
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
-      setNotationLayout(await getCurrentNotationLayout());
+      const nextNotationLayout = await getCurrentNotationLayout();
+      setNotationLayout(nextNotationLayout);
+      setSelectedNoteForEditing(nextNotationLayout.selected_note);
       setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -606,7 +711,9 @@ export default function App() {
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
-      setNotationLayout(await getCurrentNotationLayout());
+      const nextNotationLayout = await getCurrentNotationLayout();
+      setNotationLayout(nextNotationLayout);
+      setSelectedNoteForEditing(nextNotationLayout.selected_note);
       setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -620,7 +727,9 @@ export default function App() {
       setMappingReport(await getCurrentConductorMappingReport());
       setMotionReport(await getCurrentConductorMotionReport());
       setSeedMusicScore(await getCurrentProjectScore());
-      setNotationLayout(await getCurrentNotationLayout());
+      const nextNotationLayout = await getCurrentNotationLayout();
+      setNotationLayout(nextNotationLayout);
+      setSelectedNoteForEditing(nextNotationLayout.selected_note);
       setSelectedDiagnostic("musicTimeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -907,6 +1016,8 @@ export default function App() {
         return musicTimeline;
       case "notationLayout":
         return notationLayout;
+      case "notationEditReport":
+        return notationEditReport;
       case "gestureTimeline":
         return gestureTimeline;
       case "playbackReport":
@@ -957,7 +1068,8 @@ export default function App() {
   const depthTrack = musicTimeline?.tracks.find((track) => track.track_id === "depth_voice") ?? null;
   const fieldTrack = musicTimeline?.tracks.find((track) => track.track_id === "field_voice") ?? null;
   const activeEvent = getActiveEvent(motionReport, motionTimeMs);
-  const selectedNote = notationLayout?.selected_note ?? leadTrack?.notes[0] ?? null;
+  const selectedNote = selectedNotationNote ?? notationLayout?.selected_note ?? leadTrack?.notes[0] ?? null;
+  const selectedNoteKey = selectedNotationNote ? `${selectedNotationNote.track_id}:${selectedNotationNote.event_index}` : null;
   const beginnerBlocks = resonanceBundle?.beginner_view.slice(0, 8) ?? [];
   const conductorCues = resonanceBundle?.conductor_view.slice(0, 8) ?? [];
 
@@ -1021,6 +1133,8 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 notationLayout={notationLayout}
+                selectedNoteKey={selectedNoteKey}
+                onSelectNote={selectNotationNote}
                 modeLabel="Compose"
                 variant="compose"
               />
@@ -1122,6 +1236,8 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 notationLayout={notationLayout}
+                selectedNoteKey={selectedNoteKey}
+                onSelectNote={selectNotationNote}
                 modeLabel="Conduct"
                 variant="compact"
               />
@@ -1132,6 +1248,8 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 notationLayout={notationLayout}
+                selectedNoteKey={selectedNoteKey}
+                onSelectNote={selectNotationNote}
                 modeLabel="Perform"
                 variant="performance"
               />
@@ -1175,6 +1293,8 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 notationLayout={notationLayout}
+                selectedNoteKey={selectedNoteKey}
+                onSelectNote={selectNotationNote}
                 modeLabel="Rehearse"
                 variant="compact"
               />
@@ -1260,6 +1380,8 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 notationLayout={notationLayout}
+                selectedNoteKey={selectedNoteKey}
+                onSelectNote={selectNotationNote}
                 modeLabel="Project"
                 variant="compact"
               />
@@ -1323,6 +1445,8 @@ export default function App() {
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
                 notationLayout={notationLayout}
+                selectedNoteKey={selectedNoteKey}
+                onSelectNote={selectNotationNote}
                 modeLabel="Diagnostics"
                 variant="compact"
               />
@@ -1347,9 +1471,42 @@ export default function App() {
                 <h3>Selected Note</h3>
                 <div className="property-list">
                   <span><strong>Pitch</strong>{selectedNote?.note_name ?? "none"}</span>
+                  <span><strong>Track</strong>{selectedNote?.track_id ?? "—"}</span>
+                  <span><strong>Event</strong>{selectedNotationNote?.event_index ?? "—"}</span>
                   <span><strong>MIDI</strong>{selectedNote?.midi_note ?? "—"}</span>
                   <span><strong>Frequency</strong>{selectedNote ? `${selectedNote.frequency_hz.toFixed(2)} Hz` : "—"}</span>
                   <span><strong>Lane</strong>{selectedNote?.resonance_lane ?? "—"}</span>
+                </div>
+              </section>
+
+
+              <section className="control-section note-edit-section">
+                <h3>Edit Selected Note</h3>
+                <div className="note-edit-grid">
+                  <label>
+                    <span>MIDI Pitch</span>
+                    <input value={noteEditMidi} onChange={(event) => setNoteEditMidi(event.target.value)} inputMode="numeric" />
+                  </label>
+                  <label>
+                    <span>Duration ms</span>
+                    <input value={noteEditDurationMs} onChange={(event) => setNoteEditDurationMs(event.target.value)} inputMode="numeric" />
+                  </label>
+                  <label>
+                    <span>Velocity</span>
+                    <input value={noteEditVelocity} onChange={(event) => setNoteEditVelocity(event.target.value)} inputMode="decimal" />
+                  </label>
+                  <label>
+                    <span>Track</span>
+                    <select value={noteEditTrackId} onChange={(event) => setNoteEditTrackId(event.target.value)}>
+                      <option value="lead_voice">Lead</option>
+                      <option value="depth_voice">Depth</option>
+                      <option value="field_voice">Field</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="button-row">
+                  <button onClick={editSelectedNotationNote} disabled={!selectedNotationNote} type="button">Apply Note Edit</button>
+                  <button className="danger" onClick={deleteSelectedNotationNote} disabled={!selectedNotationNote} type="button">Delete Note</button>
                 </div>
               </section>
 

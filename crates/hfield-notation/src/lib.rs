@@ -80,6 +80,7 @@ pub struct NotationCueBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SelectedNotationNote {
+    pub event_index: usize,
     pub track_id: String,
     pub role: String,
     pub midi_note: u8,
@@ -93,6 +94,14 @@ pub struct SelectedNotationNote {
     pub beat_in_measure: f64,
     pub velocity: f32,
     pub resonance_lane: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NotationEditReport {
+    pub status: String,
+    pub action: String,
+    pub selected_note: Option<SelectedNotationNote>,
+    pub layout: NotationLayoutReport,
 }
 
 pub fn create_notation_layout_report(score: &FieldScore) -> NotationLayoutReport {
@@ -309,6 +318,7 @@ fn build_cue_block(
 
 fn selected_note_from_block(note: &NotationNoteBlock) -> SelectedNotationNote {
     SelectedNotationNote {
+        event_index: note.event_index,
         track_id: note.track_id.clone(),
         role: note.role.clone(),
         midi_note: note.midi_note,
@@ -323,6 +333,167 @@ fn selected_note_from_block(note: &NotationNoteBlock) -> SelectedNotationNote {
         velocity: note.velocity,
         resonance_lane: note.resonance_lane.clone(),
     }
+}
+
+pub fn select_notation_note(
+    score: &FieldScore,
+    track_id: &str,
+    event_index: usize,
+) -> Result<SelectedNotationNote, String> {
+    let layout = create_notation_layout_report(score);
+    find_selected_note_in_layout(&layout, track_id, event_index).ok_or_else(|| {
+        format!("notation note not found: track={track_id}, event_index={event_index}")
+    })
+}
+
+pub fn edit_notation_note(
+    score: &mut FieldScore,
+    track_id: &str,
+    event_index: usize,
+    midi_note: u8,
+    duration_ms: u32,
+    velocity: f32,
+    target_track_id: Option<&str>,
+) -> Result<NotationEditReport, String> {
+    let destination_track_id = target_track_id
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(track_id);
+
+    let source_track_position = score
+        .music
+        .tracks
+        .iter()
+        .position(|track| track.track_id == track_id)
+        .ok_or_else(|| format!("source music track not found: {track_id}"))?;
+
+    let source_note_position =
+        sorted_note_source_index(&score.music.tracks[source_track_position], event_index)?;
+
+    let mut edited_note = score.music.tracks[source_track_position]
+        .notes
+        .remove(source_note_position);
+
+    edited_note.midi_note = midi_note.min(127);
+    edited_note.duration_ms = duration_ms.clamp(80, 60_000);
+    edited_note.velocity = velocity.clamp(0.0, 1.0);
+
+    let destination_track_position = score
+        .music
+        .tracks
+        .iter()
+        .position(|track| track.track_id == destination_track_id)
+        .ok_or_else(|| format!("destination music track not found: {destination_track_id}"))?;
+
+    score.music.tracks[destination_track_position]
+        .notes
+        .push(edited_note.clone());
+
+    let layout = create_notation_layout_report(score);
+    let selected_note = find_selected_note_by_identity(
+        &layout,
+        destination_track_id,
+        edited_note.start_ms,
+        edited_note.midi_note,
+        edited_note.duration_ms,
+    )
+    .or_else(|| layout.selected_note.clone());
+
+    Ok(NotationEditReport {
+        status: "ok".to_string(),
+        action: "edit_note".to_string(),
+        selected_note,
+        layout,
+    })
+}
+
+pub fn delete_notation_note(
+    score: &mut FieldScore,
+    track_id: &str,
+    event_index: usize,
+) -> Result<NotationEditReport, String> {
+    let track_position = score
+        .music
+        .tracks
+        .iter()
+        .position(|track| track.track_id == track_id)
+        .ok_or_else(|| format!("music track not found: {track_id}"))?;
+
+    let note_position = sorted_note_source_index(&score.music.tracks[track_position], event_index)?;
+    score.music.tracks[track_position]
+        .notes
+        .remove(note_position);
+
+    let layout = create_notation_layout_report(score);
+
+    Ok(NotationEditReport {
+        status: "ok".to_string(),
+        action: "delete_note".to_string(),
+        selected_note: layout.selected_note.clone(),
+        layout,
+    })
+}
+
+fn sorted_note_source_index(track: &MusicTrack, event_index: usize) -> Result<usize, String> {
+    if event_index == 0 {
+        return Err("notation event index is 1-based and must be greater than zero".to_string());
+    }
+
+    let mut indexed_notes = track
+        .notes
+        .iter()
+        .enumerate()
+        .collect::<Vec<(usize, &NoteEvent)>>();
+
+    indexed_notes.sort_by_key(|(_, note)| (note.start_ms, note.midi_note));
+
+    indexed_notes
+        .get(event_index - 1)
+        .map(|(source_index, _)| *source_index)
+        .ok_or_else(|| {
+            format!(
+                "notation note index {event_index} is out of range for track {}",
+                track.track_id
+            )
+        })
+}
+
+fn find_selected_note_in_layout(
+    layout: &NotationLayoutReport,
+    track_id: &str,
+    event_index: usize,
+) -> Option<SelectedNotationNote> {
+    layout
+        .voices
+        .iter()
+        .find(|voice| voice.track_id == track_id)
+        .and_then(|voice| {
+            voice
+                .notes
+                .iter()
+                .find(|note| note.event_index == event_index)
+        })
+        .map(selected_note_from_block)
+}
+
+fn find_selected_note_by_identity(
+    layout: &NotationLayoutReport,
+    track_id: &str,
+    start_ms: u32,
+    midi_note: u8,
+    duration_ms: u32,
+) -> Option<SelectedNotationNote> {
+    layout
+        .voices
+        .iter()
+        .find(|voice| voice.track_id == track_id)
+        .and_then(|voice| {
+            voice.notes.iter().find(|note| {
+                note.start_ms == start_ms
+                    && note.midi_note == midi_note
+                    && note.duration_ms == duration_ms
+            })
+        })
+        .map(selected_note_from_block)
 }
 
 fn parse_meter(meter: &str) -> (u32, u32) {
@@ -496,5 +667,75 @@ mod tests {
         assert_eq!(report.conductor_cue_count, 3);
         assert_eq!(report.cue_strip[0].gesture_id, "g2");
         assert!(report.cue_strip[0].width_percent > 0.0);
+    }
+
+    #[test]
+    fn selects_edits_and_deletes_notation_notes() {
+        let mut score = FieldScore::default_hcs();
+        score.music.tracks[0].notes = vec![
+            NoteEvent {
+                midi_note: 64,
+                start_ms: 0,
+                duration_ms: 714,
+                velocity: 0.8,
+            },
+            NoteEvent {
+                midi_note: 67,
+                start_ms: 714,
+                duration_ms: 714,
+                velocity: 0.7,
+            },
+        ];
+
+        let selected = select_notation_note(&score, "lead_voice", 2).expect("select note");
+        assert_eq!(selected.event_index, 2);
+        assert_eq!(selected.note_name, "G4");
+
+        let edited = edit_notation_note(
+            &mut score,
+            "lead_voice",
+            2,
+            69,
+            1428,
+            0.55,
+            Some("lead_voice"),
+        )
+        .expect("edit note");
+
+        let edited_note = edited.selected_note.expect("edited selected note");
+        assert_eq!(edited_note.note_name, "A4");
+        assert_eq!(edited_note.duration_ms, 1428);
+        assert!((edited_note.velocity - 0.55).abs() < 0.001);
+
+        let deleted = delete_notation_note(&mut score, "lead_voice", 2).expect("delete note");
+        assert_eq!(deleted.layout.note_count, 1);
+    }
+
+    #[test]
+    fn can_move_notation_note_to_another_track() {
+        let mut score = FieldScore::default_hcs();
+        score.music.tracks[0].notes = vec![NoteEvent {
+            midi_note: 64,
+            start_ms: 0,
+            duration_ms: 714,
+            velocity: 0.8,
+        }];
+
+        let edited = edit_notation_note(
+            &mut score,
+            "lead_voice",
+            1,
+            48,
+            1428,
+            0.5,
+            Some("depth_voice"),
+        )
+        .expect("move note");
+
+        let selected = edited.selected_note.expect("selected moved note");
+        assert_eq!(selected.track_id, "depth_voice");
+        assert_eq!(selected.note_name, "C3");
+        assert!(score.music.tracks[0].notes.is_empty());
+        assert_eq!(score.music.tracks[1].notes.len(), 1);
     }
 }

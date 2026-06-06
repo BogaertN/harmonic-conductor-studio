@@ -158,6 +158,7 @@ export type NotationLayoutReport = {
     cue_text: string;
   }>;
   selected_note: {
+    event_index: number;
     track_id: string;
     role: string;
     midi_note: number;
@@ -173,6 +174,13 @@ export type NotationLayoutReport = {
     resonance_lane: string;
   } | null;
   warnings: string[];
+};
+
+export type NotationEditReport = {
+  status: string;
+  action: string;
+  selected_note: NotationLayoutReport["selected_note"];
+  layout: NotationLayoutReport;
 };
 
 export type ConductorMotionPoint = {
@@ -410,6 +418,44 @@ export async function getCurrentProjectScore(): Promise<unknown> {
 
 export async function getCurrentNotationLayout(): Promise<NotationLayoutReport> {
   return await invoke<NotationLayoutReport>("get_current_notation_layout");
+}
+
+export async function selectCurrentNotationNote(
+  trackId: string,
+  eventIndex: number
+): Promise<NotationLayoutReport["selected_note"]> {
+  return await invoke<NotationLayoutReport["selected_note"]>("select_current_notation_note", {
+    trackId,
+    eventIndex
+  });
+}
+
+export async function editCurrentNotationNote(
+  trackId: string,
+  eventIndex: number,
+  midiNote: number,
+  durationMs: number,
+  velocity: number,
+  targetTrackId: string
+): Promise<NotationEditReport> {
+  return await invoke<NotationEditReport>("edit_current_notation_note", {
+    trackId,
+    eventIndex,
+    midiNote,
+    durationMs,
+    velocity,
+    targetTrackId
+  });
+}
+
+export async function deleteCurrentNotationNote(
+  trackId: string,
+  eventIndex: number
+): Promise<NotationEditReport> {
+  return await invoke<NotationEditReport>("delete_current_notation_note", {
+    trackId,
+    eventIndex
+  });
 }
 
 export async function getCurrentMusicTimeline(): Promise<MusicTimelineReport> {

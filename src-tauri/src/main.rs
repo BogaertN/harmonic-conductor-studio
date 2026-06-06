@@ -10,7 +10,9 @@ use hfield_dsp::{
 };
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
 use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
-use hfield_notation::create_notation_layout_report;
+use hfield_notation::{
+    create_notation_layout_report, delete_notation_note, edit_notation_note, select_notation_note,
+};
 use hfield_project::{list_hfield_projects, open_hfield_project, save_hfield_project};
 use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
@@ -369,6 +371,63 @@ fn render_generated_mapped_combined_wav(
         "hcs_generated_mapped_combined_v1.wav",
         compiled,
     ))
+}
+
+#[tauri::command]
+fn select_current_notation_note(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+    event_index: usize,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(select_notation_note(&guard, &track_id, event_index)?)
+        .map_err(|err| format!("selected notation note serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn edit_current_notation_note(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+    event_index: usize,
+    midi_note: u8,
+    duration_ms: u32,
+    velocity: f32,
+    target_track_id: String,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(edit_notation_note(
+        &mut guard,
+        &track_id,
+        event_index,
+        midi_note,
+        duration_ms,
+        velocity,
+        Some(target_track_id.as_str()),
+    )?)
+    .map_err(|err| format!("notation edit report serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn delete_current_notation_note(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+    event_index: usize,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(delete_notation_note(&mut guard, &track_id, event_index)?)
+        .map_err(|err| format!("notation delete report serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -1103,6 +1162,9 @@ fn main() {
             play_generated_conductor_mapping_audio,
             play_generated_mapped_combined_audio,
             render_generated_mapped_combined_wav,
+            select_current_notation_note,
+            edit_current_notation_note,
+            delete_current_notation_note,
             get_current_notation_layout,
             get_current_music_timeline,
             append_note_to_current_track,

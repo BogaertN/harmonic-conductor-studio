@@ -1326,3 +1326,62 @@ body {
     min-height: 260px;
   }
 }
+
+
+.notation-note {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.notation-note:hover,
+.notation-note:focus-visible {
+  outline: 2px solid rgba(255, 247, 223, 0.92);
+  outline-offset: 2px;
+  filter: brightness(1.08);
+}
+
+.notation-note.selected {
+  box-shadow: 0 0 0 3px rgba(255, 247, 223, 0.86), 0 0 24px rgba(231, 216, 164, 0.52);
+  border-color: #fff7df;
+  transform: translateY(-50%) scale(1.04);
+  z-index: 8;
+}
+
+.note-edit-section {
+  border-color: rgba(231, 216, 164, 0.26);
+  background: rgba(231, 216, 164, 0.045);
+}
+
+.note-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.note-edit-grid label {
+  display: grid;
+  gap: 0.32rem;
+  color: #f4ead0;
+  font-weight: 800;
+  font-size: 0.72rem;
+}
+
+.note-edit-grid input,
+.note-edit-grid select {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid rgba(231, 216, 164, 0.28);
+  border-radius: 10px;
+  background: rgba(5, 7, 12, 0.72);
+  color: #fff7df;
+  padding: 0.55rem 0.6rem;
+  font: inherit;
+  font-weight: 800;
+}
+
+.note-edit-grid input:focus,
+.note-edit-grid select:focus {
+  outline: 2px solid rgba(231, 216, 164, 0.55);
+  outline-offset: 2px;
+}
