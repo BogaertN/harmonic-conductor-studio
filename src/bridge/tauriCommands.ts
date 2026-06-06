@@ -142,6 +142,36 @@ export type HfieldHarmonicFieldScoreV1UpgradeReport = {
   next_schema_work: string[];
 };
 
+
+export type HfieldCouplingProfileEngineV1Report = {
+  status: string;
+  contract_id: string;
+  registry_id: string;
+  engine_role: string;
+  active_profile_id: string;
+  normalized_profile_id: string;
+  profile_status: string;
+  authority_boundaries: {
+    harmonic_field_score_remains_source: boolean;
+    coupling_profile_is_binding_logic: boolean;
+    renderers_are_downstream: boolean;
+    open_source_libraries_may_render_parse_or_export: boolean;
+    open_source_libraries_are_source_authority: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  source_inputs: unknown[];
+  profile_registry: unknown[];
+  coupling_laws: unknown[];
+  renderer_bindings: unknown[];
+  open_source_dependency_policy: unknown;
+  current_score_scan: unknown;
+  readiness_gates: unknown;
+  next_work: string[];
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1280,6 +1310,11 @@ export async function getCurrentNineGestureConductorEngineReport(): Promise<Hfie
 
 export async function getCurrentHarmonicFieldScoreV1UpgradeReport(): Promise<HfieldHarmonicFieldScoreV1UpgradeReport> {
   return await invoke<HfieldHarmonicFieldScoreV1UpgradeReport>("get_current_harmonic_field_score_v1_upgrade_report");
+}
+
+
+export async function getCurrentCouplingProfileEngineV1Report(): Promise<HfieldCouplingProfileEngineV1Report> {
+  return await invoke<HfieldCouplingProfileEngineV1Report>("get_current_coupling_profile_engine_v1_report");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

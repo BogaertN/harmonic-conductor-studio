@@ -17,6 +17,7 @@ import {
   inspectCurrentHfieldSchemaMigrationRegistryJson,
   getCurrentNineGestureConductorEngineReport,
   getCurrentHarmonicFieldScoreV1UpgradeReport,
+  getCurrentCouplingProfileEngineV1Report,
   exportCurrentHfieldCymaticSurfaceJson,
   exportCurrentHfieldPacketContractJson,
   exportCurrentHfieldProjectJson,
@@ -96,6 +97,7 @@ import {
   type HfieldSchemaVersionMigrationRegistryReport,
   type HfieldNineGestureConductorEngineReport,
   type HfieldHarmonicFieldScoreV1UpgradeReport,
+  type HfieldCouplingProfileEngineV1Report,
 } from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
@@ -137,6 +139,7 @@ type DiagnosticKey =
   | "hfieldSchemaMigrationRegistry"
   | "nineGestureConductorEngine"
   | "harmonicFieldScoreV1Upgrade"
+  | "couplingProfileEngineV1"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -202,6 +205,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "hfieldSchemaMigrationRegistry", label: "Schema Migration Registry" },
   { key: "nineGestureConductorEngine", label: "Nine-Gesture Conductor Engine" },
   { key: "harmonicFieldScoreV1Upgrade", label: "Harmonic Field Score v1 Upgrade" },
+  { key: "couplingProfileEngineV1", label: "Coupling Profile Engine v1" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -612,6 +616,7 @@ export default function App() {
   const [hfieldSchemaMigrationRegistryReport, setHfieldSchemaMigrationRegistryReport] = useState<HfieldSchemaVersionMigrationRegistryReport | null>(null);
   const [nineGestureConductorEngineReport, setNineGestureConductorEngineReport] = useState<HfieldNineGestureConductorEngineReport | null>(null);
   const [harmonicFieldScoreV1UpgradeReport, setHarmonicFieldScoreV1UpgradeReport] = useState<HfieldHarmonicFieldScoreV1UpgradeReport | null>(null);
+  const [couplingProfileEngineV1Report, setCouplingProfileEngineV1Report] = useState<HfieldCouplingProfileEngineV1Report | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1371,6 +1376,17 @@ export default function App() {
     }
   }
 
+
+  async function inspectCouplingProfileEngineV1() {
+    setError(null);
+    try {
+      setCouplingProfileEngineV1Report(await getCurrentCouplingProfileEngineV1Report());
+      setSelectedDiagnostic("couplingProfileEngineV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1595,6 +1611,8 @@ export default function App() {
         return nineGestureConductorEngineReport;
       case "harmonicFieldScoreV1Upgrade":
         return harmonicFieldScoreV1UpgradeReport;
+      case "couplingProfileEngineV1":
+        return couplingProfileEngineV1Report;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -2080,8 +2098,9 @@ export default function App() {
                   <button onClick={inspectHfieldSchemaMigrationRegistry} type="button">Inspect Schema Registry</button>
                   <button onClick={inspectNineGestureConductorEngine} type="button">Inspect Nine-Gesture Engine</button>
                   <button onClick={inspectHarmonicFieldScoreV1Upgrade} type="button">Inspect Field Score v1</button>
+                  <button onClick={inspectCouplingProfileEngineV1} type="button">Inspect Coupling Profile</button>
                 </div>
-                <pre>{JSON.stringify(harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">

@@ -12,6 +12,9 @@ pub const HFIELD_ANCHOR_LAYOUT_ID: &str = "center_1_lower_5_upper_9";
 pub const HARMONIC_FIELD_SCORE_V1_CONTRACT_ID: &str = "aiweb.hfield.harmonic_field_score.v1";
 pub const HFIELD_NOTATION_PROBLEM_STATEMENT_ID: &str = "aiweb.hfield.notation_problem_statement.v1";
 pub const HFIELD_RENDER_VIEW_REGISTRY_ID: &str = "aiweb.hfield.render_view_registry.v1";
+pub const HFIELD_COUPLING_PROFILE_ENGINE_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.coupling_profile_engine.v1";
+pub const HFIELD_COUPLING_PROFILE_REGISTRY_ID: &str = "aiweb.hfield.coupling_profile_registry.v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FieldScore {
@@ -481,6 +484,473 @@ fn harmonic_field_note_count(score: &FieldScore) -> usize {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingProfileEngineV1Report {
+    pub status: &'static str,
+    pub contract_id: &'static str,
+    pub registry_id: &'static str,
+    pub engine_role: &'static str,
+    pub active_profile_id: String,
+    pub normalized_profile_id: String,
+    pub profile_status: &'static str,
+    pub authority_boundaries: CouplingProfileAuthorityBoundaries,
+    pub source_inputs: Vec<CouplingSourceInput>,
+    pub profile_registry: Vec<CouplingProfileDefinition>,
+    pub coupling_laws: Vec<CouplingLaw>,
+    pub renderer_bindings: Vec<CouplingRendererBinding>,
+    pub open_source_dependency_policy: CouplingOpenSourceDependencyPolicy,
+    pub current_score_scan: CouplingProfileScoreScan,
+    pub readiness_gates: CouplingProfileReadinessGates,
+    pub next_work: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingProfileAuthorityBoundaries {
+    pub harmonic_field_score_remains_source: bool,
+    pub coupling_profile_is_binding_logic: bool,
+    pub renderers_are_downstream: bool,
+    pub open_source_libraries_may_render_parse_or_export: bool,
+    pub open_source_libraries_are_source_authority: bool,
+    pub mutates_forge: bool,
+    pub performs_identity_vault_write: bool,
+    pub exports_private_identity: bool,
+    pub authorizes_health_or_sensor_claims: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingSourceInput {
+    pub input_id: &'static str,
+    pub source_layer: &'static str,
+    pub current_binding: String,
+    pub owned_by_harmonic_field_score: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingProfileDefinition {
+    pub profile_id: &'static str,
+    pub status: &'static str,
+    pub legacy_aliases: Vec<&'static str>,
+    pub role: &'static str,
+    pub source_layers: Vec<&'static str>,
+    pub downstream_renderer_targets: Vec<&'static str>,
+    pub deterministic_replay_required: bool,
+    pub renderer_specific_state_allowed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingLaw {
+    pub law_id: &'static str,
+    pub description: &'static str,
+    pub source_authority: &'static str,
+    pub downstream_effect: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingRendererBinding {
+    pub binding_id: &'static str,
+    pub renderer_target: &'static str,
+    pub reads_from_layers: Vec<&'static str>,
+    pub output_kind: &'static str,
+    pub can_mutate_source_without_save_gate: bool,
+    pub open_source_help_allowed: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingOpenSourceDependencyPolicy {
+    pub principle: &'static str,
+    pub allowed_roles: Vec<&'static str>,
+    pub forbidden_roles: Vec<&'static str>,
+    pub dependency_gates: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingProfileScoreScan {
+    pub music_track_count: usize,
+    pub note_count: usize,
+    pub primary_gesture_event_count: usize,
+    pub expressive_gesture_event_count: usize,
+    pub render_target_count: usize,
+    pub payload_layer_count: usize,
+    pub root_frequency_hz: f64,
+    pub phase_order: Vec<u8>,
+    pub active_profile_id: String,
+    pub normalized_profile_id: String,
+    pub profile_supported: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CouplingProfileReadinessGates {
+    pub has_supported_or_legacy_profile: bool,
+    pub has_music_track_layer: bool,
+    pub has_conductor_gesture_layer: bool,
+    pub has_frequency_anchor_model: bool,
+    pub has_nine_phase_geometry: bool,
+    pub has_render_targets: bool,
+    pub renderers_downstream_only: bool,
+    pub source_hash_policy_preserved: bool,
+    pub no_live_forge_or_identity_side_effects: bool,
+    pub current_score_can_drive_coupling_profile: bool,
+}
+
+pub fn create_coupling_profile_engine_v1_report(
+    score: &FieldScore,
+) -> CouplingProfileEngineV1Report {
+    let (normalized_profile_id, profile_status) =
+        normalize_coupling_profile_id(&score.coupling_profile);
+    let profile_supported = coupling_profile_supported(&score.coupling_profile);
+    let source_inputs = coupling_profile_source_inputs(score);
+    let profile_registry = coupling_profile_engine_profiles();
+    let coupling_laws = coupling_profile_engine_laws();
+    let renderer_bindings = coupling_profile_renderer_bindings();
+    let readiness_gates = coupling_profile_readiness_gates(score, profile_supported);
+
+    CouplingProfileEngineV1Report {
+        status: "ok",
+        contract_id: HFIELD_COUPLING_PROFILE_ENGINE_V1_CONTRACT_ID,
+        registry_id: HFIELD_COUPLING_PROFILE_REGISTRY_ID,
+        engine_role: "deterministic source-to-renderer coupling layer for Harmonic Field Score views",
+        active_profile_id: score.coupling_profile.clone(),
+        normalized_profile_id: normalized_profile_id.clone(),
+        profile_status,
+        authority_boundaries: CouplingProfileAuthorityBoundaries {
+            harmonic_field_score_remains_source: true,
+            coupling_profile_is_binding_logic: true,
+            renderers_are_downstream: true,
+            open_source_libraries_may_render_parse_or_export: true,
+            open_source_libraries_are_source_authority: false,
+            mutates_forge: false,
+            performs_identity_vault_write: false,
+            exports_private_identity: false,
+            authorizes_health_or_sensor_claims: false,
+        },
+        source_inputs,
+        profile_registry,
+        coupling_laws,
+        renderer_bindings,
+        open_source_dependency_policy: CouplingOpenSourceDependencyPolicy {
+            principle: "Use mature open-source libraries for solved rendering, parsing, analysis, and export surfaces, but never delegate Harmonic Field Score source authority to them.",
+            allowed_roles: vec![
+                "MusicXML import_export_adapter",
+                "MIDI import_export_adapter",
+                "notation_layout_renderer",
+                "audio_file_encoding",
+                "FFT_spectrum_analysis",
+                "3D_rendering_helper",
+                "accessibility_display_helper",
+                "font_and_glyph_layout",
+            ],
+            forbidden_roles: vec![
+                ".hfield_source_authority",
+                "Harmonic_Field_Score_schema_authority",
+                "Forge_authorization",
+                "Identity_Vault_live_write",
+                "private_identity_export",
+                "health_or_sensor_claim_authority",
+            ],
+            dependency_gates: vec![
+                "license_compatibility",
+                "maintenance_activity",
+                "rust_tauri_react_fit",
+                "local_first_no_cloud_required",
+                "no_hidden_data_collection",
+                "no_unintended_copyleft_contamination",
+                "no_authority_over_hfield_source_object",
+            ],
+        },
+        current_score_scan: CouplingProfileScoreScan {
+            music_track_count: score.music.tracks.len(),
+            note_count: harmonic_field_note_count(score),
+            primary_gesture_event_count: score.conductor.primary_hand_track.events.len(),
+            expressive_gesture_event_count: score
+                .conductor
+                .expressive_hand_track
+                .as_ref()
+                .map(|track| track.events.len())
+                .unwrap_or(0),
+            render_target_count: score.packet.render_targets.len(),
+            payload_layer_count: score.packet.payload_layers.len(),
+            root_frequency_hz: score.root_frequency_hz,
+            phase_order: HFIELD_PHASE_ORDER.to_vec(),
+            active_profile_id: score.coupling_profile.clone(),
+            normalized_profile_id,
+            profile_supported,
+        },
+        readiness_gates,
+        next_work: vec![
+            "move profile definitions into serialized profile manifests after fixture coverage exists",
+            "bind coupling profile registry hash into canonical bundle manifest v2",
+            "add MusicXML and MIDI adapter evaluation packet before dependency adoption",
+            "add deterministic renderer replay tests that compare source hash to rendered artifact hashes",
+            "add user-view preferences outside the source hash so accessibility views do not mutate .hfield truth",
+        ],
+    }
+}
+
+pub fn coupling_profile_engine_profiles() -> Vec<CouplingProfileDefinition> {
+    vec![CouplingProfileDefinition {
+        profile_id: "pitch_preview_v1",
+        status: "current",
+        legacy_aliases: vec!["pitch_preview_v0"],
+        role: "bind timed musical events, G1-G9 gesture motion, frequency anchors, and render targets into deterministic preview behavior",
+        source_layers: vec![
+            "musical_event_layer",
+            "gesture_motion_layer",
+            "frequency_anchor_model",
+            "nine_phase_geometry",
+            "packet_and_render_contract_layer",
+        ],
+        downstream_renderer_targets: vec![
+            "standard_staff_notation",
+            "conductor_path_view",
+            "three_dimensional_field_view",
+            "audio_preview",
+            "waveform_and_spectrum_display",
+            "cymatic_reader_surface",
+            "piano_roll_preview_reserved",
+            "forge_packet_adapter_reserved",
+        ],
+        deterministic_replay_required: true,
+        renderer_specific_state_allowed: false,
+    }]
+}
+
+fn normalize_coupling_profile_id(profile_id: &str) -> (String, &'static str) {
+    if coupling_profile_engine_profiles()
+        .iter()
+        .any(|profile| profile.profile_id == profile_id)
+    {
+        return (profile_id.to_string(), "current");
+    }
+
+    for profile in coupling_profile_engine_profiles() {
+        if profile
+            .legacy_aliases
+            .iter()
+            .any(|alias| alias == &profile_id)
+        {
+            return (profile.profile_id.to_string(), "legacy_alias_supported");
+        }
+    }
+
+    (profile_id.to_string(), "unsupported")
+}
+
+fn coupling_profile_supported(profile_id: &str) -> bool {
+    let (_, status) = normalize_coupling_profile_id(profile_id);
+    status == "current" || status == "legacy_alias_supported"
+}
+
+fn coupling_profile_source_inputs(score: &FieldScore) -> Vec<CouplingSourceInput> {
+    vec![
+        CouplingSourceInput {
+            input_id: "tempo_meter_timebase",
+            source_layer: "musical_event_layer",
+            current_binding: format!(
+                "tempo={} meter={}",
+                score.music.tempo_bpm, score.music.meter
+            ),
+            owned_by_harmonic_field_score: true,
+        },
+        CouplingSourceInput {
+            input_id: "pitch_and_tuning_events",
+            source_layer: "musical_event_layer",
+            current_binding: format!(
+                "tracks={} notes={} tuning={}",
+                score.music.tracks.len(),
+                harmonic_field_note_count(score),
+                score.music.tuning_mode
+            ),
+            owned_by_harmonic_field_score: true,
+        },
+        CouplingSourceInput {
+            input_id: "g1_g9_gesture_timeline",
+            source_layer: "gesture_motion_layer",
+            current_binding: format!(
+                "primary_events={} expressive_events={}",
+                score.conductor.primary_hand_track.events.len(),
+                score
+                    .conductor
+                    .expressive_hand_track
+                    .as_ref()
+                    .map(|track| track.events.len())
+                    .unwrap_or(0)
+            ),
+            owned_by_harmonic_field_score: true,
+        },
+        CouplingSourceInput {
+            input_id: "anchor_frequency_model",
+            source_layer: "frequency_anchor_model",
+            current_binding: format!(
+                "root={}Hz a1={} a5={} a9={}",
+                score.root_frequency_hz,
+                score.anchors.anchor_1.ratio,
+                score.anchors.anchor_5.ratio,
+                score.anchors.anchor_9.ratio
+            ),
+            owned_by_harmonic_field_score: true,
+        },
+        CouplingSourceInput {
+            input_id: "render_target_contract",
+            source_layer: "packet_and_render_contract_layer",
+            current_binding: format!("render_targets={}", score.packet.render_targets.len()),
+            owned_by_harmonic_field_score: true,
+        },
+    ]
+}
+
+fn coupling_profile_engine_laws() -> Vec<CouplingLaw> {
+    vec![
+        CouplingLaw {
+            law_id: "source_before_render",
+            description: "Renderers must read from Harmonic Field Score source layers through a named coupling profile.",
+            source_authority: "Harmonic Field Score v1",
+            downstream_effect: "views may render, preview, export, or measure but may not become source truth",
+        },
+        CouplingLaw {
+            law_id: "timebase_alignment",
+            description: "Tempo, meter, milliseconds, note durations, and gesture windows must resolve to one replayable timebase.",
+            source_authority: "musical_event_layer plus gesture_motion_layer",
+            downstream_effect: "notation, audio, conductor path, field view, and cymatic model align to the same score time",
+        },
+        CouplingLaw {
+            law_id: "frequency_anchor_binding",
+            description: "Pitch and root-frequency data bind to the 1-5-9 anchor model without replacing the musical event layer.",
+            source_authority: "frequency_anchor_model plus musical_event_layer",
+            downstream_effect: "audio, 3D field, waveform, spectrum, and cymatic previews share frequency provenance",
+        },
+        CouplingLaw {
+            law_id: "gesture_modulation_binding",
+            description: "G1-G9 physical gesture events may modulate preview intensity, field path, and expressive emphasis without locking Forge meaning.",
+            source_authority: "Nine-Gesture Conductor Engine v1",
+            downstream_effect: "renderers show physical motion and candidate expression while Forge semantics remain unmutated",
+        },
+        CouplingLaw {
+            law_id: "open_source_adapter_boundary",
+            description: "Open-source libraries may solve mature parser, renderer, export, and analysis problems behind adapters.",
+            source_authority: "HCS dependency gate and .hfield schema",
+            downstream_effect: "dependencies can help draw or export views but cannot own .hfield truth",
+        },
+    ]
+}
+
+fn coupling_profile_renderer_bindings() -> Vec<CouplingRendererBinding> {
+    vec![
+        CouplingRendererBinding {
+            binding_id: "notation_binding",
+            renderer_target: "standard_staff_notation",
+            reads_from_layers: vec!["musical_event_layer", "coupling_profile_layer"],
+            output_kind: "human_readable_score_view",
+            can_mutate_source_without_save_gate: false,
+            open_source_help_allowed: vec!["notation_layout_renderer", "MusicXML_export_adapter"],
+        },
+        CouplingRendererBinding {
+            binding_id: "audio_binding",
+            renderer_target: "audio_preview",
+            reads_from_layers: vec![
+                "musical_event_layer",
+                "gesture_motion_layer",
+                "frequency_anchor_model",
+                "coupling_profile_layer",
+            ],
+            output_kind: "audible_preview_or_wav_export",
+            can_mutate_source_without_save_gate: false,
+            open_source_help_allowed: vec!["WAV_encoder", "DSP_helper", "MIDI_export_adapter"],
+        },
+        CouplingRendererBinding {
+            binding_id: "field_binding",
+            renderer_target: "three_dimensional_field_view",
+            reads_from_layers: vec![
+                "frequency_anchor_model",
+                "nine_phase_geometry",
+                "gesture_motion_layer",
+                "musical_event_layer",
+            ],
+            output_kind: "spatial_field_rendering",
+            can_mutate_source_without_save_gate: false,
+            open_source_help_allowed: vec!["3D_rendering_helper", "geometry_math_helper"],
+        },
+        CouplingRendererBinding {
+            binding_id: "cymatic_surface_binding",
+            renderer_target: "cymatic_reader_surface",
+            reads_from_layers: vec![
+                "frequency_anchor_model",
+                "musical_event_layer",
+                "gesture_motion_layer",
+            ],
+            output_kind: "modeled_cymatic_surface_preview",
+            can_mutate_source_without_save_gate: false,
+            open_source_help_allowed: vec!["mesh_generation_helper", "FFT_spectrum_analysis"],
+        },
+        CouplingRendererBinding {
+            binding_id: "accessibility_view_binding",
+            renderer_target: "accessibility_views_reserved",
+            reads_from_layers: vec!["musical_event_layer", "render_view_registry"],
+            output_kind: "large_staff_note_name_color_solfege_braille_jianpu_views",
+            can_mutate_source_without_save_gate: false,
+            open_source_help_allowed: vec![
+                "Braille_export_adapter",
+                "Jianpu_display_adapter",
+                "font_and_glyph_layout",
+            ],
+        },
+        CouplingRendererBinding {
+            binding_id: "forge_adapter_binding_reserved",
+            renderer_target: "forge_packet_adapter_reserved",
+            reads_from_layers: vec![
+                "score_identity",
+                "packet_and_render_contract_layer",
+                "forge_adapter_reference_layer",
+            ],
+            output_kind: "future_authorized_adapter_packet",
+            can_mutate_source_without_save_gate: false,
+            open_source_help_allowed: Vec::new(),
+        },
+    ]
+}
+
+fn coupling_profile_readiness_gates(
+    score: &FieldScore,
+    profile_supported: bool,
+) -> CouplingProfileReadinessGates {
+    let has_music_track_layer = !score.music.tracks.is_empty();
+    let has_conductor_gesture_layer = !score
+        .conductor
+        .primary_hand_track
+        .track_id
+        .trim()
+        .is_empty();
+    let has_frequency_anchor_model = score.root_frequency_hz > 0.0
+        && score.anchors.anchor_1.ratio > 0.0
+        && score.anchors.anchor_5.ratio > 0.0
+        && score.anchors.anchor_9.ratio > 0.0;
+    let has_nine_phase_geometry = HFIELD_PHASE_ORDER.len() == HFIELD_PHASE_COUNT as usize
+        && score.conductor.field_layout == HFIELD_ANCHOR_LAYOUT_ID;
+    let has_render_targets = !score.packet.render_targets.is_empty();
+    let no_live_forge_or_identity_side_effects = score.packet.forge_bridge.status == "reserved"
+        && score.packet.forge_bridge.forge_runtime_ref.is_none()
+        && score.provenance.identity_vault.vault_record_ref.is_none()
+        && !score.provenance.raw_private_identity_exported;
+
+    CouplingProfileReadinessGates {
+        has_supported_or_legacy_profile: profile_supported,
+        has_music_track_layer,
+        has_conductor_gesture_layer,
+        has_frequency_anchor_model,
+        has_nine_phase_geometry,
+        has_render_targets,
+        renderers_downstream_only: true,
+        source_hash_policy_preserved: true,
+        no_live_forge_or_identity_side_effects,
+        current_score_can_drive_coupling_profile: profile_supported
+            && has_music_track_layer
+            && has_conductor_gesture_layer
+            && has_frequency_anchor_model
+            && has_nine_phase_geometry
+            && has_render_targets
+            && no_live_forge_or_identity_side_effects,
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HfieldPacketContract {
     pub contract_id: String,
     pub packet_kind: String,
@@ -943,5 +1413,68 @@ mod tests {
                 .accessibility_policy
                 .source_data_preserved_across_views
         );
+    }
+
+    #[test]
+    fn coupling_profile_engine_v1_accepts_legacy_pitch_preview_alias() {
+        let report = create_coupling_profile_engine_v1_report(&FieldScore::default_hcs());
+
+        assert_eq!(
+            report.contract_id,
+            HFIELD_COUPLING_PROFILE_ENGINE_V1_CONTRACT_ID
+        );
+        assert_eq!(report.active_profile_id, "pitch_preview_v0");
+        assert_eq!(report.normalized_profile_id, "pitch_preview_v1");
+        assert_eq!(report.profile_status, "legacy_alias_supported");
+        assert!(report.current_score_scan.profile_supported);
+        assert!(report.readiness_gates.has_supported_or_legacy_profile);
+        assert!(
+            report
+                .readiness_gates
+                .current_score_can_drive_coupling_profile
+        );
+    }
+
+    #[test]
+    fn coupling_profile_engine_v1_keeps_renderers_and_open_source_downstream() {
+        let report = create_coupling_profile_engine_v1_report(&FieldScore::default_hcs());
+
+        assert!(
+            report
+                .authority_boundaries
+                .harmonic_field_score_remains_source
+        );
+        assert!(
+            report
+                .authority_boundaries
+                .coupling_profile_is_binding_logic
+        );
+        assert!(report.authority_boundaries.renderers_are_downstream);
+        assert!(
+            report
+                .authority_boundaries
+                .open_source_libraries_may_render_parse_or_export
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .open_source_libraries_are_source_authority
+        );
+        assert!(!report.authority_boundaries.mutates_forge);
+        assert!(!report.authority_boundaries.performs_identity_vault_write);
+        assert!(!report.authority_boundaries.exports_private_identity);
+
+        assert!(report
+            .renderer_bindings
+            .iter()
+            .all(|binding| !binding.can_mutate_source_without_save_gate));
+        assert!(report
+            .open_source_dependency_policy
+            .forbidden_roles
+            .contains(&".hfield_source_authority"));
+        assert!(report
+            .coupling_laws
+            .iter()
+            .any(|law| law.law_id == "open_source_adapter_boundary"));
     }
 }
