@@ -1,6 +1,7 @@
 use hfield_domain::{
-    FieldScore, HFIELD_ANCHOR_LAYOUT_ID, HFIELD_FORMAT_ID, HFIELD_IDENTITY_PROVENANCE_CONTRACT_ID,
-    HFIELD_PACKET_CONTRACT_ID, HFIELD_PHASE_COUNT, HFIELD_PHASE_ORDER, HFIELD_VERSION,
+    FieldScore, HfieldIdentityProvenanceContract, HfieldPacketContract, HFIELD_ANCHOR_LAYOUT_ID,
+    HFIELD_FORMAT_ID, HFIELD_IDENTITY_PROVENANCE_CONTRACT_ID, HFIELD_PACKET_CONTRACT_ID,
+    HFIELD_PHASE_COUNT, HFIELD_PHASE_ORDER, HFIELD_VERSION,
 };
 use hfield_storage::score_hash_hex;
 use serde::{Deserialize, Serialize};
@@ -388,6 +389,238 @@ fn require_payload_layer(score: &FieldScore, layer: &str, fatal_errors: &mut Vec
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HfieldCanonicalizationReport {
+    pub status: String,
+    pub source_version: String,
+    pub target_version: String,
+    pub before_hash: String,
+    pub after_hash: String,
+    pub provenance_hash: String,
+    pub changed_fields: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+pub fn canonicalize_hfield_score(score: &mut FieldScore) -> HfieldCanonicalizationReport {
+    let before_hash = score_hash_hex(score).unwrap_or_else(|_| "hash_unavailable".to_string());
+    let source_version = score.version.clone();
+    let mut changed_fields = Vec::new();
+    let mut warnings = Vec::new();
+
+    if score.format.trim().is_empty() {
+        score.format = HFIELD_FORMAT_ID.to_string();
+        changed_fields.push("format".to_string());
+    } else if score.format != HFIELD_FORMAT_ID {
+        warnings.push(format!(
+            "non-AI.Web format was not rewritten during canonicalization: {}",
+            score.format
+        ));
+    }
+
+    if score.format == HFIELD_FORMAT_ID && score.version != HFIELD_VERSION {
+        score.version = HFIELD_VERSION.to_string();
+        changed_fields.push("version".to_string());
+    }
+
+    if score.packet.contract_id.trim().is_empty() {
+        score.packet.contract_id = HFIELD_PACKET_CONTRACT_ID.to_string();
+        changed_fields.push("packet.contract_id".to_string());
+    }
+
+    if score.packet.packet_kind.trim().is_empty() {
+        score.packet.packet_kind = HfieldPacketContract::default().packet_kind;
+        changed_fields.push("packet.packet_kind".to_string());
+    }
+
+    if score.packet.packet_role.trim().is_empty() {
+        score.packet.packet_role = HfieldPacketContract::default().packet_role;
+        changed_fields.push("packet.packet_role".to_string());
+    }
+
+    if score.packet.source_system.trim().is_empty() {
+        score.packet.source_system = "HCS".to_string();
+        changed_fields.push("packet.source_system".to_string());
+    }
+
+    ensure_string_member(
+        &mut score.packet.target_systems,
+        "HCS",
+        "packet.target_systems.HCS",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.target_systems,
+        "Forge",
+        "packet.target_systems.Forge",
+        &mut changed_fields,
+    );
+
+    if score.packet.analog_bridge_intent.trim().is_empty() {
+        score.packet.analog_bridge_intent = HfieldPacketContract::default().analog_bridge_intent;
+        changed_fields.push("packet.analog_bridge_intent".to_string());
+    }
+
+    ensure_string_member(
+        &mut score.packet.payload_layers,
+        "score",
+        "packet.payload_layers.score",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.payload_layers,
+        "frequency_phase",
+        "packet.payload_layers.frequency_phase",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.payload_layers,
+        "gesture",
+        "packet.payload_layers.gesture",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.payload_layers,
+        "field",
+        "packet.payload_layers.field",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.payload_layers,
+        "render",
+        "packet.payload_layers.render",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.payload_layers,
+        "forge_bridge",
+        "packet.payload_layers.forge_bridge",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.payload_layers,
+        "identity_provenance",
+        "packet.payload_layers.identity_provenance",
+        &mut changed_fields,
+    );
+
+    ensure_string_member(
+        &mut score.packet.render_targets,
+        "notation",
+        "packet.render_targets.notation",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.render_targets,
+        "audio",
+        "packet.render_targets.audio",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.render_targets,
+        "conductor_motion",
+        "packet.render_targets.conductor_motion",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.render_targets,
+        "three_dimensional_field_reserved",
+        "packet.render_targets.three_dimensional_field_reserved",
+        &mut changed_fields,
+    );
+    ensure_string_member(
+        &mut score.packet.render_targets,
+        "cymatic_field_reserved",
+        "packet.render_targets.cymatic_field_reserved",
+        &mut changed_fields,
+    );
+
+    if score.packet.migration_profile != "canonical_save_migration_v1" {
+        score.packet.migration_profile = "canonical_save_migration_v1".to_string();
+        changed_fields.push("packet.migration_profile".to_string());
+    }
+
+    if score.provenance.contract_id.trim().is_empty() {
+        score.provenance.contract_id = HFIELD_IDENTITY_PROVENANCE_CONTRACT_ID.to_string();
+        changed_fields.push("provenance.contract_id".to_string());
+    }
+
+    if score.provenance.artifact_kind.trim().is_empty() {
+        score.provenance.artifact_kind = HfieldIdentityProvenanceContract::default().artifact_kind;
+        changed_fields.push("provenance.artifact_kind".to_string());
+    }
+
+    if score.provenance.custody_model.trim().is_empty() {
+        score.provenance.custody_model = HfieldIdentityProvenanceContract::default().custody_model;
+        changed_fields.push("provenance.custody_model".to_string());
+    }
+
+    if score.provenance.disclosure_class.trim().is_empty() {
+        score.provenance.disclosure_class =
+            HfieldIdentityProvenanceContract::default().disclosure_class;
+        changed_fields.push("provenance.disclosure_class".to_string());
+    }
+
+    if score.provenance.artifact_id.trim().is_empty()
+        || score.provenance.artifact_id == "hfield_artifact_unbound"
+    {
+        let artifact_seed_hash = compute_hfield_provenance_hash(score);
+        let short_hash = artifact_seed_hash.chars().take(16).collect::<String>();
+        score.provenance.artifact_id = format!("hfield_artifact_{short_hash}");
+        changed_fields.push("provenance.artifact_id".to_string());
+    }
+
+    let provenance_hash = compute_hfield_provenance_hash(score);
+    if score.provenance.provenance_hash.as_deref() != Some(provenance_hash.as_str()) {
+        score.provenance.provenance_hash = Some(provenance_hash.clone());
+        changed_fields.push("provenance.provenance_hash".to_string());
+    }
+
+    let after_hash = score_hash_hex(score).unwrap_or_else(|_| "hash_unavailable".to_string());
+    let status = if changed_fields.is_empty() {
+        "unchanged"
+    } else {
+        "changed"
+    }
+    .to_string();
+
+    HfieldCanonicalizationReport {
+        status,
+        source_version,
+        target_version: HFIELD_VERSION.to_string(),
+        before_hash,
+        after_hash,
+        provenance_hash,
+        changed_fields,
+        warnings,
+    }
+}
+
+pub fn canonicalized_hfield_score(
+    score: &FieldScore,
+) -> (FieldScore, HfieldCanonicalizationReport) {
+    let mut canonical = score.clone();
+    let report = canonicalize_hfield_score(&mut canonical);
+    (canonical, report)
+}
+
+pub fn compute_hfield_provenance_hash(score: &FieldScore) -> String {
+    let mut clone = score.clone();
+    clone.provenance.provenance_hash = None;
+    score_hash_hex(&clone).unwrap_or_else(|_| "hash_unavailable".to_string())
+}
+
+fn ensure_string_member(
+    values: &mut Vec<String>,
+    required: &str,
+    field_label: &str,
+    changed_fields: &mut Vec<String>,
+) {
+    if !values.iter().any(|value| value == required) {
+        values.push(required.to_string());
+        changed_fields.push(field_label.to_string());
+    }
+}
+
 pub fn assert_hfield_packet_openable(
     score: &FieldScore,
 ) -> Result<HfieldPacketContractReport, String> {
@@ -420,6 +653,54 @@ fn conductor_event_count(score: &FieldScore) -> usize {
 mod tests {
     use super::*;
     use hfield_domain::{FieldScore, NoteEvent};
+
+    #[test]
+    fn canonicalizes_unbound_artifact_and_seals_provenance_hash() {
+        let mut score = FieldScore::default_hcs();
+        score.version = "0.0.1".to_string();
+        score.provenance.artifact_id = "hfield_artifact_unbound".to_string();
+        score.provenance.provenance_hash = None;
+
+        let report = canonicalize_hfield_score(&mut score);
+
+        assert_eq!(report.status, "changed");
+        assert_eq!(score.version, HFIELD_VERSION);
+        assert!(score.provenance.artifact_id.starts_with("hfield_artifact_"));
+        assert!(score.provenance.provenance_hash.is_some());
+        assert!(report.changed_fields.iter().any(|field| field == "version"));
+        assert!(report
+            .changed_fields
+            .iter()
+            .any(|field| field == "provenance.provenance_hash"));
+    }
+
+    #[test]
+    fn canonicalization_restores_required_packet_members_without_hiding_private_export() {
+        let mut score = FieldScore::default_hcs();
+        score.packet.target_systems.clear();
+        score.packet.payload_layers.clear();
+        score.packet.render_targets.clear();
+        score.provenance.raw_private_identity_exported = true;
+
+        let report = canonicalize_hfield_score(&mut score);
+        let validation = validate_hfield_packet_contract(&score);
+
+        assert_eq!(report.status, "changed");
+        assert!(score.packet.target_systems.contains(&"HCS".to_string()));
+        assert!(score.packet.target_systems.contains(&"Forge".to_string()));
+        assert!(score
+            .packet
+            .payload_layers
+            .contains(&"identity_provenance".to_string()));
+        assert!(score
+            .packet
+            .render_targets
+            .contains(&"notation".to_string()));
+        assert!(validation
+            .fatal_errors
+            .iter()
+            .any(|error| error.contains("must not export raw private identity")));
+    }
 
     #[test]
     fn default_packet_has_contract_but_warns_about_empty_score_and_unbound_custody() {

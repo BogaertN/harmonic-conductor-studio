@@ -132,6 +132,13 @@ export type ProjectFileReport = {
   title: string;
   format: string;
   version: string;
+
+  packet_status: string;
+  packet_contract_id: string;
+  migration_status: string;
+  migration_changed_fields: string[];
+  canonical_hash: string;
+  fatal_errors: string[];
   note_count: number;
   conductor_event_count: number;
   warnings: string[];

@@ -1,10 +1,15 @@
 use hfield_domain::FieldScore;
+#[cfg(test)]
+use hfield_domain::HFIELD_VERSION;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use hfield_packet::{assert_hfield_packet_openable, validate_hfield_packet_contract};
+use hfield_packet::{
+    assert_hfield_packet_openable, canonicalize_hfield_score, canonicalized_hfield_score,
+    validate_hfield_packet_contract, HfieldCanonicalizationReport,
+};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProjectFileReport {
     pub status: String,
@@ -20,6 +25,9 @@ pub struct ProjectFileReport {
     pub version: String,
     pub packet_status: String,
     pub packet_contract_id: String,
+    pub migration_status: String,
+    pub migration_changed_fields: Vec<String>,
+    pub canonical_hash: String,
     pub fatal_errors: Vec<String>,
     pub note_count: usize,
     pub conductor_event_count: usize,
@@ -107,16 +115,25 @@ pub fn save_hfield_project(
     std::fs::create_dir_all(&project_dir)
         .map_err(|err| format!("failed to create project directory: {err}"))?;
 
-    assert_hfield_packet_openable(score)?;
-    let warnings = validate_score(score);
-    let json = score_to_pretty_json(score)
-        .map_err(|err| format!("failed to serialize score as .hfield JSON: {err}"))?;
+    let (canonical_score, migration_report) = canonicalized_hfield_score(score);
+    assert_hfield_packet_openable(&canonical_score)?;
+    let warnings = validate_score(&canonical_score);
+    let json = score_to_pretty_json(&canonical_score)
+        .map_err(|err| format!("failed to serialize canonical .hfield JSON: {err}"))?;
 
     let path = project_dir.join(&file_name);
     std::fs::write(&path, json.as_bytes())
-        .map_err(|err| format!("failed to write .hfield project: {err}"))?;
+        .map_err(|err| format!("failed to write canonical .hfield project: {err}"))?;
 
-    create_file_report("save", &project_dir, &file_name, &path, score, warnings)
+    create_file_report(
+        "save",
+        &project_dir,
+        &file_name,
+        &path,
+        &canonical_score,
+        warnings,
+        migration_report,
+    )
 }
 
 pub fn open_hfield_project(
@@ -130,12 +147,21 @@ pub fn open_hfield_project(
     let json = std::fs::read_to_string(&path)
         .map_err(|err| format!("failed to read .hfield project: {err}"))?;
 
-    let score: FieldScore = serde_json::from_str(&json)
+    let mut score: FieldScore = serde_json::from_str(&json)
         .map_err(|err| format!("failed to parse .hfield project JSON: {err}"))?;
 
+    let migration_report = canonicalize_hfield_score(&mut score);
     assert_hfield_packet_openable(&score)?;
     let warnings = validate_score(&score);
-    let report = create_file_report("open", &project_dir, &file_name, &path, &score, warnings)?;
+    let report = create_file_report(
+        "open",
+        &project_dir,
+        &file_name,
+        &path,
+        &score,
+        warnings,
+        migration_report,
+    )?;
 
     Ok((score, report))
 }
@@ -243,6 +269,7 @@ fn create_file_report(
     path: &Path,
     score: &FieldScore,
     warnings: Vec<String>,
+    migration_report: HfieldCanonicalizationReport,
 ) -> Result<ProjectFileReport, String> {
     let metadata = std::fs::metadata(path)
         .map_err(|err| format!("failed to stat .hfield project file: {err}"))?;
@@ -270,6 +297,9 @@ fn create_file_report(
         version: score.version.clone(),
         packet_status: packet_report.status,
         packet_contract_id: packet_report.contract_id,
+        migration_status: migration_report.status,
+        migration_changed_fields: migration_report.changed_fields,
+        canonical_hash: migration_report.after_hash,
         fatal_errors: packet_report.fatal_errors,
         note_count: note_count(score),
         conductor_event_count: conductor_event_count(score),
@@ -395,6 +425,54 @@ mod tests {
         assert!(warnings
             .iter()
             .any(|warning| warning.contains("no music notes")));
+    }
+
+    #[test]
+    fn opens_legacy_project_with_canonical_migration() {
+        let root =
+            std::env::temp_dir().join(format!("hcs_project_migration_test_{}", std::process::id()));
+
+        if root.exists() {
+            std::fs::remove_dir_all(&root).expect("clean old migration root");
+        }
+
+        let project_dir = project_dir_for_app(&root);
+        std::fs::create_dir_all(&project_dir).expect("create project dir");
+
+        let mut legacy_score = FieldScore::default_hcs();
+        legacy_score.title = "Legacy Project".to_string();
+        legacy_score.version = "0.0.1".to_string();
+        legacy_score.packet.payload_layers.clear();
+        legacy_score.packet.render_targets.clear();
+        legacy_score.packet.target_systems.clear();
+        legacy_score.provenance.artifact_id = "hfield_artifact_unbound".to_string();
+        legacy_score.provenance.provenance_hash = None;
+
+        let path = project_dir.join("legacy_project.hfield");
+        std::fs::write(
+            &path,
+            serde_json::to_string_pretty(&legacy_score).expect("serialize legacy"),
+        )
+        .expect("write legacy");
+
+        let (opened, report) =
+            open_hfield_project(&root, "legacy_project.hfield").expect("open legacy");
+
+        assert_eq!(opened.version, HFIELD_VERSION);
+        assert!(opened.packet.target_systems.contains(&"HCS".to_string()));
+        assert!(opened.packet.target_systems.contains(&"Forge".to_string()));
+        assert!(opened
+            .packet
+            .payload_layers
+            .contains(&"identity_provenance".to_string()));
+        assert!(opened.provenance.provenance_hash.is_some());
+        assert_eq!(report.migration_status, "changed");
+        assert!(report
+            .migration_changed_fields
+            .iter()
+            .any(|field| field == "version"));
+
+        std::fs::remove_dir_all(&root).expect("remove migration root");
     }
 
     #[test]
