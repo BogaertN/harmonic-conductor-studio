@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 pub const HFIELD_FORMAT_ID: &str = "aiweb.hfield";
 pub const HFIELD_VERSION: &str = "0.1.0";
 pub const HFIELD_PACKET_CONTRACT_ID: &str = "aiweb.hfield.packet_contract.v1";
+pub const HFIELD_IDENTITY_PROVENANCE_CONTRACT_ID: &str =
+    "aiweb.hfield.identity_provenance_contract.v1";
 pub const DEFAULT_ROOT_FREQUENCY_HZ: f64 = 144.0;
 pub const HFIELD_PHASE_COUNT: u8 = 9;
 pub const HFIELD_PHASE_ORDER: [u8; 9] = [2, 1, 3, 4, 5, 6, 7, 9, 8];
@@ -14,6 +16,8 @@ pub struct FieldScore {
     pub version: String,
     #[serde(default)]
     pub packet: HfieldPacketContract,
+    #[serde(default)]
+    pub provenance: HfieldIdentityProvenanceContract,
     pub title: String,
     pub root_frequency_hz: f64,
     pub anchors: AnchorModel,
@@ -29,6 +33,7 @@ impl FieldScore {
             format: HFIELD_FORMAT_ID.to_string(),
             version: HFIELD_VERSION.to_string(),
             packet: HfieldPacketContract::default(),
+            provenance: HfieldIdentityProvenanceContract::default(),
             title: "Untitled Harmonic Conductor Score".to_string(),
             root_frequency_hz: DEFAULT_ROOT_FREQUENCY_HZ,
             anchors: AnchorModel::default(),
@@ -127,6 +132,117 @@ impl Default for ForgeBridgeDescriptor {
             validation_ref: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HfieldIdentityProvenanceContract {
+    pub contract_id: String,
+    pub artifact_id: String,
+    pub artifact_kind: String,
+    pub custody_model: String,
+    pub disclosure_class: String,
+    pub identity_vault: IdentityVaultReference,
+    pub creator: PrincipalReference,
+    pub contributors: Vec<ContributionReference>,
+    pub parent_artifacts: Vec<ArtifactReference>,
+    pub derivative_chain: Vec<ArtifactReference>,
+    pub forge_trace_ref: Option<String>,
+    pub memory_capsule_ref: Option<String>,
+    pub authority_receipt_ref: Option<String>,
+    pub consent_event_ref: Option<String>,
+    pub license_ref: Option<String>,
+    pub rights_policy_ref: Option<String>,
+    pub signature_ref: Option<String>,
+    pub provenance_hash: Option<String>,
+    pub raw_private_identity_exported: bool,
+    pub public_identity_authorized: bool,
+    pub economic_processing_authorized: bool,
+    pub portable_rights_authorized: bool,
+}
+
+impl Default for HfieldIdentityProvenanceContract {
+    fn default() -> Self {
+        Self {
+            contract_id: HFIELD_IDENTITY_PROVENANCE_CONTRACT_ID.to_string(),
+            artifact_id: "hfield_artifact_unbound".to_string(),
+            artifact_kind: "harmonic_field_packet".to_string(),
+            custody_model: "identity_vault_reference_only".to_string(),
+            disclosure_class: "private_reference_only".to_string(),
+            identity_vault: IdentityVaultReference::default(),
+            creator: PrincipalReference::default(),
+            contributors: Vec::new(),
+            parent_artifacts: Vec::new(),
+            derivative_chain: Vec::new(),
+            forge_trace_ref: None,
+            memory_capsule_ref: None,
+            authority_receipt_ref: None,
+            consent_event_ref: None,
+            license_ref: None,
+            rights_policy_ref: None,
+            signature_ref: None,
+            provenance_hash: None,
+            raw_private_identity_exported: false,
+            public_identity_authorized: false,
+            economic_processing_authorized: false,
+            portable_rights_authorized: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct IdentityVaultReference {
+    pub status: String,
+    pub vault_profile: String,
+    pub vault_record_ref: Option<String>,
+    pub public_identity_ref: Option<String>,
+}
+
+impl Default for IdentityVaultReference {
+    fn default() -> Self {
+        Self {
+            status: "unbound".to_string(),
+            vault_profile: "aiweb.identity_vault.reference.v1".to_string(),
+            vault_record_ref: None,
+            public_identity_ref: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PrincipalReference {
+    pub principal_id: Option<String>,
+    pub principal_kind: String,
+    pub display_label: Option<String>,
+    pub identity_vault_ref: Option<String>,
+    pub authority_scope: String,
+}
+
+impl Default for PrincipalReference {
+    fn default() -> Self {
+        Self {
+            principal_id: None,
+            principal_kind: "human_creator".to_string(),
+            display_label: None,
+            identity_vault_ref: None,
+            authority_scope: "creator_unbound_private".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ContributionReference {
+    pub contributor: PrincipalReference,
+    pub contribution_kind: String,
+    pub contribution_ref: Option<String>,
+    pub contribution_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ArtifactReference {
+    pub artifact_id: String,
+    pub artifact_kind: String,
+    pub relation: String,
+    pub proof_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -297,6 +413,25 @@ mod tests {
     }
 
     #[test]
+    fn default_score_has_identity_provenance_contract() {
+        let score = FieldScore::default_hcs();
+        assert_eq!(
+            score.provenance.contract_id,
+            HFIELD_IDENTITY_PROVENANCE_CONTRACT_ID
+        );
+        assert_eq!(score.provenance.artifact_kind, "harmonic_field_packet");
+        assert_eq!(
+            score.provenance.custody_model,
+            "identity_vault_reference_only"
+        );
+        assert_eq!(score.provenance.disclosure_class, "private_reference_only");
+        assert!(!score.provenance.raw_private_identity_exported);
+        assert!(!score.provenance.public_identity_authorized);
+        assert!(!score.provenance.economic_processing_authorized);
+        assert!(!score.provenance.portable_rights_authorized);
+    }
+
+    #[test]
     fn old_hfield_json_without_packet_defaults_contract() {
         let old_json = r#"{
             "format":"aiweb.hfield",
@@ -317,5 +452,10 @@ mod tests {
         let score: FieldScore = serde_json::from_str(old_json).expect("old .hfield parses");
         assert_eq!(score.packet.contract_id, HFIELD_PACKET_CONTRACT_ID);
         assert_eq!(score.packet.phase_profile.phase_count, 9);
+        assert_eq!(
+            score.provenance.contract_id,
+            HFIELD_IDENTITY_PROVENANCE_CONTRACT_ID
+        );
+        assert_eq!(score.provenance.disclosure_class, "private_reference_only");
     }
 }
