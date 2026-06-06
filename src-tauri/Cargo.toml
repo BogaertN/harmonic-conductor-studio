@@ -31,5 +31,6 @@ hfield-forge-bridge = { path = "../crates/hfield-forge-bridge" }
 hfield-field = { path = "../crates/hfield-field" }
 hfield-cymatics = { path = "../crates/hfield-cymatics" }
 hfield-carrier = { path = "../crates/hfield-carrier" }
+hfield-coordinate = { path = "../crates/hfield-coordinate" }
 hfield-playhead = { path = "../crates/hfield-playhead" }
 hfield-loop = { path = "../crates/hfield-loop" }

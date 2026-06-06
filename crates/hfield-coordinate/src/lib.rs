@@ -465,3 +465,405 @@ mod tests {
         assert!(reports.iter().any(|report| report.eligible));
     }
 }
+
+// HFIELD Rust Render Manifest v1
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HfieldRustRenderManifest {
+    pub contract_id: String,
+    pub source_coordinate_contract_id: String,
+    pub coordinate_profile: String,
+    pub axis_contract: AxisContract,
+    pub total_duration_ms: u32,
+    pub scan_min_z: f64,
+    pub scan_max_z: f64,
+    pub field_width: f64,
+    pub field_height: f64,
+    pub field_bodies: Vec<HfieldRustRenderBody>,
+    pub bridge_bodies: Vec<HfieldRustRenderBridge>,
+    pub proof_windows: Vec<HfieldRustRenderProofWindow>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HfieldRustRenderBody {
+    pub body_id: String,
+    pub source_entry_id: String,
+    pub layer_key: String,
+    pub lane_key: String,
+    pub track_id: String,
+    pub label: String,
+    pub note_name: Option<String>,
+    pub midi_note: Option<u8>,
+    pub frequency_hz: f64,
+    pub start_ms: u32,
+    pub duration_ms: u32,
+    pub end_ms: u32,
+    pub x: f64,
+    pub y: f64,
+    pub z_start: f64,
+    pub z_end: f64,
+    pub z_center: f64,
+    pub z_body_length: f64,
+    pub radius_x: f64,
+    pub radius_y: f64,
+    pub amplitude: f64,
+    pub color_hex: String,
+    pub layer_color_hex: String,
+    pub pitch_color_hex: String,
+    pub render_role: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HfieldRustRenderBridge {
+    pub bridge_id: String,
+    pub left_body_id: String,
+    pub right_body_id: String,
+    pub overlap_ms: u32,
+    pub x: f64,
+    pub y: f64,
+    pub z_start: f64,
+    pub z_end: f64,
+    pub z_center: f64,
+    pub z_body_length: f64,
+    pub radius_x: f64,
+    pub radius_y: f64,
+    pub color_a_hex: String,
+    pub color_b_hex: String,
+    pub blend_strength: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HfieldRustRenderProofWindow {
+    pub label: String,
+    pub time_ms: u32,
+    pub active_payload_count: usize,
+    pub active_runtime_count: usize,
+    pub active_body_ids: Vec<String>,
+}
+
+pub fn create_hfield_rust_render_manifest(score: &FieldScore) -> HfieldRustRenderManifest {
+    let registry = build_harmonic_coordinate_registry(score);
+    let field_bodies = registry
+        .entries
+        .iter()
+        .map(|entry| render_body_from_coordinate_entry(score, entry))
+        .collect::<Vec<_>>();
+
+    let bridge_bodies = render_bridges_from_manifest(&registry, &field_bodies);
+
+    let proof_windows = vec![
+        render_proof_window("single tone proof", 1000, &field_bodies),
+        render_proof_window("two tone interference proof", 3000, &field_bodies),
+        render_proof_window("three tone chord proof", 5000, &field_bodies),
+        render_proof_window("packet emission proof", 7000, &field_bodies),
+    ];
+
+    HfieldRustRenderManifest {
+        contract_id: "aiweb.hfield.rust_render_manifest.v1".to_string(),
+        source_coordinate_contract_id: registry.contract_id.clone(),
+        coordinate_profile: registry.coordinate_profile.clone(),
+        axis_contract: registry.axis_contract.clone(),
+        total_duration_ms: registry.total_duration_ms,
+        scan_min_z: FIELD_Z_MIN,
+        scan_max_z: FIELD_Z_MAX,
+        field_width: FIELD_X_MAX - FIELD_X_MIN,
+        field_height: 3.8,
+        field_bodies,
+        bridge_bodies,
+        proof_windows,
+        warnings: Vec::new(),
+    }
+}
+
+fn render_body_from_coordinate_entry(
+    score: &FieldScore,
+    entry: &HarmonicCoordinateEntry,
+) -> HfieldRustRenderBody {
+    let amplitude = render_amplitude(score, entry);
+    let radius_x = render_radius_x(&entry.layer, amplitude);
+    let radius_y = render_radius_y(&entry.layer, amplitude);
+    let layer_key = coordinate_layer_key(&entry.layer).to_string();
+    let lane_key = vertical_lane_key(&entry.lane).to_string();
+    let color_hex = match entry.layer {
+        CoordinateLayer::FileIdentityCarrier => entry.layer_color.clone(),
+        CoordinateLayer::RuntimePathCarrier => entry.layer_color.clone(),
+        CoordinateLayer::PayloadTone => entry.pitch_color.clone(),
+    };
+
+    HfieldRustRenderBody {
+        body_id: format!("render_body:{}", entry.entry_id),
+        source_entry_id: entry.entry_id.clone(),
+        layer_key,
+        lane_key,
+        track_id: entry.track_id.clone(),
+        label: entry.label.clone(),
+        note_name: entry.note_name.clone(),
+        midi_note: entry.midi_note,
+        frequency_hz: entry.frequency_hz,
+        start_ms: entry.start_ms,
+        duration_ms: entry.duration_ms,
+        end_ms: entry.end_ms,
+        x: entry.x_pitch_position,
+        y: entry.y_lane_position,
+        z_start: entry.z_start_position,
+        z_end: entry.z_end_position,
+        z_center: entry.z_center_position,
+        z_body_length: entry.z_body_length.max(0.08),
+        radius_x,
+        radius_y,
+        amplitude,
+        color_hex,
+        layer_color_hex: entry.layer_color.clone(),
+        pitch_color_hex: entry.pitch_color.clone(),
+        render_role: render_role(&entry.layer, &entry.lane).to_string(),
+    }
+}
+
+fn render_bridges_from_manifest(
+    registry: &HarmonicCoordinateRegistry,
+    bodies: &[HfieldRustRenderBody],
+) -> Vec<HfieldRustRenderBridge> {
+    let eligibility = calculate_interference_eligibility(registry);
+    let mut bridges = Vec::new();
+
+    for report in eligibility.iter().filter(|report| report.eligible) {
+        let Some(left) = bodies
+            .iter()
+            .find(|body| body.source_entry_id == report.left_entry_id)
+        else {
+            continue;
+        };
+
+        let Some(right) = bodies
+            .iter()
+            .find(|body| body.source_entry_id == report.right_entry_id)
+        else {
+            continue;
+        };
+
+        let z_start = left.z_start.max(right.z_start);
+        let z_end = left.z_end.min(right.z_end);
+
+        if z_end <= z_start {
+            continue;
+        }
+
+        let pitch_pressure = 1.0 - (report.pitch_distance / 1.35).clamp(0.0, 1.0);
+        let lane_pressure = 1.0 - (report.lane_distance / 1.25).clamp(0.0, 1.0);
+        let blend_strength = round4((pitch_pressure * 0.62 + lane_pressure * 0.38).clamp(0.0, 1.0));
+
+        bridges.push(HfieldRustRenderBridge {
+            bridge_id: format!("render_bridge:{}::{}", left.body_id, right.body_id),
+            left_body_id: left.body_id.clone(),
+            right_body_id: right.body_id.clone(),
+            overlap_ms: report.overlap_ms,
+            x: round4((left.x + right.x) / 2.0),
+            y: round4((left.y + right.y) / 2.0),
+            z_start,
+            z_end,
+            z_center: round4((z_start + z_end) / 2.0),
+            z_body_length: round4((z_end - z_start).abs().max(0.08)),
+            radius_x: round4(left.radius_x.min(right.radius_x) * (0.24 + blend_strength * 0.42)),
+            radius_y: round4(left.radius_y.min(right.radius_y) * (0.18 + blend_strength * 0.36)),
+            color_a_hex: left.color_hex.clone(),
+            color_b_hex: right.color_hex.clone(),
+            blend_strength,
+        });
+    }
+
+    bridges
+}
+
+fn render_proof_window(
+    label: &str,
+    time_ms: u32,
+    bodies: &[HfieldRustRenderBody],
+) -> HfieldRustRenderProofWindow {
+    let active = bodies
+        .iter()
+        .filter(|body| time_ms >= body.start_ms && time_ms < body.end_ms)
+        .collect::<Vec<_>>();
+
+    HfieldRustRenderProofWindow {
+        label: label.to_string(),
+        time_ms,
+        active_payload_count: active
+            .iter()
+            .filter(|body| body.layer_key == "payload_tone")
+            .count(),
+        active_runtime_count: active
+            .iter()
+            .filter(|body| body.layer_key == "runtime_path_carrier")
+            .count(),
+        active_body_ids: active.iter().map(|body| body.body_id.clone()).collect(),
+    }
+}
+
+fn render_amplitude(score: &FieldScore, entry: &HarmonicCoordinateEntry) -> f64 {
+    if entry.layer == CoordinateLayer::FileIdentityCarrier {
+        return 0.5;
+    }
+
+    let Some(midi_note) = entry.midi_note else {
+        return 0.5;
+    };
+
+    for track in &score.music.tracks {
+        if track.track_id != entry.track_id {
+            continue;
+        }
+
+        for note in &track.notes {
+            if note.midi_note == midi_note
+                && note.start_ms == entry.start_ms
+                && note.duration_ms == entry.duration_ms
+            {
+                return round4(f64::from(note.velocity).clamp(0.0, 1.0));
+            }
+        }
+    }
+
+    0.5
+}
+
+fn render_radius_x(layer: &CoordinateLayer, amplitude: f64) -> f64 {
+    let value = match layer {
+        CoordinateLayer::FileIdentityCarrier => 0.46,
+        CoordinateLayer::RuntimePathCarrier => 0.31 + amplitude * 0.2,
+        CoordinateLayer::PayloadTone => 0.34 + amplitude * 0.26,
+    };
+
+    round4(value)
+}
+
+fn render_radius_y(layer: &CoordinateLayer, amplitude: f64) -> f64 {
+    let value = match layer {
+        CoordinateLayer::FileIdentityCarrier => 0.32,
+        CoordinateLayer::RuntimePathCarrier => 0.24 + amplitude * 0.18,
+        CoordinateLayer::PayloadTone => 0.25 + amplitude * 0.28,
+    };
+
+    round4(value)
+}
+
+fn coordinate_layer_key(layer: &CoordinateLayer) -> &'static str {
+    match layer {
+        CoordinateLayer::FileIdentityCarrier => "file_identity_carrier",
+        CoordinateLayer::RuntimePathCarrier => "runtime_path_carrier",
+        CoordinateLayer::PayloadTone => "payload_tone",
+    }
+}
+
+fn vertical_lane_key(lane: &VerticalLane) -> &'static str {
+    match lane {
+        VerticalLane::Identity => "identity",
+        VerticalLane::PayloadLead => "payload_lead",
+        VerticalLane::RuntimeDepth => "runtime_depth",
+        VerticalLane::RuntimeField => "runtime_field",
+        VerticalLane::RuntimeOther => "runtime_other",
+    }
+}
+
+fn render_role(layer: &CoordinateLayer, lane: &VerticalLane) -> &'static str {
+    match (layer, lane) {
+        (CoordinateLayer::FileIdentityCarrier, _) => "global file identity body",
+        (CoordinateLayer::PayloadTone, VerticalLane::PayloadLead) => "played payload tone body",
+        (CoordinateLayer::RuntimePathCarrier, VerticalLane::RuntimeDepth) => {
+            "lower runtime path carrier body"
+        }
+        (CoordinateLayer::RuntimePathCarrier, VerticalLane::RuntimeField) => {
+            "upper runtime field carrier body"
+        }
+        (CoordinateLayer::RuntimePathCarrier, _) => "runtime path carrier body",
+        _ => "harmonic field body",
+    }
+}
+
+#[cfg(test)]
+mod render_manifest_tests {
+    use super::*;
+
+    fn canonical_score() -> FieldScore {
+        serde_json::from_str(include_str!(
+            "../../../projects/hcs_canonical_reader_packet_v1.hfield"
+        ))
+        .expect("canonical reader must parse")
+    }
+
+    #[test]
+    fn render_manifest_uses_coordinate_registry_without_frontend_guessing() {
+        let score = canonical_score();
+        let registry = build_harmonic_coordinate_registry(&score);
+        let manifest = create_hfield_rust_render_manifest(&score);
+
+        assert_eq!(manifest.contract_id, "aiweb.hfield.rust_render_manifest.v1");
+        assert_eq!(manifest.source_coordinate_contract_id, registry.contract_id);
+        assert_eq!(manifest.total_duration_ms, 8000);
+
+        let coordinate_c4 = registry
+            .entries
+            .iter()
+            .find(|entry| {
+                entry.track_id == "lead_voice"
+                    && entry.note_name.as_deref() == Some("C4")
+                    && entry.start_ms == 0
+            })
+            .expect("coordinate C4 must exist");
+
+        let render_c4 = manifest
+            .field_bodies
+            .iter()
+            .find(|body| {
+                body.track_id == "lead_voice"
+                    && body.note_name.as_deref() == Some("C4")
+                    && body.start_ms == 0
+            })
+            .expect("render C4 must exist");
+
+        assert_eq!(render_c4.x, coordinate_c4.x_pitch_position);
+        assert_eq!(render_c4.y, coordinate_c4.y_lane_position);
+        assert_eq!(render_c4.z_start, coordinate_c4.z_start_position);
+        assert_eq!(render_c4.z_end, coordinate_c4.z_end_position);
+        assert_eq!(render_c4.color_hex, coordinate_c4.pitch_color);
+    }
+
+    #[test]
+    fn render_manifest_preserves_reader_proof_windows() {
+        let score = canonical_score();
+        let manifest = create_hfield_rust_render_manifest(&score);
+
+        let single = manifest
+            .proof_windows
+            .iter()
+            .find(|window| window.time_ms == 1000)
+            .expect("single tone window must exist");
+        let two = manifest
+            .proof_windows
+            .iter()
+            .find(|window| window.time_ms == 3000)
+            .expect("two tone window must exist");
+        let three = manifest
+            .proof_windows
+            .iter()
+            .find(|window| window.time_ms == 5000)
+            .expect("three tone window must exist");
+
+        assert_eq!(single.active_payload_count, 1);
+        assert_eq!(two.active_payload_count, 1);
+        assert_eq!(three.active_payload_count, 1);
+        assert!(two.active_runtime_count >= 1);
+        assert!(three.active_runtime_count >= 2);
+    }
+
+    #[test]
+    fn render_manifest_creates_mold_bridge_bodies_from_coordinate_overlap() {
+        let score = canonical_score();
+        let manifest = create_hfield_rust_render_manifest(&score);
+
+        assert!(!manifest.bridge_bodies.is_empty());
+        assert!(manifest
+            .bridge_bodies
+            .iter()
+            .all(|bridge| bridge.overlap_ms > 0 && bridge.z_body_length > 0.0));
+    }
+}

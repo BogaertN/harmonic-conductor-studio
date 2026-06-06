@@ -4,6 +4,7 @@ use hfield_carrier::synthesize_hfield_runtime_carrier_packet_model;
 use hfield_conductor::{
     create_gesture_timeline_report, is_valid_gesture_id, nine_gesture_vocabulary,
 };
+use hfield_coordinate::create_hfield_rust_render_manifest;
 use hfield_cymatics::synthesize_hfield_cymatic_reader_surface;
 use hfield_domain::{ConductedPerformance, FieldScore, GestureEvent, GestureTrack, NoteEvent};
 use hfield_dsp::{
@@ -273,6 +274,19 @@ fn get_current_hfield_runtime_carrier_packet_report(
 
     serde_json::to_value(synthesize_hfield_runtime_carrier_packet_model(&guard))
         .map_err(|err| format!(".hfield runtime carrier packet serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn get_current_hfield_rust_render_manifest_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_hfield_rust_render_manifest(&guard))
+        .map_err(|err| format!(".hfield rust render manifest serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -1378,6 +1392,7 @@ fn main() {
             get_current_hfield_field_synthesis_report,
             get_current_hfield_cymatic_reader_surface_report,
             get_current_hfield_runtime_carrier_packet_report,
+            get_current_hfield_rust_render_manifest_report,
             get_current_forge_packet_bridge_stub_report,
             get_current_playhead_cursor_report,
             get_current_loop_phrase_report,

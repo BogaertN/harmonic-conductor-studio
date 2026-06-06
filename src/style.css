@@ -1846,3 +1846,15 @@ body {
   content: " · timed spatial tone binding active · bubbles persist for their score duration and light when the glass reader intersects them";
 }
 /* END HFIELD Timed Spatial Tone Binding v1 */
+
+
+/* HFIELD Rust Render Manifest v1 */
+.field-reader-stage-hint::after {
+  content: " · Rust render manifest active · pitch, lane, duration, color, and bridges are backend-owned";
+  color: rgba(86, 214, 255, 0.84);
+}
+
+.field-reader-focus-active .field-reader-stage-hint::after {
+  content: " · React renders only the Rust-owned coordinate truth · no frontend pitch guessing";
+}
+/* END HFIELD Rust Render Manifest v1 */

@@ -895,6 +895,76 @@ export type ResonanceLevelBundle = {
   professional_boundary: string;
 };
 
+
+export type HfieldRustRenderManifestReport = {
+  contract_id: string;
+  source_coordinate_contract_id: string;
+  coordinate_profile: string;
+  axis_contract: {
+    x: string;
+    y: string;
+    z: string;
+    t: string;
+  };
+  total_duration_ms: number;
+  scan_min_z: number;
+  scan_max_z: number;
+  field_width: number;
+  field_height: number;
+  field_bodies: Array<{
+    body_id: string;
+    source_entry_id: string;
+    layer_key: string;
+    lane_key: string;
+    track_id: string;
+    label: string;
+    note_name: string | null;
+    midi_note: number | null;
+    frequency_hz: number;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    x: number;
+    y: number;
+    z_start: number;
+    z_end: number;
+    z_center: number;
+    z_body_length: number;
+    radius_x: number;
+    radius_y: number;
+    amplitude: number;
+    color_hex: string;
+    layer_color_hex: string;
+    pitch_color_hex: string;
+    render_role: string;
+  }>;
+  bridge_bodies: Array<{
+    bridge_id: string;
+    left_body_id: string;
+    right_body_id: string;
+    overlap_ms: number;
+    x: number;
+    y: number;
+    z_start: number;
+    z_end: number;
+    z_center: number;
+    z_body_length: number;
+    radius_x: number;
+    radius_y: number;
+    color_a_hex: string;
+    color_b_hex: string;
+    blend_strength: number;
+  }>;
+  proof_windows: Array<{
+    label: string;
+    time_ms: number;
+    active_payload_count: number;
+    active_runtime_count: number;
+    active_body_ids: string[];
+  }>;
+  warnings: string[];
+};
+
 export async function getCurrentHfieldPacketContractReport(): Promise<HfieldPacketContractReport> {
   return await invoke<HfieldPacketContractReport>("get_current_hfield_packet_contract_report");
 }
@@ -905,6 +975,11 @@ export async function getCurrentHfieldRuntimeCarrierPacketReport(): Promise<Hfie
 
 export async function getCurrentHfieldCymaticReaderSurfaceReport(): Promise<HfieldCymaticReaderSurfaceReport> {
   return await invoke<HfieldCymaticReaderSurfaceReport>("get_current_hfield_cymatic_reader_surface_report");
+}
+
+
+export async function getCurrentHfieldRustRenderManifestReport(): Promise<HfieldRustRenderManifestReport> {
+  return await invoke<HfieldRustRenderManifestReport>("get_current_hfield_rust_render_manifest_report");
 }
 
 export async function getCurrentHfieldFieldSynthesisReport(): Promise<HfieldFieldSynthesisReport> {

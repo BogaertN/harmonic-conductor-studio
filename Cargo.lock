@@ -1296,6 +1296,7 @@ dependencies = [
  "hfield-analysis",
  "hfield-carrier",
  "hfield-conductor",
+ "hfield-coordinate",
  "hfield-cymatics",
  "hfield-domain",
  "hfield-dsp",

@@ -7,9 +7,11 @@ import type { Group } from "three";
 import {
   getCurrentHfieldCymaticReaderSurfaceReport,
   getCurrentHfieldRuntimeCarrierPacketReport,
+  getCurrentHfieldRustRenderManifestReport,
   type HfieldCymaticReaderSurfaceReport,
   type HfieldFieldSynthesisReport,
   type HfieldRuntimeCarrierPacketReport,
+  type HfieldRustRenderManifestReport,
   type PlayheadCursorReport
 } from "../bridge/tauriCommands";
 
@@ -250,6 +252,7 @@ function RuntimeCarrierScene(props: HfieldVolumetricPacketFieldProps) {
 export default function HfieldPhaseFieldViewport({ report, playheadReport, isPlaying, onRefresh, onPlay, onStop }: ViewportProps) {
   const [cymaticReport, setCymaticReport] = useState<HfieldCymaticReaderSurfaceReport | null>(null);
   const [carrierReport, setCarrierReport] = useState<HfieldRuntimeCarrierPacketReport | null>(null);
+  const [renderManifest, setRenderManifest] = useState<HfieldRustRenderManifestReport | null>(null);
   const [readerError, setReaderError] = useState<string | null>(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [cameraRevision, setCameraRevision] = useState(0);
@@ -258,13 +261,14 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
     let mounted = true;
     setReaderError(null);
 
-    Promise.all([getCurrentHfieldCymaticReaderSurfaceReport(), getCurrentHfieldRuntimeCarrierPacketReport()])
-      .then(([nextCymaticReport, nextCarrierReport]) => {
+    Promise.all([getCurrentHfieldCymaticReaderSurfaceReport(), getCurrentHfieldRuntimeCarrierPacketReport(), getCurrentHfieldRustRenderManifestReport()])
+      .then(([nextCymaticReport, nextCarrierReport, nextRenderManifest]) => {
         if (!mounted) {
           return;
         }
         setCymaticReport(nextCymaticReport);
         setCarrierReport(nextCarrierReport);
+        setRenderManifest(nextRenderManifest);
       })
       .catch((error: unknown) => {
         if (!mounted) {
@@ -321,7 +325,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
 
       <div className="field-canvas-shell carrier-reader-canvas-shell">
         <Canvas key={`carrier-reader-${isFocusMode ? "focus" : "inline"}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
-          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} playheadReport={playheadReport} isPlaying={isPlaying} />
+          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} playheadReport={playheadReport} isPlaying={isPlaying} />
         </Canvas>
         <div className="field-reader-stage-hint">Orbit: drag · Zoom: wheel · Pan: right-drag · Reset Camera returns the packet to inspection view</div>
       </div>
@@ -333,6 +337,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
         <div className="mini-stat"><span>file carrier</span><strong>{carrierReport ? `${carrierReport.identity_carrier.frequency_hz.toFixed(1)} Hz` : "—"}</strong></div>
         <div className="mini-stat"><span>operating field</span><strong>{carrierReport?.operating_field.key_signature_proxy ?? "—"}</strong></div>
         <div className="mini-stat"><span>runtime paths</span><strong>{carrierReport?.runtime_paths.length ?? 0}</strong></div>
+        <div className="mini-stat"><span>render bodies</span><strong>{renderManifest?.field_bodies.length ?? 0}</strong></div>
         <div className="mini-stat"><span>ripples</span><strong>{carrierReport?.information_ripples.length ?? 0}</strong></div>
         <div className="mini-stat"><span>surface</span><strong>{cymaticReport ? `${cymaticReport.reader_surface.vertex_count} vertices` : "—"}</strong></div>
         <div className="mini-stat"><span>meaning</span><strong>{carrierReport?.readable_packet_model ?? "waiting"}</strong></div>
