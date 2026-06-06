@@ -1295,6 +1295,7 @@ dependencies = [
  "cpal",
  "hfield-analysis",
  "hfield-conductor",
+ "hfield-cymatics",
  "hfield-domain",
  "hfield-dsp",
  "hfield-field",
@@ -1367,6 +1368,18 @@ version = "0.1.0"
 dependencies = [
  "hfield-domain",
  "serde",
+]
+
+[[package]]
+name = "hfield-cymatics"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "hfield-domain",
+ "hfield-field",
+ "hfield-music",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

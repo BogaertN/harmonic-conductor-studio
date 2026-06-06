@@ -1664,8 +1664,8 @@ export default function App() {
               <div className="workspace-header-row">
                 <div>
                   <p className="eyebrow">Harmonic Packet Field</p>
-                  <h2>3D Phase Field and Cymatic Trace</h2>
-                  <p className="note">This viewport renders the .hfield packet as a deterministic 9 phase field. Three.js handles the 3D plumbing; the Rust field synthesis engine owns the meaning.</p>
+                  <h2>3D Glass Reader and Cymatic Surface</h2>
+                  <p className="note">This viewport renders the .hfield packet through a glass-reader cymatic surface. Three.js handles the 3D plumbing; Rust owns the field, frequency, phase, and mesh meaning.</p>
                 </div>
                 <div className="button-row compact-row">
                   <button onClick={refreshFieldSynthesis} type="button">Refresh Field</button>

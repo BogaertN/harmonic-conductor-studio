@@ -121,6 +121,114 @@ export type HfieldPacketContractReport = {
 };
 
 
+
+export type HfieldCymaticReaderSurfaceReport = {
+  strategy: string;
+  status: string;
+  cymatic_reader_contract_id: string;
+  source_field_contract_id: string;
+  source_field_hash: string;
+  title: string;
+  root_frequency_hz: number;
+  phase_order: number[];
+  phase_grid_rows: number[][];
+  reader_model: string;
+  color_profile_id: string;
+  standard_frequency_reference: string;
+  glass_reader: {
+    label: string;
+    role: string;
+    material_model: string;
+    width_units: number;
+    height_units: number;
+    thickness_units: number;
+    orientation: string;
+    time_axis: string;
+    frequency_axis: string;
+    displacement_axis: string;
+    opacity_hint: number;
+  };
+  anchor_colors: Array<{
+    phase: number;
+    phase_role: string;
+    anchor_role: string;
+    base_frequency_hz: number;
+    color_hex: string;
+    hue_degrees: number;
+    semantic_note: string;
+  }>;
+  active_tones: Array<{
+    tone_index: number;
+    event_kind: string;
+    source_track_id: string;
+    source_role: string;
+    phase: number;
+    anchor_phase: number;
+    note_name: string | null;
+    gesture_id: string | null;
+    frequency_hz: number;
+    amplitude: number;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    color_hex: string;
+    hue_degrees: number;
+    spatial_x: number;
+    spatial_y: number;
+    spatial_z: number;
+  }>;
+  reader_surface: {
+    x_segments: number;
+    t_segments: number;
+    vertex_count: number;
+    triangle_count: number;
+    max_abs_displacement: number;
+    polyphonic_interference_count: number;
+    vertices: Array<{
+      vertex_index: number;
+      x_norm: number;
+      time_norm: number;
+      time_ms: number;
+      displacement: number;
+      intensity: number;
+      active_tone_count: number;
+      dominant_phase: number;
+      dominant_frequency_hz: number;
+      color_hex: string;
+      r: number;
+      g: number;
+      b: number;
+    }>;
+  };
+  interference_slices: Array<{
+    slice_index: number;
+    time_ms: number;
+    time_norm: number;
+    active_tone_count: number;
+    dominant_phase: number;
+    dominant_frequency_hz: number;
+    constructive_energy: number;
+    destructive_energy: number;
+    net_displacement: number;
+    color_hex: string;
+  }>;
+  ambient_field_points: Array<{
+    point_index: number;
+    time_ms: number;
+    time_norm: number;
+    phase: number;
+    frequency_hz: number;
+    amplitude: number;
+    x: number;
+    y: number;
+    z: number;
+    color_hex: string;
+    role: string;
+  }>;
+  deterministic_reader_hash: string;
+  warnings: string[];
+};
+
 export type HfieldFieldSynthesisReport = {
   strategy: string;
   status: string;
@@ -687,6 +795,10 @@ export type ResonanceLevelBundle = {
 
 export async function getCurrentHfieldPacketContractReport(): Promise<HfieldPacketContractReport> {
   return await invoke<HfieldPacketContractReport>("get_current_hfield_packet_contract_report");
+}
+
+export async function getCurrentHfieldCymaticReaderSurfaceReport(): Promise<HfieldCymaticReaderSurfaceReport> {
+  return await invoke<HfieldCymaticReaderSurfaceReport>("get_current_hfield_cymatic_reader_surface_report");
 }
 
 export async function getCurrentHfieldFieldSynthesisReport(): Promise<HfieldFieldSynthesisReport> {

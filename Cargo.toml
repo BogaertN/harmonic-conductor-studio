@@ -15,6 +15,7 @@ members = [
   "crates/hfield-packet",
   "crates/hfield-forge-bridge",
   "crates/hfield-field",
+  "crates/hfield-cymatics",
   "crates/hfield-playhead",
   "crates/hfield-loop",
   "src-tauri"
