@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { HfieldPhaseFieldViewport } from "./components/HfieldPhaseFieldViewport";
+import HfieldPhaseFieldViewport from "./components/HfieldPhaseFieldViewport";
 import {
   appendGestureToCurrentScore,
   appendNoteToCurrentTrack,
@@ -1664,8 +1664,8 @@ export default function App() {
               <div className="workspace-header-row">
                 <div>
                   <p className="eyebrow">Harmonic Packet Field</p>
-                  <h2>3D Glass Reader and Cymatic Surface</h2>
-                  <p className="note">This viewport renders the .hfield packet through a glass-reader cymatic surface. Three.js handles the 3D plumbing; Rust owns the field, frequency, phase, and mesh meaning.</p>
+                  <h2>3D Glass Reader and Runtime Carrier Cymatics</h2>
+                  <p className="note">This viewport reads the .hfield packet through a glass plane. Rust derives the file identity carrier from the packet identity, then separates runtime path carriers and note payload frequencies before the renderer draws the cymatic ripples through time.</p>
                 </div>
                 <div className="button-row compact-row">
                   <button onClick={refreshFieldSynthesis} type="button">Refresh Field</button>

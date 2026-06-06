@@ -122,6 +122,108 @@ export type HfieldPacketContractReport = {
 
 
 
+
+export type HfieldRuntimeCarrierPacketReport = {
+  strategy: string;
+  status: string;
+  carrier_contract_id: string;
+  title: string;
+  source_format: string;
+  source_version: string;
+  packet_kind: string;
+  packet_role: string;
+  global_file_carrier_frequency_hz: number;
+  phase_root_frequency_hz: number;
+  identity_carrier: {
+    artifact_id: string;
+    title_signature: string;
+    frequency_hz: number;
+    carrier_role: string;
+    payload_layer: string;
+    phase: number;
+    color_hex: string;
+    is_global_identity_tone: boolean;
+  };
+  operating_field: {
+    tuning_mode: string;
+    meter: string;
+    tempo_bpm: number;
+    key_signature_proxy: string;
+    phase_order: number[];
+    phase_grid_rows: number[][];
+    carrier_stack_description: string;
+  };
+  runtime_paths: Array<{
+    path_index: number;
+    path_id: string;
+    display_label: string;
+    channel_kind: string;
+    source_track_id: string;
+    source_role: string;
+    instrument_proxy: string;
+    carrier_frequency_hz: number;
+    anchor_phase: number;
+    color_hex: string;
+  }>;
+  packet_events: Array<{
+    event_index: number;
+    event_kind: string;
+    payload_layer: string;
+    runtime_path_id: string;
+    source_track_id: string;
+    source_role: string;
+    note_name: string | null;
+    gesture_id: string | null;
+    semantic_binding: string;
+    carrier_frequency_hz: number;
+    payload_frequency_hz: number;
+    phase: number;
+    anchor_phase: number;
+    amplitude: number;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    time_norm_start: number;
+    time_norm_end: number;
+    color_hex: string;
+  }>;
+  information_ripples: Array<{
+    ripple_index: number;
+    source_event_index: number;
+    ripple_kind: string;
+    payload_layer: string;
+    runtime_path_id: string;
+    semantic_binding: string;
+    carrier_frequency_hz: number;
+    payload_frequency_hz: number;
+    phase: number;
+    anchor_phase: number;
+    start_ms: number;
+    duration_ms: number;
+    time_norm: number;
+    surface_x_norm: number;
+    surface_radius_norm: number;
+    amplitude: number;
+    color_hex: string;
+  }>;
+  time_slices: Array<{
+    slice_index: number;
+    time_ms: number;
+    time_norm: number;
+    scanline_z_norm: number;
+    active_ripple_count: number;
+    active_carrier_frequencies_hz: number[];
+    active_payload_frequencies_hz: number[];
+    composite_amplitude: number;
+    dominant_payload_layer: string;
+    dominant_phase: number;
+    dominant_color_hex: string;
+  }>;
+  readable_packet_model: string;
+  deterministic_carrier_hash: string;
+  warnings: string[];
+};
+
 export type HfieldCymaticReaderSurfaceReport = {
   strategy: string;
   status: string;
@@ -795,6 +897,10 @@ export type ResonanceLevelBundle = {
 
 export async function getCurrentHfieldPacketContractReport(): Promise<HfieldPacketContractReport> {
   return await invoke<HfieldPacketContractReport>("get_current_hfield_packet_contract_report");
+}
+
+export async function getCurrentHfieldRuntimeCarrierPacketReport(): Promise<HfieldRuntimeCarrierPacketReport> {
+  return await invoke<HfieldRuntimeCarrierPacketReport>("get_current_hfield_runtime_carrier_packet_report");
 }
 
 export async function getCurrentHfieldCymaticReaderSurfaceReport(): Promise<HfieldCymaticReaderSurfaceReport> {
