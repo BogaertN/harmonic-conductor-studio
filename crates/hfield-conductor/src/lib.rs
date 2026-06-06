@@ -729,3 +729,833 @@ mod timeline_tests {
         assert_eq!(report.total_duration_ms, 1120);
     }
 }
+
+pub const TRUE_CONDUCTOR_GESTURE_REFERENCE_MANIFEST_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.true_conductor_gesture_reference_manifest.v1";
+pub const TRUE_CONDUCTOR_GESTURE_REFERENCE_MANIFEST_PROFILE_ID: &str =
+    "true_conductor_gesture_reference_manifest_v1";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueConductorGestureReferenceManifestV1Report {
+    pub status: &'static str,
+    pub contract_id: &'static str,
+    pub profile_id: &'static str,
+    pub manifest_role: &'static str,
+    pub research_basis: TrueGestureReferenceResearchBasis,
+    pub authority_boundaries: TrueGestureReferenceAuthorityBoundaries,
+    pub coordinate_policy: TrueGestureReferenceCoordinatePolicy,
+    pub conducting_operator_manifest: Vec<TrueConductingOperatorReference>,
+    pub reference_count: usize,
+    pub references: Vec<TrueGestureReference>,
+    pub current_score_scan: TrueGestureReferenceScoreScan,
+    pub readiness_gates: TrueGestureReferenceReadinessGates,
+    pub next_work: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureReferenceResearchBasis {
+    pub hcs_build_ruling: &'static str,
+    pub conducting_manual_basis: Vec<&'static str>,
+    pub design_correction: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureReferenceAuthorityBoundaries {
+    pub manifest_is_rust_owned: bool,
+    pub references_are_renderer_inputs: bool,
+    pub references_are_forge_operational_meaning: bool,
+    pub replaces_generic_reference_overlay: bool,
+    pub may_drive_later_gesture_aware_field_renderer: bool,
+    pub mutates_forge: bool,
+    pub performs_identity_vault_write: bool,
+    pub exports_private_identity: bool,
+    pub authorizes_health_or_sensor_claims: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureReferenceCoordinatePolicy {
+    pub coordinate_space: &'static str,
+    pub source_layout: &'static str,
+    pub spatial_order: Vec<&'static str>,
+    pub anchor_model: Vec<TrueGestureAnchorReference>,
+    pub path_rule: &'static str,
+    pub timing_rule: &'static str,
+    pub radius_rule: &'static str,
+    pub motif_rule: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureAnchorReference {
+    pub anchor_id: &'static str,
+    pub anchor_gesture_id: &'static str,
+    pub field_region: &'static str,
+    pub position: TrueGesturePoint,
+    pub role: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueConductingOperatorReference {
+    pub operator_id: &'static str,
+    pub role: &'static str,
+    pub physical_rule: &'static str,
+    pub renderer_effect: &'static str,
+    pub forge_boundary: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureReference {
+    pub reference_id: String,
+    pub track_id: String,
+    pub hand_role: &'static str,
+    pub event_index: usize,
+    pub gesture_id: String,
+    pub valid: bool,
+    pub primitive_name: String,
+    pub anchor_id: String,
+    pub anchor_gesture_id: String,
+    pub anchor_relationship: String,
+    pub field_region: String,
+    pub orbital_direction: String,
+    pub path: TrueGesturePathReference,
+    pub timing: TrueGestureTimingReference,
+    pub intensity_radius: TrueGestureIntensityRadius,
+    pub associated_track: String,
+    pub associated_motif: Option<String>,
+    pub conducting_operators: Vec<String>,
+    pub timing_tags: Vec<String>,
+    pub renderer_contract: TrueGestureRendererReferenceContract,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGesturePathReference {
+    pub path_id: String,
+    pub easing_profile: String,
+    pub start_position: TrueGesturePoint,
+    pub control_points: Vec<TrueGesturePoint>,
+    pub end_position: TrueGesturePoint,
+    pub sample_points: Vec<TrueGesturePoint>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct TrueGesturePoint {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureTimingReference {
+    pub start_ms: u32,
+    pub duration_ms: u32,
+    pub end_ms: u32,
+    pub normalized_start: f32,
+    pub normalized_end: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureIntensityRadius {
+    pub source_intensity: f32,
+    pub path_radius: f32,
+    pub stroke_weight: f32,
+    pub visual_alpha: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureRendererReferenceContract {
+    pub renderer_may_draw_path: bool,
+    pub renderer_may_draw_anchor_relation: bool,
+    pub renderer_may_draw_timing_window: bool,
+    pub renderer_may_draw_motif_chunk: bool,
+    pub renderer_may_infer_missing_gesture_geometry: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureReferenceScoreScan {
+    pub primary_event_count: usize,
+    pub expressive_event_count: usize,
+    pub total_event_count: usize,
+    pub invalid_event_count: usize,
+    pub total_duration_ms: u32,
+    pub observed_gesture_ids: Vec<String>,
+    pub has_motif_layer_reference: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrueGestureReferenceReadinessGates {
+    pub has_nine_gesture_engine: bool,
+    pub has_primary_track: bool,
+    pub every_reference_has_start_and_end: bool,
+    pub every_reference_has_anchor_relationship: bool,
+    pub every_reference_has_path_samples: bool,
+    pub every_reference_has_renderer_contract: bool,
+    pub no_generic_overlay_fallback_needed: bool,
+    pub no_live_forge_or_identity_side_effects: bool,
+    pub current_score_can_drive_true_gesture_reference_manifest: bool,
+}
+
+pub fn create_true_conductor_gesture_reference_manifest_v1_report(
+    score: &hfield_domain::FieldScore,
+) -> TrueConductorGestureReferenceManifestV1Report {
+    let mut references = Vec::new();
+    for (index, event) in score.conductor.primary_hand_track.events.iter().enumerate() {
+        references.push(true_gesture_reference_from_event(
+            score,
+            event,
+            index + 1,
+            &score.conductor.primary_hand_track.track_id,
+            "dominant_conductor_hand",
+        ));
+    }
+
+    if let Some(track) = &score.conductor.expressive_hand_track {
+        for (index, event) in track.events.iter().enumerate() {
+            references.push(true_gesture_reference_from_event(
+                score,
+                event,
+                index + 1,
+                &track.track_id,
+                "expressive_support_hand",
+            ));
+        }
+    }
+
+    let current_score_scan = true_gesture_reference_score_scan(score, &references);
+    let readiness_gates =
+        true_gesture_reference_readiness_gates(score, &references, &current_score_scan);
+
+    TrueConductorGestureReferenceManifestV1Report {
+        status: "ok",
+        contract_id: TRUE_CONDUCTOR_GESTURE_REFERENCE_MANIFEST_V1_CONTRACT_ID,
+        profile_id: TRUE_CONDUCTOR_GESTURE_REFERENCE_MANIFEST_PROFILE_ID,
+        manifest_role: "Rust-owned gesture path, timing, anchor, radius, operator, and motif-reference manifest for downstream renderers",
+        research_basis: TrueGestureReferenceResearchBasis {
+            hcs_build_ruling: "True gesture references must exist before the gesture-aware field renderer returns; generic decorative reference lines are not allowed.",
+            conducting_manual_basis: vec![
+                "The beat is steady and must be visible through consistent motion.",
+                "The downbeat establishes the first beat with clear downward motion.",
+                "The ictus is the readable beat point, usually shown by a small bounce or dip.",
+                "The preparatory beat sets tempo, mood, and breath before entry.",
+                "The cutoff marks the definite end of sound or phrase.",
+                "Pickup beats, fermatas, and re-entry require transition logic, not random lines.",
+                "The left hand may support phrasing, dynamics, style, sustain, subgroup cueing, and expression while the dominant hand keeps the primary path.",
+            ],
+            design_correction: "This manifest exports actual event-derived gesture paths and anchor/orbit metadata; renderers must read this manifest instead of guessing overlay geometry.",
+        },
+        authority_boundaries: TrueGestureReferenceAuthorityBoundaries {
+            manifest_is_rust_owned: true,
+            references_are_renderer_inputs: true,
+            references_are_forge_operational_meaning: false,
+            replaces_generic_reference_overlay: true,
+            may_drive_later_gesture_aware_field_renderer: true,
+            mutates_forge: false,
+            performs_identity_vault_write: false,
+            exports_private_identity: false,
+            authorizes_health_or_sensor_claims: false,
+        },
+        coordinate_policy: true_gesture_reference_coordinate_policy(),
+        conducting_operator_manifest: true_conducting_operator_manifest(),
+        reference_count: references.len(),
+        references,
+        current_score_scan,
+        readiness_gates,
+        next_work: vec![
+            "bind true gesture reference manifest hash into canonical bundle manifest v2",
+            "update Gesture-Aware Field Renderer v2 to consume these path references directly",
+            "add motif span ids after serialized motif objects exist",
+            "add renderer replay tests proving no generic reference overlay fallback is used",
+            "later add two-hand renderer behavior using expressive_support_hand references",
+        ],
+    }
+}
+
+fn true_gesture_reference_from_event(
+    score: &hfield_domain::FieldScore,
+    event: &hfield_domain::GestureEvent,
+    event_index: usize,
+    track_id: &str,
+    hand_role: &'static str,
+) -> TrueGestureReference {
+    let primitive = nine_gesture_engine_primitive(&event.gesture_id);
+    let primitive_name = primitive
+        .as_ref()
+        .map(|primitive| primitive.name.to_string())
+        .unwrap_or_else(|| "Unknown Gesture".to_string());
+    let metadata = true_gesture_static_metadata(&event.gesture_id);
+    let path =
+        true_gesture_path_reference(&event.gesture_id, event.intensity, event_index, track_id);
+    let total_duration_ms = true_gesture_total_duration_ms(score).max(1);
+    let end_ms = event.start_ms.saturating_add(event.duration_ms);
+    let associated_motif = true_gesture_associated_motif(score, &event.gesture_id, track_id);
+
+    TrueGestureReference {
+        reference_id: format!(
+            "{}_{}_{}_{}",
+            track_id, event_index, event.gesture_id, event.start_ms
+        ),
+        track_id: track_id.to_string(),
+        hand_role,
+        event_index,
+        gesture_id: event.gesture_id.clone(),
+        valid: primitive.is_some(),
+        primitive_name,
+        anchor_id: metadata.anchor_id.to_string(),
+        anchor_gesture_id: metadata.anchor_gesture_id.to_string(),
+        anchor_relationship: metadata.anchor_relationship.to_string(),
+        field_region: metadata.field_region.to_string(),
+        orbital_direction: metadata.orbital_direction.to_string(),
+        path,
+        timing: TrueGestureTimingReference {
+            start_ms: event.start_ms,
+            duration_ms: event.duration_ms,
+            end_ms,
+            normalized_start: event.start_ms as f32 / total_duration_ms as f32,
+            normalized_end: end_ms as f32 / total_duration_ms as f32,
+        },
+        intensity_radius: TrueGestureIntensityRadius {
+            source_intensity: event.intensity,
+            path_radius: true_gesture_path_radius(event.intensity),
+            stroke_weight: (1.0 + event.intensity.clamp(0.0, 1.0) * 4.0).clamp(1.0, 5.0),
+            visual_alpha: (0.35 + event.intensity.clamp(0.0, 1.0) * 0.60).clamp(0.35, 0.95),
+        },
+        associated_track: track_id.to_string(),
+        associated_motif,
+        conducting_operators: true_gesture_conducting_operators(&event.gesture_id)
+            .into_iter()
+            .map(|operator| operator.to_string())
+            .collect(),
+        timing_tags: true_gesture_timing_tags(&event.gesture_id, event.start_ms, event.duration_ms)
+            .into_iter()
+            .map(|tag| tag.to_string())
+            .collect(),
+        renderer_contract: TrueGestureRendererReferenceContract {
+            renderer_may_draw_path: true,
+            renderer_may_draw_anchor_relation: true,
+            renderer_may_draw_timing_window: true,
+            renderer_may_draw_motif_chunk: true,
+            renderer_may_infer_missing_gesture_geometry: false,
+        },
+    }
+}
+
+struct TrueGestureStaticMetadata {
+    anchor_id: &'static str,
+    anchor_gesture_id: &'static str,
+    anchor_relationship: &'static str,
+    field_region: &'static str,
+    orbital_direction: &'static str,
+}
+
+fn true_gesture_static_metadata(gesture_id: &str) -> TrueGestureStaticMetadata {
+    match gesture_id {
+        "g2" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_1",
+            anchor_gesture_id: "g1",
+            anchor_relationship: "inward_side_approach_to_root_anchor",
+            field_region: "root_row_receptive_left",
+            orbital_direction: "inward_to_anchor",
+        },
+        "g1" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_1",
+            anchor_gesture_id: "g1",
+            anchor_relationship: "root_anchor_settle",
+            field_region: "root_row_center",
+            orbital_direction: "anchor_hold",
+        },
+        "g3" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_1",
+            anchor_gesture_id: "g1",
+            anchor_relationship: "outward_side_release_from_root_anchor",
+            field_region: "root_row_projective_right",
+            orbital_direction: "outward_from_anchor",
+        },
+        "g4" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_5",
+            anchor_gesture_id: "g5",
+            anchor_relationship: "inward_side_approach_to_transformation_anchor",
+            field_region: "lower_transformation_row_receptive_left",
+            orbital_direction: "inward_to_anchor",
+        },
+        "g5" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_5",
+            anchor_gesture_id: "g5",
+            anchor_relationship: "transformation_anchor_hold",
+            field_region: "lower_transformation_row_center",
+            orbital_direction: "anchor_hold",
+        },
+        "g6" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_5",
+            anchor_gesture_id: "g5",
+            anchor_relationship: "outward_side_release_from_transformation_anchor",
+            field_region: "lower_transformation_row_projective_right",
+            orbital_direction: "outward_from_anchor",
+        },
+        "g7" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_9",
+            anchor_gesture_id: "g9",
+            anchor_relationship: "inward_side_approach_to_expression_anchor",
+            field_region: "upper_expression_row_receptive_left",
+            orbital_direction: "inward_to_anchor",
+        },
+        "g9" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_9",
+            anchor_gesture_id: "g9",
+            anchor_relationship: "formed_expression_anchor_hold",
+            field_region: "upper_expression_row_center",
+            orbital_direction: "anchor_hold",
+        },
+        "g8" => TrueGestureStaticMetadata {
+            anchor_id: "anchor_9",
+            anchor_gesture_id: "g9",
+            anchor_relationship: "outward_side_release_from_expression_anchor",
+            field_region: "upper_expression_row_projective_right",
+            orbital_direction: "outward_from_anchor",
+        },
+        _ => TrueGestureStaticMetadata {
+            anchor_id: "unknown",
+            anchor_gesture_id: "unknown",
+            anchor_relationship: "unknown_gesture_no_anchor_relationship",
+            field_region: "unknown",
+            orbital_direction: "unknown",
+        },
+    }
+}
+
+fn true_gesture_static_position(gesture_id: &str) -> TrueGesturePoint {
+    match gesture_id {
+        "g2" => TrueGesturePoint {
+            x: -1.0,
+            y: 0.0,
+            z: 0.0,
+        },
+        "g1" => TrueGesturePoint {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+        "g3" => TrueGesturePoint {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+        },
+        "g4" => TrueGesturePoint {
+            x: -1.0,
+            y: -1.0,
+            z: 0.0,
+        },
+        "g5" => TrueGesturePoint {
+            x: 0.0,
+            y: -1.0,
+            z: 0.0,
+        },
+        "g6" => TrueGesturePoint {
+            x: 1.0,
+            y: -1.0,
+            z: 0.0,
+        },
+        "g7" => TrueGesturePoint {
+            x: -1.0,
+            y: 1.0,
+            z: 0.0,
+        },
+        "g9" => TrueGesturePoint {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+        },
+        "g8" => TrueGesturePoint {
+            x: 1.0,
+            y: 1.0,
+            z: 0.0,
+        },
+        _ => TrueGesturePoint {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+    }
+}
+
+fn true_gesture_start_end_ids(gesture_id: &str) -> (&'static str, &'static str) {
+    match gesture_id {
+        "g2" => ("g2", "g1"),
+        "g1" => ("g1", "g1"),
+        "g3" => ("g1", "g3"),
+        "g4" => ("g4", "g5"),
+        "g5" => ("g5", "g5"),
+        "g6" => ("g5", "g6"),
+        "g7" => ("g7", "g9"),
+        "g9" => ("g9", "g9"),
+        "g8" => ("g9", "g8"),
+        _ => ("g1", "g1"),
+    }
+}
+
+fn true_gesture_path_reference(
+    gesture_id: &str,
+    intensity: f32,
+    event_index: usize,
+    track_id: &str,
+) -> TrueGesturePathReference {
+    let (start_id, end_id) = true_gesture_start_end_ids(gesture_id);
+    let start = true_gesture_static_position(start_id);
+    let end = true_gesture_static_position(end_id);
+    let lift = (0.12 + intensity.clamp(0.0, 1.0) * 0.38).clamp(0.12, 0.50);
+    let midpoint = TrueGesturePoint {
+        x: (start.x + end.x) / 2.0,
+        y: (start.y + end.y) / 2.0,
+        z: lift,
+    };
+
+    TrueGesturePathReference {
+        path_id: format!("{}_{}_{}_path", track_id, event_index, gesture_id),
+        easing_profile: true_gesture_easing_profile(gesture_id).to_string(),
+        start_position: start,
+        control_points: vec![midpoint],
+        end_position: end,
+        sample_points: vec![start, midpoint, end],
+    }
+}
+
+fn true_gesture_easing_profile(gesture_id: &str) -> &'static str {
+    match gesture_id {
+        "g1" => "settle_ictus_micro_bounce",
+        "g5" | "g9" => "sustained_hold_with_release_readiness",
+        "g2" | "g4" | "g7" => "preparatory_inward_curve",
+        "g3" | "g6" | "g8" => "outward_release_curve",
+        _ => "unknown_linear_safe_fallback",
+    }
+}
+
+fn true_gesture_path_radius(intensity: f32) -> f32 {
+    (0.20 + intensity.clamp(0.0, 1.0) * 0.80).clamp(0.20, 1.0)
+}
+
+fn true_gesture_conducting_operators(gesture_id: &str) -> Vec<&'static str> {
+    match gesture_id {
+        "g2" => vec!["prepare", "pickup_readiness"],
+        "g1" => vec!["downbeat", "ictus", "settle"],
+        "g3" => vec!["upbeat", "phrase_entry", "outward_motion"],
+        "g4" => vec!["prepare", "constraint_entry", "controlled_dip"],
+        "g5" => vec!["hold", "fermata_ready", "sustain"],
+        "g6" => vec!["cutoff", "release", "reentry_ready"],
+        "g7" => vec!["left_hand_cue", "gather", "prepare_expression"],
+        "g9" => vec!["hold", "fermata", "phrase_completion"],
+        "g8" => vec!["final_cutoff", "outward_release", "emit"],
+        _ => vec!["unknown"],
+    }
+}
+
+fn true_gesture_timing_tags(
+    gesture_id: &str,
+    start_ms: u32,
+    duration_ms: u32,
+) -> Vec<&'static str> {
+    let mut tags = true_gesture_conducting_operators(gesture_id);
+    if start_ms == 0 {
+        tags.push("score_entry_window");
+    }
+    if duration_ms >= 1_000 {
+        tags.push("long_duration_window");
+    }
+    tags
+}
+
+fn true_gesture_associated_motif(
+    score: &hfield_domain::FieldScore,
+    gesture_id: &str,
+    track_id: &str,
+) -> Option<String> {
+    let has_music = score
+        .music
+        .tracks
+        .iter()
+        .any(|track| !track.notes.is_empty());
+    let base = match gesture_id {
+        "g2" | "g3" => "opening_motif_candidate",
+        "g4" | "g5" | "g6" => "constraint_resolution_motif_candidate",
+        "g7" | "g9" | "g8" => "expression_release_motif_candidate",
+        "g1" => "root_settle_motif_candidate",
+        _ => "unknown_motif_candidate",
+    };
+
+    if has_music || track_id.contains("gesture") || track_id.contains("conductor") {
+        Some(base.to_string())
+    } else {
+        None
+    }
+}
+
+fn true_gesture_reference_coordinate_policy() -> TrueGestureReferenceCoordinatePolicy {
+    TrueGestureReferenceCoordinatePolicy {
+        coordinate_space: "hcs_conductor_reference_space_v1",
+        source_layout: "[g2 g1 g3] [g4 g5 g6] [g7 g9 g8] with g1 center, g5 lower, g9 upper",
+        spatial_order: vec!["g2", "g1", "g3", "g4", "g5", "g6", "g7", "g9", "g8"],
+        anchor_model: vec![
+            TrueGestureAnchorReference {
+                anchor_id: "anchor_1",
+                anchor_gesture_id: "g1",
+                field_region: "root_center",
+                position: true_gesture_static_position("g1"),
+                role: "root/home/ictus settle reference",
+            },
+            TrueGestureAnchorReference {
+                anchor_id: "anchor_5",
+                anchor_gesture_id: "g5",
+                field_region: "lower_transformation_hold",
+                position: true_gesture_static_position("g5"),
+                role: "lower embodied transformation hold reference",
+            },
+            TrueGestureAnchorReference {
+                anchor_id: "anchor_9",
+                anchor_gesture_id: "g9",
+                field_region: "upper_formed_expression_hold",
+                position: true_gesture_static_position("g9"),
+                role: "upper formed expression hold reference",
+            },
+        ],
+        path_rule: "Each event resolves to a start point, one control point, and end point owned by Rust, not guessed by a renderer.",
+        timing_rule: "Every reference carries start_ms, duration_ms, end_ms, and normalized timing against the score gesture span.",
+        radius_rule: "Path radius, stroke weight, and alpha derive from bounded event intensity.",
+        motif_rule: "Motif linkage is candidate metadata until serialized motif ids and approval gates exist.",
+    }
+}
+
+fn true_conducting_operator_manifest() -> Vec<TrueConductingOperatorReference> {
+    vec![
+        TrueConductingOperatorReference {
+            operator_id: "prepare",
+            role: "entry preparation",
+            physical_rule: "motion before entry sets shared breath, tempo, and mood",
+            renderer_effect: "draw pre-entry curve into the target anchor side",
+            forge_boundary: "candidate timing support only; no Forge meaning lock",
+        },
+        TrueConductingOperatorReference {
+            operator_id: "downbeat",
+            role: "beat-one assertion",
+            physical_rule: "clear downward motion establishes the first beat",
+            renderer_effect: "mark anchor contact/settle point",
+            forge_boundary: "renderer timing only",
+        },
+        TrueConductingOperatorReference {
+            operator_id: "ictus",
+            role: "readable beat point",
+            physical_rule: "small bounce/dip makes the beat point legible",
+            renderer_effect: "draw ictus point on the path",
+            forge_boundary: "no semantic authority",
+        },
+        TrueConductingOperatorReference {
+            operator_id: "hold",
+            role: "sustained phrase or sound",
+            physical_rule: "stable hand position sustains until release",
+            renderer_effect: "draw anchor dwell window",
+            forge_boundary: "not a memory or delivery authorization",
+        },
+        TrueConductingOperatorReference {
+            operator_id: "cutoff",
+            role: "definite ending",
+            physical_rule: "clear ending motion marks where sound or phrase stops",
+            renderer_effect: "draw terminal gesture cap",
+            forge_boundary: "no Forge mutation",
+        },
+        TrueConductingOperatorReference {
+            operator_id: "pickup_readiness",
+            role: "partial entry before main beat",
+            physical_rule: "prepared motion allows phrase entry before the next downbeat",
+            renderer_effect: "draw pickup window before anchor contact",
+            forge_boundary: "candidate timing support only",
+        },
+        TrueConductingOperatorReference {
+            operator_id: "fermata",
+            role: "extended hold with controlled continuation",
+            physical_rule: "held point waits, then leaves through cutoff or preparation",
+            renderer_effect: "draw extended dwell plus release vector",
+            forge_boundary: "no health/sensor/identity claim",
+        },
+        TrueConductingOperatorReference {
+            operator_id: "left_hand_cue",
+            role: "supporting cue or phrase shaping",
+            physical_rule: "support hand may cue style, sustain, group entry, dynamics, or mood",
+            renderer_effect: "draw expressive_support_hand overlay when present",
+            forge_boundary: "support metadata only",
+        },
+    ]
+}
+
+fn true_gesture_reference_score_scan(
+    score: &hfield_domain::FieldScore,
+    references: &[TrueGestureReference],
+) -> TrueGestureReferenceScoreScan {
+    let mut observed_gesture_ids: Vec<String> = Vec::new();
+    for reference in references {
+        if !observed_gesture_ids
+            .iter()
+            .any(|id| id == &reference.gesture_id)
+        {
+            observed_gesture_ids.push(reference.gesture_id.clone());
+        }
+    }
+
+    TrueGestureReferenceScoreScan {
+        primary_event_count: score.conductor.primary_hand_track.events.len(),
+        expressive_event_count: score
+            .conductor
+            .expressive_hand_track
+            .as_ref()
+            .map(|track| track.events.len())
+            .unwrap_or(0),
+        total_event_count: references.len(),
+        invalid_event_count: references
+            .iter()
+            .filter(|reference| !reference.valid)
+            .count(),
+        total_duration_ms: true_gesture_total_duration_ms(score),
+        observed_gesture_ids,
+        has_motif_layer_reference: references
+            .iter()
+            .any(|reference| reference.associated_motif.is_some()),
+    }
+}
+
+fn true_gesture_reference_readiness_gates(
+    score: &hfield_domain::FieldScore,
+    references: &[TrueGestureReference],
+    scan: &TrueGestureReferenceScoreScan,
+) -> TrueGestureReferenceReadinessGates {
+    let every_reference_has_start_and_end = references
+        .iter()
+        .all(|reference| reference.timing.end_ms >= reference.timing.start_ms);
+    let every_reference_has_anchor_relationship = references.iter().all(|reference| {
+        !reference.anchor_relationship.trim().is_empty() && reference.anchor_id != "unknown"
+    });
+    let every_reference_has_path_samples = references
+        .iter()
+        .all(|reference| reference.path.sample_points.len() >= 3);
+    let every_reference_has_renderer_contract = references.iter().all(|reference| {
+        reference.renderer_contract.renderer_may_draw_path
+            && !reference
+                .renderer_contract
+                .renderer_may_infer_missing_gesture_geometry
+    });
+    let no_live_forge_or_identity_side_effects = score.packet.forge_bridge.status == "reserved"
+        && score.packet.forge_bridge.forge_runtime_ref.is_none()
+        && score.provenance.identity_vault.vault_record_ref.is_none()
+        && !score.provenance.raw_private_identity_exported;
+    let has_primary_track = !score
+        .conductor
+        .primary_hand_track
+        .track_id
+        .trim()
+        .is_empty();
+
+    TrueGestureReferenceReadinessGates {
+        has_nine_gesture_engine: nine_gesture_engine_primitives().len() == 9,
+        has_primary_track,
+        every_reference_has_start_and_end,
+        every_reference_has_anchor_relationship,
+        every_reference_has_path_samples,
+        every_reference_has_renderer_contract,
+        no_generic_overlay_fallback_needed: !references.is_empty() && scan.invalid_event_count == 0,
+        no_live_forge_or_identity_side_effects,
+        current_score_can_drive_true_gesture_reference_manifest: nine_gesture_engine_primitives()
+            .len()
+            == 9
+            && has_primary_track
+            && !references.is_empty()
+            && every_reference_has_start_and_end
+            && every_reference_has_anchor_relationship
+            && every_reference_has_path_samples
+            && every_reference_has_renderer_contract
+            && scan.invalid_event_count == 0
+            && no_live_forge_or_identity_side_effects,
+    }
+}
+
+fn true_gesture_total_duration_ms(score: &hfield_domain::FieldScore) -> u32 {
+    let primary_max = score
+        .conductor
+        .primary_hand_track
+        .events
+        .iter()
+        .map(|event| event.start_ms.saturating_add(event.duration_ms))
+        .max()
+        .unwrap_or(0);
+    let expressive_max = score
+        .conductor
+        .expressive_hand_track
+        .as_ref()
+        .and_then(|track| {
+            track
+                .events
+                .iter()
+                .map(|event| event.start_ms.saturating_add(event.duration_ms))
+                .max()
+        })
+        .unwrap_or(0);
+    primary_max.max(expressive_max)
+}
+
+#[cfg(test)]
+mod true_conductor_gesture_reference_manifest_v1_tests {
+    use super::*;
+
+    #[test]
+    fn true_manifest_creates_real_path_references_for_current_score() {
+        let report = create_true_conductor_gesture_reference_manifest_v1_report(
+            &hfield_domain::FieldScore::default_hcs(),
+        );
+
+        assert_eq!(
+            report.contract_id,
+            TRUE_CONDUCTOR_GESTURE_REFERENCE_MANIFEST_V1_CONTRACT_ID
+        );
+        assert!(report.reference_count >= 1);
+        assert_eq!(report.reference_count, report.references.len());
+        assert!(report
+            .references
+            .iter()
+            .all(|reference| reference.path.sample_points.len() >= 3));
+        assert!(report.references.iter().all(|reference| !reference
+            .renderer_contract
+            .renderer_may_infer_missing_gesture_geometry));
+        assert!(
+            report
+                .readiness_gates
+                .current_score_can_drive_true_gesture_reference_manifest
+        );
+    }
+
+    #[test]
+    fn true_manifest_keeps_references_downstream_and_out_of_forge_authority() {
+        let report = create_true_conductor_gesture_reference_manifest_v1_report(
+            &hfield_domain::FieldScore::default_hcs(),
+        );
+
+        assert!(report.authority_boundaries.manifest_is_rust_owned);
+        assert!(report.authority_boundaries.references_are_renderer_inputs);
+        assert!(
+            !report
+                .authority_boundaries
+                .references_are_forge_operational_meaning
+        );
+        assert!(
+            report
+                .authority_boundaries
+                .replaces_generic_reference_overlay
+        );
+        assert!(!report.authority_boundaries.mutates_forge);
+        assert!(!report.authority_boundaries.performs_identity_vault_write);
+        assert!(!report.authority_boundaries.exports_private_identity);
+        assert!(report
+            .conducting_operator_manifest
+            .iter()
+            .any(|operator| operator.operator_id == "prepare"));
+        assert!(report
+            .conducting_operator_manifest
+            .iter()
+            .any(|operator| operator.operator_id == "cutoff"));
+        assert!(report
+            .conducting_operator_manifest
+            .iter()
+            .any(|operator| operator.operator_id == "fermata"));
+    }
+}

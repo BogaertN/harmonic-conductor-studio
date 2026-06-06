@@ -3,7 +3,8 @@ use hfield_analysis::summarize_waveform;
 use hfield_carrier::synthesize_hfield_runtime_carrier_packet_model;
 use hfield_conductor::{
     create_gesture_timeline_report, create_nine_gesture_conductor_engine_report,
-    is_valid_gesture_id, nine_gesture_vocabulary,
+    create_true_conductor_gesture_reference_manifest_v1_report, is_valid_gesture_id,
+    nine_gesture_vocabulary,
 };
 use hfield_coordinate::create_hfield_rust_render_manifest;
 use hfield_cymatics::synthesize_hfield_cymatic_reader_surface;
@@ -1601,6 +1602,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "coupling_profile_engine_contract_id": "aiweb.hfield.coupling_profile_engine.v1",
         "motif_library_annotation_layer_contract_id": "aiweb.hfield.motif_library_annotation_layer.v1",
         "deterministic_audio_engine_v2_contract_id": "aiweb.hfield.deterministic_audio_engine.v2",
+        "true_conductor_gesture_reference_manifest_v1_contract_id": "aiweb.hfield.true_conductor_gesture_reference_manifest.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -1825,6 +1827,36 @@ fn export_current_deterministic_audio_engine_v2_wav(
         "hcs_deterministic_audio_engine_v2.wav",
         rendered.compiled,
     ))
+}
+
+#[tauri::command]
+fn get_current_true_conductor_gesture_reference_manifest_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    serde_json::to_value(create_true_conductor_gesture_reference_manifest_v1_report(
+        &score,
+    ))
+    .map_err(|err| {
+        format!("failed to serialize true conductor gesture reference manifest v1 report: {err}")
+    })
+}
+
+#[tauri::command]
+fn export_current_true_conductor_gesture_reference_manifest_v1_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(
+        state,
+        "true_conductor_gesture_reference_manifest_v1",
+        "json",
+        |score| {
+            serde_json::to_value(create_true_conductor_gesture_reference_manifest_v1_report(score))
+                .map_err(|err| {
+                    format!("failed to serialize true conductor gesture reference manifest v1 export: {err}")
+                })
+        },
+    )
 }
 
 #[tauri::command]
@@ -2736,6 +2768,8 @@ fn main() {
             get_current_motif_library_annotation_layer_v1_report,
             get_current_deterministic_audio_engine_v2_report,
             export_current_deterministic_audio_engine_v2_wav,
+            get_current_true_conductor_gesture_reference_manifest_v1_report,
+            export_current_true_conductor_gesture_reference_manifest_v1_json,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,

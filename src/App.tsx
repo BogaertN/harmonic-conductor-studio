@@ -26,6 +26,8 @@ import {
   getCurrentMotifLibraryAnnotationLayerV1Report,
   getCurrentDeterministicAudioEngineV2Report,
   exportCurrentDeterministicAudioEngineV2Wav,
+  getCurrentTrueConductorGestureReferenceManifestV1Report,
+  exportCurrentTrueConductorGestureReferenceManifestV1Json,
   listSavedProjects,
   saveCurrentProjectAs,
   openProjectByFileName,
@@ -82,6 +84,7 @@ import {
   type HfieldCouplingProfileEngineV1Report,
   type HfieldMotifLibraryAnnotationLayerV1Report,
   type HfieldDeterministicAudioEngineV2Report,
+  type HfieldTrueConductorGestureReferenceManifestV1Report,
   type HfieldSchemaVersionMigrationRegistryReport,
   type HfieldExportReplayVerifierReport,
   type PlaybackReport,
@@ -147,6 +150,7 @@ type DiagnosticKey =
   | "couplingProfileEngineV1"
   | "motifLibraryAnnotationLayerV1"
   | "deterministicAudioEngineV2"
+  | "trueConductorGestureReferenceManifestV1"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -215,6 +219,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "couplingProfileEngineV1", label: "Coupling Profile Engine v1" },
   { key: "motifLibraryAnnotationLayerV1", label: "Motif Library + Annotation Layer v1" },
   { key: "deterministicAudioEngineV2", label: "Deterministic Audio Engine v2" },
+  { key: "trueConductorGestureReferenceManifestV1", label: "True Gesture Reference Manifest v1" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -628,6 +633,8 @@ export default function App() {
   const [couplingProfileEngineV1Report, setCouplingProfileEngineV1Report] = useState<HfieldCouplingProfileEngineV1Report | null>(null);
   const [motifLibraryAnnotationLayerV1Report, setMotifLibraryAnnotationLayerV1Report] = useState<HfieldMotifLibraryAnnotationLayerV1Report | null>(null);
   const [deterministicAudioEngineV2Report, setDeterministicAudioEngineV2Report] = useState<HfieldDeterministicAudioEngineV2Report | null>(null);
+  const [trueConductorGestureReferenceManifestReport, setTrueConductorGestureReferenceManifestReport] = useState<HfieldTrueConductorGestureReferenceManifestV1Report | null>(null);
+  const [trueConductorGestureReferenceManifestExportReport, setTrueConductorGestureReferenceManifestExportReport] = useState<ExportFileReport | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1433,6 +1440,27 @@ export default function App() {
     }
   }
 
+  async function inspectTrueConductorGestureReferenceManifestV1() {
+    setError(null);
+    try {
+      setTrueConductorGestureReferenceManifestReport(await getCurrentTrueConductorGestureReferenceManifestV1Report());
+      setSelectedDiagnostic("trueConductorGestureReferenceManifestV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportTrueConductorGestureReferenceManifestV1Json() {
+    setError(null);
+    try {
+      setTrueConductorGestureReferenceManifestExportReport(await exportCurrentTrueConductorGestureReferenceManifestV1Json());
+      setSelectedDiagnostic("trueConductorGestureReferenceManifestV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1663,6 +1691,8 @@ export default function App() {
         return motifLibraryAnnotationLayerV1Report;
       case "deterministicAudioEngineV2":
         return deterministicAudioEngineV2Report;
+      case "trueConductorGestureReferenceManifestV1":
+        return trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport;
 case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -2152,6 +2182,8 @@ case "mappedWav":
                   <button onClick={inspectMotifLibraryAnnotationLayerV1} type="button">Inspect Motif Layer</button>
                   <button onClick={inspectDeterministicAudioEngineV2} type="button">Inspect Audio Engine v2</button>
                   <button onClick={exportDeterministicAudioEngineV2Wav} type="button">Export Audio v2 WAV</button>
+                  <button onClick={inspectTrueConductorGestureReferenceManifestV1} type="button">Inspect True Gesture Manifest</button>
+                  <button onClick={exportTrueConductorGestureReferenceManifestV1Json} type="button">Export True Gesture JSON</button>
                 </div>
                 <pre>{JSON.stringify(deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>

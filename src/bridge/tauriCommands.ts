@@ -239,6 +239,33 @@ export type HfieldDeterministicAudioEngineV2Report = {
   next_work: string[];
 };
 
+
+export type HfieldTrueConductorGestureReferenceManifestV1Report = {
+  status: string;
+  contract_id: string;
+  profile_id: string;
+  manifest_role: string;
+  research_basis: unknown;
+  authority_boundaries: {
+    manifest_is_rust_owned: boolean;
+    references_are_renderer_inputs: boolean;
+    references_are_forge_operational_meaning: boolean;
+    replaces_generic_reference_overlay: boolean;
+    may_drive_later_gesture_aware_field_renderer: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  coordinate_policy: unknown;
+  conducting_operator_manifest: unknown[];
+  reference_count: number;
+  references: unknown[];
+  current_score_scan: unknown;
+  readiness_gates: unknown;
+  next_work: string[];
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1397,6 +1424,15 @@ export async function getCurrentDeterministicAudioEngineV2Report(): Promise<Hfie
 
 export async function exportCurrentDeterministicAudioEngineV2Wav(): Promise<WavRenderReport> {
   return await invoke<WavRenderReport>("export_current_deterministic_audio_engine_v2_wav");
+}
+
+
+export async function getCurrentTrueConductorGestureReferenceManifestV1Report(): Promise<HfieldTrueConductorGestureReferenceManifestV1Report> {
+  return await invoke<HfieldTrueConductorGestureReferenceManifestV1Report>("get_current_true_conductor_gesture_reference_manifest_v1_report");
+}
+
+export async function exportCurrentTrueConductorGestureReferenceManifestV1Json(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_true_conductor_gesture_reference_manifest_v1_json");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {
