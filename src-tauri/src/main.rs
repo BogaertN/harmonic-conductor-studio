@@ -8,6 +8,7 @@ use hfield_dsp::{
     compile_combined_music_and_conductor_preview, compile_music_preview, compile_pitch_preview,
     write_wav_i16, CompiledAudio,
 };
+use hfield_forge_bridge::create_forge_packet_bridge_stub_report;
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
 use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
 use hfield_notation::{
@@ -254,6 +255,19 @@ fn stop_existing_playback(state: &AppState) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn get_current_forge_packet_bridge_stub_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_forge_packet_bridge_stub_report(&guard))
+        .map_err(|err| format!("Forge packet bridge stub serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -1237,6 +1251,7 @@ fn main() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             get_current_hfield_packet_contract_report,
+            get_current_forge_packet_bridge_stub_report,
             get_current_conductor_motion_report,
             get_generated_conductor_motion_report,
             get_current_conductor_mapping_report,

@@ -27,3 +27,4 @@ hfield-visual = { path = "../crates/hfield-visual" }
 hfield-project = { path = "../crates/hfield-project" }
 hfield-notation = { path = "../crates/hfield-notation" }
 hfield-packet = { path = "../crates/hfield-packet" }
+hfield-forge-bridge = { path = "../crates/hfield-forge-bridge" }

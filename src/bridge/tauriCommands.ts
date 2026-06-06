@@ -120,6 +120,50 @@ export type HfieldPacketContractReport = {
   warnings: string[];
 };
 
+export type ForgePacketBridgeStubReport = {
+  status: string;
+  bridge_contract_id: string;
+  execution_mode: string;
+  source_system: string;
+  target_system: string;
+  bridge_profile: string;
+  packet_contract_id: string;
+  packet_status: string;
+  packet_hash: string;
+  score_hash: string;
+  artifact_id: string;
+  provenance_hash: string;
+  identity_vault_ref: string | null;
+  forge_runtime_ref: string | null;
+  symbolic_trace_ref: string | null;
+  validation_ref: string | null;
+  memory_capsule_ref: string | null;
+  payload: {
+    packet_kind: string;
+    packet_role: string;
+    root_frequency_hz: number;
+    phase_count: number;
+    phase_order: number[];
+    anchor_layout: string;
+    payload_layers: string[];
+    render_targets: string[];
+    note_count: number;
+    conductor_event_count: number;
+  };
+  export_policy: {
+    forge_bridge_reserved: boolean;
+    forge_runtime_bound: boolean;
+    live_execution_authorized: boolean;
+    private_identity_exported: boolean;
+    public_disclosure_authorized: boolean;
+    economic_processing_authorized: boolean;
+    portable_rights_authorized: boolean;
+    safe_for_reference_export: boolean;
+  };
+  warnings: string[];
+  fatal_errors: string[];
+};
+
 export type ProjectFileReport = {
   status: string;
   action: string;
@@ -420,6 +464,10 @@ export type ResonanceLevelBundle = {
 
 export async function getCurrentHfieldPacketContractReport(): Promise<HfieldPacketContractReport> {
   return await invoke<HfieldPacketContractReport>("get_current_hfield_packet_contract_report");
+}
+
+export async function getCurrentForgePacketBridgeStubReport(): Promise<ForgePacketBridgeStubReport> {
+  return await invoke<ForgePacketBridgeStubReport>("get_current_forge_packet_bridge_stub_report");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

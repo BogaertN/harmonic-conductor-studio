@@ -13,6 +13,7 @@ members = [
   "crates/hfield-project",
   "crates/hfield-notation",
   "crates/hfield-packet",
+  "crates/hfield-forge-bridge",
   "src-tauri"
 ]
 

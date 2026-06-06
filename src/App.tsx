@@ -14,6 +14,7 @@ import {
   getCurrentConductorMotionReport,
   getCurrentGestureTimeline,
   getCurrentHfieldPacketContractReport,
+  getCurrentForgePacketBridgeStubReport,
   getCurrentMusicTimeline,
   getCurrentNotationLayout,
   getCurrentProjectScore,
@@ -51,6 +52,7 @@ import {
   type ConductorMotionReport,
   type GestureTimelineReport,
   type HfieldPacketContractReport,
+  type ForgePacketBridgeStubReport,
   type MusicPreviewReport,
   type MusicTimelineReport,
   type NotationEditReport,
@@ -69,6 +71,7 @@ type DiagnosticKey =
   | "projectReport"
   | "projectList"
   | "packetContract"
+  | "forgeBridgeStub"
   | "motionReport"
   | "mappingReport"
   | "musicTimeline"
@@ -116,6 +119,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "projectReport", label: "Project File Report" },
   { key: "projectList", label: "Project List" },
   { key: "packetContract", label: ".hfield Packet Contract" },
+  { key: "forgeBridgeStub", label: "Forge Bridge Stub" },
   { key: "motionReport", label: "Conductor Motion" },
   { key: "mappingReport", label: "Conductor Mapping" },
   { key: "musicTimeline", label: "Music Timeline" },
@@ -469,6 +473,7 @@ export default function App() {
   const [projectReport, setProjectReport] = useState<ProjectFileReport | null>(null);
   const [projectList, setProjectList] = useState<ProjectListReport | null>(null);
   const [packetContractReport, setPacketContractReport] = useState<HfieldPacketContractReport | null>(null);
+  const [forgeBridgeStubReport, setForgeBridgeStubReport] = useState<ForgePacketBridgeStubReport | null>(null);
   const [isMotionPlaying, setIsMotionPlaying] = useState(false);
   const motionStartRef = useRef(0);
   const wallClockStartRef = useRef(0);
@@ -558,6 +563,7 @@ export default function App() {
     setMappingReport(await getCurrentConductorMappingReport());
     setMotionReport(await getCurrentConductorMotionReport());
     setPacketContractReport(await getCurrentHfieldPacketContractReport());
+    setForgeBridgeStubReport(await getCurrentForgePacketBridgeStubReport());
     resetMotionAnimation();
   }
 
@@ -1085,6 +1091,8 @@ export default function App() {
         return projectList;
       case "packetContract":
         return packetContractReport;
+      case "forgeBridgeStub":
+        return forgeBridgeStubReport;
       case "motionReport":
         return motionReport;
       case "mappingReport":
