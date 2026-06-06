@@ -10,7 +10,10 @@ use hfield_coordinate::create_hfield_rust_render_manifest;
 use hfield_cymatics::{
     synthesize_cymatic_field_model_v2_report, synthesize_hfield_cymatic_reader_surface,
 };
-use hfield_domain::{ConductedPerformance, FieldScore, GestureEvent, GestureTrack, NoteEvent};
+use hfield_domain::{
+    create_syllable_shaped_expression_v1_report, ConductedPerformance, FieldScore, GestureEvent,
+    GestureTrack, NoteEvent,
+};
 use hfield_dsp::{
     compile_combined_music_and_conductor_preview, compile_deterministic_audio_engine_v2,
     compile_music_preview, compile_pitch_preview, create_deterministic_audio_engine_v2_report,
@@ -1607,6 +1610,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "true_conductor_gesture_reference_manifest_v1_contract_id": "aiweb.hfield.true_conductor_gesture_reference_manifest.v1",
         "gesture_aware_field_renderer_v2_contract_id": "aiweb.hfield.gesture_aware_field_renderer.v2",
         "cymatic_field_model_v2_contract_id": "aiweb.hfield.cymatic_field_model.v2",
+        "syllable_shaped_expression_v1_contract_id": "aiweb.hfield.syllable_shaped_expression.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -1899,6 +1903,26 @@ fn export_current_cymatic_field_model_v2_json(
     write_current_score_json_export(state, "cymatic_field_model_v2", "json", |score| {
         serde_json::to_value(synthesize_cymatic_field_model_v2_report(score))
             .map_err(|err| format!("failed to serialize cymatic field model v2 export: {err}"))
+    })
+}
+
+#[tauri::command]
+fn get_current_syllable_shaped_expression_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    serde_json::to_value(create_syllable_shaped_expression_v1_report(&score))
+        .map_err(|err| format!("failed to serialize syllable-shaped expression v1 report: {err}"))
+}
+
+#[tauri::command]
+fn export_current_syllable_shaped_expression_v1_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(state, "syllable_shaped_expression_v1", "json", |score| {
+        serde_json::to_value(create_syllable_shaped_expression_v1_report(score)).map_err(|err| {
+            format!("failed to serialize syllable-shaped expression v1 export: {err}")
+        })
     })
 }
 
@@ -2817,6 +2841,8 @@ fn main() {
             export_current_gesture_aware_field_renderer_v2_json,
             get_current_cymatic_field_model_v2_report,
             export_current_cymatic_field_model_v2_json,
+            get_current_syllable_shaped_expression_v1_report,
+            export_current_syllable_shaped_expression_v1_json,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,

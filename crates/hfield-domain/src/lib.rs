@@ -1734,6 +1734,537 @@ pub struct GestureEvent {
     pub operator: Option<String>,
 }
 
+pub const SYLLABLE_SHAPED_EXPRESSION_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.syllable_shaped_expression.v1";
+pub const SYLLABLE_SHAPED_EXPRESSION_V1_PROFILE_ID: &str = "score_gesture_phrase_syllable_shape_v1";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyllableShapedExpressionV1Report {
+    pub status: &'static str,
+    pub contract_id: &'static str,
+    pub profile_id: &'static str,
+    pub expression_role: &'static str,
+    pub authority_boundaries: SyllableExpressionAuthorityBoundaries,
+    pub expression_policy: SyllableExpressionPolicy,
+    pub source_inventory: SyllableExpressionSourceInventory,
+    pub expression_unit_count: usize,
+    pub expression_units: Vec<SyllableExpressionUnit>,
+    pub renderer_bindings: Vec<SyllableExpressionRendererBinding>,
+    pub open_source_dependency_policy: SyllableExpressionOpenSourcePolicy,
+    pub readiness_gates: SyllableExpressionReadinessGates,
+    pub next_work: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyllableExpressionAuthorityBoundaries {
+    pub expression_is_downstream_rendering_model: bool,
+    pub harmonic_field_score_remains_source: bool,
+    pub syllable_shapes_are_language_semantics: bool,
+    pub syllable_shapes_are_phoneme_claims: bool,
+    pub generates_words_or_lyrics: bool,
+    pub renderer_outputs_are_source_authority: bool,
+    pub renderer_outputs_are_forge_operational_meaning: bool,
+    pub mutates_forge: bool,
+    pub performs_identity_vault_write: bool,
+    pub exports_private_identity: bool,
+    pub authorizes_health_or_sensor_claims: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyllableExpressionPolicy {
+    pub unit_model: &'static str,
+    pub shape_source: &'static str,
+    pub timing_rule: &'static str,
+    pub intensity_rule: &'static str,
+    pub language_boundary: &'static str,
+    pub accessibility_rule: &'static str,
+    pub future_voice_rule: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyllableExpressionSourceInventory {
+    pub title: String,
+    pub format: String,
+    pub version: String,
+    pub root_frequency_hz: f64,
+    pub coupling_profile: String,
+    pub music_track_count: usize,
+    pub note_event_count: usize,
+    pub primary_gesture_event_count: usize,
+    pub expressive_gesture_event_count: usize,
+    pub total_duration_ms: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyllableExpressionUnit {
+    pub unit_id: String,
+    pub source_kind: &'static str,
+    pub source_track_id: String,
+    pub source_index: usize,
+    pub source_ref: String,
+    pub start_ms: u32,
+    pub duration_ms: u32,
+    pub end_ms: u32,
+    pub onset_ms: u32,
+    pub nucleus_ms: u32,
+    pub release_ms: u32,
+    pub intensity: f32,
+    pub shape_class: &'static str,
+    pub articulation_role: &'static str,
+    pub syllable_hint: &'static str,
+    pub renderer_rule: &'static str,
+    pub semantic_meaning_locked: bool,
+    pub forge_authority: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyllableExpressionRendererBinding {
+    pub binding_id: &'static str,
+    pub source_layer: &'static str,
+    pub renderer_rule: &'static str,
+    pub downstream_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyllableExpressionOpenSourcePolicy {
+    pub principle: &'static str,
+    pub allowed_roles: Vec<&'static str>,
+    pub forbidden_roles: Vec<&'static str>,
+    pub dependency_gates: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyllableExpressionReadinessGates {
+    pub has_harmonic_field_score: bool,
+    pub has_expression_units: bool,
+    pub every_unit_has_time_bounds: bool,
+    pub every_unit_has_shape_boundary: bool,
+    pub no_unit_locks_semantic_meaning: bool,
+    pub no_unit_claims_forge_authority: bool,
+    pub no_live_forge_or_identity_side_effects: bool,
+    pub current_score_can_drive_syllable_shaped_expression_v1: bool,
+}
+
+pub fn create_syllable_shaped_expression_v1_report(
+    score: &FieldScore,
+) -> SyllableShapedExpressionV1Report {
+    let mut expression_units = Vec::new();
+
+    for track in &score.music.tracks {
+        for (index, note) in track.notes.iter().enumerate() {
+            expression_units.push(syllable_expression_unit_from_note(track, note, index + 1));
+        }
+    }
+
+    for (index, event) in score.conductor.primary_hand_track.events.iter().enumerate() {
+        expression_units.push(syllable_expression_unit_from_gesture(
+            &score.conductor.primary_hand_track.track_id,
+            event,
+            index + 1,
+            "primary_gesture",
+        ));
+    }
+
+    if let Some(track) = &score.conductor.expressive_hand_track {
+        for (index, event) in track.events.iter().enumerate() {
+            expression_units.push(syllable_expression_unit_from_gesture(
+                &track.track_id,
+                event,
+                index + 1,
+                "expressive_gesture",
+            ));
+        }
+    }
+
+    expression_units.sort_by(|left, right| {
+        left.start_ms
+            .cmp(&right.start_ms)
+            .then_with(|| left.source_track_id.cmp(&right.source_track_id))
+            .then_with(|| left.source_index.cmp(&right.source_index))
+    });
+
+    let source_inventory = syllable_expression_source_inventory(score);
+    let readiness_gates = syllable_expression_readiness_gates(score, &expression_units);
+
+    SyllableShapedExpressionV1Report {
+        status: if readiness_gates.current_score_can_drive_syllable_shaped_expression_v1 {
+            "ok"
+        } else {
+            "warning"
+        },
+        contract_id: SYLLABLE_SHAPED_EXPRESSION_V1_CONTRACT_ID,
+        profile_id: SYLLABLE_SHAPED_EXPRESSION_V1_PROFILE_ID,
+        expression_role: "downstream score/gesture expression envelope that shapes phrases into onset, nucleus, and release units without generating lyrics or Forge meaning",
+        authority_boundaries: SyllableExpressionAuthorityBoundaries {
+            expression_is_downstream_rendering_model: true,
+            harmonic_field_score_remains_source: true,
+            syllable_shapes_are_language_semantics: false,
+            syllable_shapes_are_phoneme_claims: false,
+            generates_words_or_lyrics: false,
+            renderer_outputs_are_source_authority: false,
+            renderer_outputs_are_forge_operational_meaning: false,
+            mutates_forge: false,
+            performs_identity_vault_write: false,
+            exports_private_identity: false,
+            authorizes_health_or_sensor_claims: false,
+        },
+        expression_policy: SyllableExpressionPolicy {
+            unit_model: "onset_nucleus_release_envelope",
+            shape_source: "music note timing, velocity, and G1-G9 conductor gesture timing",
+            timing_rule: "each source event becomes a bounded unit with start, duration, end, onset, nucleus, and release windows",
+            intensity_rule: "note velocity or gesture intensity controls expression emphasis but never semantic truth",
+            language_boundary: "syllable hints are neutral render labels only; HCS v1 does not generate lyrics, words, translations, or phoneme authority",
+            accessibility_rule: "future visual, haptic, caption, and notation helpers may read these units as downstream views",
+            future_voice_rule: "future voice/TTS adapters may audition these envelopes only after dependency review and replay receipt gates",
+        },
+        source_inventory,
+        expression_unit_count: expression_units.len(),
+        expression_units,
+        renderer_bindings: syllable_expression_renderer_bindings(),
+        open_source_dependency_policy: syllable_expression_open_source_policy(),
+        readiness_gates,
+        next_work: vec![
+            "bind syllable-shaped expression v1 hash into canonical bundle manifest v2",
+            "add renderer replay verifier coverage for syllable expression exports",
+            "wire notation/field views to show phrase breath, onset, nucleus, and release overlays",
+            "evaluate open-source TTS/phoneme tools only as optional downstream audition helpers",
+            "later connect Forge authorized result meaning to expression only through a sealed adapter",
+        ],
+    }
+}
+
+fn syllable_expression_unit_from_note(
+    track: &MusicTrack,
+    note: &NoteEvent,
+    source_index: usize,
+) -> SyllableExpressionUnit {
+    let envelope = syllable_envelope(note.duration_ms);
+    let shape_class = note_shape_class(note.duration_ms, note.velocity);
+    let articulation_role = note_articulation_role(track.role.as_str(), note.velocity);
+
+    SyllableExpressionUnit {
+        unit_id: format!("{}_note_{}_syllable_shape", track.track_id, source_index),
+        source_kind: "music_note",
+        source_track_id: track.track_id.clone(),
+        source_index,
+        source_ref: format!("midi_{}_start_{}", note.midi_note, note.start_ms),
+        start_ms: note.start_ms,
+        duration_ms: note.duration_ms,
+        end_ms: note.start_ms.saturating_add(note.duration_ms),
+        onset_ms: envelope.onset_ms,
+        nucleus_ms: envelope.nucleus_ms,
+        release_ms: envelope.release_ms,
+        intensity: note.velocity.clamp(0.0, 1.0),
+        shape_class,
+        articulation_role,
+        syllable_hint: "neutral_tone_syllable",
+        renderer_rule:
+            "shape the note as a neutral syllabic envelope without creating words or phoneme claims",
+        semantic_meaning_locked: false,
+        forge_authority: false,
+    }
+}
+
+fn syllable_expression_unit_from_gesture(
+    track_id: &str,
+    event: &GestureEvent,
+    source_index: usize,
+    source_kind: &'static str,
+) -> SyllableExpressionUnit {
+    let envelope = syllable_envelope(event.duration_ms);
+    let metadata = gesture_syllable_metadata(event.gesture_id.as_str());
+
+    SyllableExpressionUnit {
+        unit_id: format!(
+            "{}_{}_{}_syllable_shape",
+            track_id, event.gesture_id, source_index
+        ),
+        source_kind,
+        source_track_id: track_id.to_string(),
+        source_index,
+        source_ref: format!("{}_start_{}", event.gesture_id, event.start_ms),
+        start_ms: event.start_ms,
+        duration_ms: event.duration_ms,
+        end_ms: event.start_ms.saturating_add(event.duration_ms),
+        onset_ms: envelope.onset_ms,
+        nucleus_ms: envelope.nucleus_ms,
+        release_ms: envelope.release_ms,
+        intensity: event.intensity.clamp(0.0, 1.0),
+        shape_class: metadata.shape_class,
+        articulation_role: metadata.articulation_role,
+        syllable_hint: metadata.syllable_hint,
+        renderer_rule: metadata.renderer_rule,
+        semantic_meaning_locked: false,
+        forge_authority: false,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SyllableEnvelope {
+    onset_ms: u32,
+    nucleus_ms: u32,
+    release_ms: u32,
+}
+
+fn syllable_envelope(duration_ms: u32) -> SyllableEnvelope {
+    if duration_ms == 0 {
+        return SyllableEnvelope {
+            onset_ms: 0,
+            nucleus_ms: 0,
+            release_ms: 0,
+        };
+    }
+
+    let onset_ms = ((duration_ms as f32 * 0.18).round() as u32).clamp(1, duration_ms);
+    let release_budget = duration_ms.saturating_sub(onset_ms);
+    let release_ms = ((duration_ms as f32 * 0.22).round() as u32).min(release_budget);
+    let nucleus_ms = duration_ms
+        .saturating_sub(onset_ms)
+        .saturating_sub(release_ms);
+
+    SyllableEnvelope {
+        onset_ms,
+        nucleus_ms,
+        release_ms,
+    }
+}
+
+struct GestureSyllableMetadata {
+    shape_class: &'static str,
+    articulation_role: &'static str,
+    syllable_hint: &'static str,
+    renderer_rule: &'static str,
+}
+
+fn gesture_syllable_metadata(gesture_id: &str) -> GestureSyllableMetadata {
+    match gesture_id {
+        "g2" | "g4" | "g7" => GestureSyllableMetadata {
+            shape_class: "preparatory_breath_shape",
+            articulation_role: "breath_before_entry",
+            syllable_hint: "breath_marker",
+            renderer_rule:
+                "render as preparatory breath/approach envelope before the anchor or phrase event",
+        },
+        "g1" => GestureSyllableMetadata {
+            shape_class: "ictus_onset_shape",
+            articulation_role: "clear_entry_onset",
+            syllable_hint: "onset_marker",
+            renderer_rule:
+                "render as clean onset/ictus envelope without assigning language meaning",
+        },
+        "g5" | "g9" => GestureSyllableMetadata {
+            shape_class: "held_nucleus_shape",
+            articulation_role: "sustain_or_formed_hold",
+            syllable_hint: "held_vowel_marker",
+            renderer_rule: "render as a sustained nucleus/hold envelope until release is supplied",
+        },
+        "g3" | "g6" | "g8" => GestureSyllableMetadata {
+            shape_class: "release_coda_shape",
+            articulation_role: "phrase_release_or_cutoff",
+            syllable_hint: "release_marker",
+            renderer_rule: "render as coda/release envelope tied to outward or cutoff motion",
+        },
+        _ => GestureSyllableMetadata {
+            shape_class: "unknown_safe_shape",
+            articulation_role: "unclassified_event",
+            syllable_hint: "neutral_marker",
+            renderer_rule: "render as neutral bounded envelope; do not infer language meaning",
+        },
+    }
+}
+
+fn note_shape_class(duration_ms: u32, velocity: f32) -> &'static str {
+    if duration_ms <= 160 {
+        "short_plosive_pulse"
+    } else if duration_ms >= 900 {
+        "long_sustained_nucleus"
+    } else if velocity >= 0.72 {
+        "accented_open_syllable"
+    } else {
+        "balanced_open_syllable"
+    }
+}
+
+fn note_articulation_role(role: &str, velocity: f32) -> &'static str {
+    match role {
+        "bass_depth" => "grounded_depth_vowel",
+        "harmonic_field_support" => "supporting_field_vowel",
+        "melody" if velocity >= 0.72 => "accented_melodic_syllable",
+        "melody" => "melodic_syllable",
+        _ => "neutral_score_syllable",
+    }
+}
+
+fn syllable_expression_source_inventory(score: &FieldScore) -> SyllableExpressionSourceInventory {
+    SyllableExpressionSourceInventory {
+        title: score.title.clone(),
+        format: score.format.clone(),
+        version: score.version.clone(),
+        root_frequency_hz: score.root_frequency_hz,
+        coupling_profile: score.coupling_profile.clone(),
+        music_track_count: score.music.tracks.len(),
+        note_event_count: syllable_note_count(score),
+        primary_gesture_event_count: score.conductor.primary_hand_track.events.len(),
+        expressive_gesture_event_count: score
+            .conductor
+            .expressive_hand_track
+            .as_ref()
+            .map(|track| track.events.len())
+            .unwrap_or(0),
+        total_duration_ms: syllable_total_duration_ms(score),
+    }
+}
+
+fn syllable_note_count(score: &FieldScore) -> usize {
+    score
+        .music
+        .tracks
+        .iter()
+        .map(|track| track.notes.len())
+        .sum()
+}
+
+fn syllable_total_duration_ms(score: &FieldScore) -> u32 {
+    let note_max = score
+        .music
+        .tracks
+        .iter()
+        .flat_map(|track| track.notes.iter())
+        .map(|note| note.start_ms.saturating_add(note.duration_ms))
+        .max()
+        .unwrap_or(0);
+    let primary_max = score
+        .conductor
+        .primary_hand_track
+        .events
+        .iter()
+        .map(|event| event.start_ms.saturating_add(event.duration_ms))
+        .max()
+        .unwrap_or(0);
+    let expressive_max = score
+        .conductor
+        .expressive_hand_track
+        .as_ref()
+        .and_then(|track| {
+            track
+                .events
+                .iter()
+                .map(|event| event.start_ms.saturating_add(event.duration_ms))
+                .max()
+        })
+        .unwrap_or(0);
+
+    note_max.max(primary_max).max(expressive_max)
+}
+
+fn syllable_expression_renderer_bindings() -> Vec<SyllableExpressionRendererBinding> {
+    vec![
+        SyllableExpressionRendererBinding {
+            binding_id: "audio_envelope_binding",
+            source_layer: "deterministic_audio_engine_v2",
+            renderer_rule: "shape downstream audio attack, sustain, and release by syllable unit boundaries",
+            downstream_only: true,
+        },
+        SyllableExpressionRendererBinding {
+            binding_id: "notation_phrase_overlay_binding",
+            source_layer: "notation_and_score_views",
+            renderer_rule: "show breath, onset, nucleus, and release markers as overlays, not source edits",
+            downstream_only: true,
+        },
+        SyllableExpressionRendererBinding {
+            binding_id: "gesture_expression_binding",
+            source_layer: "true_conductor_gesture_reference_manifest_v1",
+            renderer_rule: "connect G1-G9 gesture timing to expression envelopes without assigning words",
+            downstream_only: true,
+        },
+        SyllableExpressionRendererBinding {
+            binding_id: "cymatic_expression_hint_binding",
+            source_layer: "cymatic_field_model_v2",
+            renderer_rule: "allow phrase pulses to be visualized as model overlays only",
+            downstream_only: true,
+        },
+        SyllableExpressionRendererBinding {
+            binding_id: "future_forge_expression_adapter_reserved",
+            source_layer: "future_authorized_forge_result_meaning",
+            renderer_rule: "reserved adapter only; Forge meaning must arrive sealed and authorized before expression rendering",
+            downstream_only: true,
+        },
+    ]
+}
+
+fn syllable_expression_open_source_policy() -> SyllableExpressionOpenSourcePolicy {
+    SyllableExpressionOpenSourcePolicy {
+        principle: "Use mature open-source speech, phoneme, TTS, accessibility, and notation tools only as downstream helpers; never let them own .hfield source truth or Forge meaning.",
+        allowed_roles: vec![
+            "speech_audition_helper",
+            "phoneme_dictionary_reference_after_boundary_gate",
+            "TTS_preview_adapter",
+            "caption_display_helper",
+            "accessibility_overlay_helper",
+            "notation_text_layout_helper",
+        ],
+        forbidden_roles: vec![
+            ".hfield_source_authority",
+            "Harmonic_Field_Score_schema_authority",
+            "Forge_semantic_authority",
+            "Identity_Vault_live_write",
+            "private_identity_export",
+            "health_or_sensor_claim_authority",
+            "lyric_generation_authority_without_user_input",
+        ],
+        dependency_gates: vec![
+            "license_compatibility",
+            "maintenance_activity",
+            "local_first_no_cloud_required",
+            "no_hidden_data_collection",
+            "deterministic_or_receipted_output",
+            "no_authority_over_hfield_source_object",
+        ],
+    }
+}
+
+fn syllable_expression_readiness_gates(
+    score: &FieldScore,
+    units: &[SyllableExpressionUnit],
+) -> SyllableExpressionReadinessGates {
+    let has_harmonic_field_score = score.format == HFIELD_FORMAT_ID;
+    let has_expression_units = !units.is_empty();
+    let every_unit_has_time_bounds = units.iter().all(|unit| {
+        unit.end_ms >= unit.start_ms && unit.duration_ms == unit.end_ms - unit.start_ms
+    });
+    let every_unit_has_shape_boundary = units.iter().all(|unit| {
+        unit.onset_ms
+            .saturating_add(unit.nucleus_ms)
+            .saturating_add(unit.release_ms)
+            == unit.duration_ms
+            && !unit.shape_class.trim().is_empty()
+            && !unit.articulation_role.trim().is_empty()
+    });
+    let no_unit_locks_semantic_meaning = units.iter().all(|unit| !unit.semantic_meaning_locked);
+    let no_unit_claims_forge_authority = units.iter().all(|unit| !unit.forge_authority);
+    let no_live_forge_or_identity_side_effects = score.packet.forge_bridge.status == "reserved"
+        && score.packet.forge_bridge.forge_runtime_ref.is_none()
+        && score.provenance.identity_vault.vault_record_ref.is_none()
+        && !score.provenance.raw_private_identity_exported;
+
+    SyllableExpressionReadinessGates {
+        has_harmonic_field_score,
+        has_expression_units,
+        every_unit_has_time_bounds,
+        every_unit_has_shape_boundary,
+        no_unit_locks_semantic_meaning,
+        no_unit_claims_forge_authority,
+        no_live_forge_or_identity_side_effects,
+        current_score_can_drive_syllable_shaped_expression_v1: has_harmonic_field_score
+            && has_expression_units
+            && every_unit_has_time_bounds
+            && every_unit_has_shape_boundary
+            && no_unit_locks_semantic_meaning
+            && no_unit_claims_forge_authority
+            && no_live_forge_or_identity_side_effects,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1983,5 +2514,69 @@ mod tests {
             .open_source_dependency_policy
             .forbidden_roles
             .contains(&"motif_truth_authority"));
+    }
+
+    #[test]
+    fn syllable_shaped_expression_v1_creates_units_from_current_score() {
+        let report = create_syllable_shaped_expression_v1_report(&FieldScore::default_hcs());
+
+        assert_eq!(
+            report.contract_id,
+            SYLLABLE_SHAPED_EXPRESSION_V1_CONTRACT_ID
+        );
+        assert!(report.expression_unit_count >= 1);
+        assert_eq!(report.expression_unit_count, report.expression_units.len());
+        assert!(report
+            .expression_units
+            .iter()
+            .any(|unit| unit.source_kind == "primary_gesture"));
+        assert!(report
+            .expression_units
+            .iter()
+            .all(|unit| unit.onset_ms + unit.nucleus_ms + unit.release_ms == unit.duration_ms));
+        assert!(
+            report
+                .readiness_gates
+                .current_score_can_drive_syllable_shaped_expression_v1
+        );
+    }
+
+    #[test]
+    fn syllable_shaped_expression_v1_stays_downstream_and_out_of_language_authority() {
+        let report = create_syllable_shaped_expression_v1_report(&FieldScore::default_hcs());
+
+        assert!(
+            report
+                .authority_boundaries
+                .expression_is_downstream_rendering_model
+        );
+        assert!(
+            report
+                .authority_boundaries
+                .harmonic_field_score_remains_source
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .syllable_shapes_are_language_semantics
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .syllable_shapes_are_phoneme_claims
+        );
+        assert!(!report.authority_boundaries.generates_words_or_lyrics);
+        assert!(
+            !report
+                .authority_boundaries
+                .renderer_outputs_are_forge_operational_meaning
+        );
+        assert!(!report.authority_boundaries.mutates_forge);
+        assert!(!report.authority_boundaries.performs_identity_vault_write);
+        assert!(!report.authority_boundaries.exports_private_identity);
+        assert!(report
+            .expression_units
+            .iter()
+            .all(|unit| !unit.semantic_meaning_locked && !unit.forge_authority));
     }
 }

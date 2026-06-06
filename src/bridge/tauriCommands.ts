@@ -336,6 +336,35 @@ export type HfieldCymaticFieldModelV2Report = {
   next_work: string[];
 };
 
+
+export type HfieldSyllableShapedExpressionV1Report = {
+  status: string;
+  contract_id: string;
+  profile_id: string;
+  expression_role: string;
+  authority_boundaries: {
+    expression_is_downstream_rendering_model: boolean;
+    harmonic_field_score_remains_source: boolean;
+    syllable_shapes_are_language_semantics: boolean;
+    syllable_shapes_are_phoneme_claims: boolean;
+    generates_words_or_lyrics: boolean;
+    renderer_outputs_are_source_authority: boolean;
+    renderer_outputs_are_forge_operational_meaning: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  expression_policy: unknown;
+  source_inventory: unknown;
+  expression_unit_count: number;
+  expression_units: unknown[];
+  renderer_bindings: unknown[];
+  open_source_dependency_policy: unknown;
+  readiness_gates: unknown;
+  next_work: string[];
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1521,6 +1550,15 @@ export async function getCurrentCymaticFieldModelV2Report(): Promise<HfieldCymat
 
 export async function exportCurrentCymaticFieldModelV2Json(): Promise<ExportFileReport> {
   return await invoke<ExportFileReport>("export_current_cymatic_field_model_v2_json");
+}
+
+
+export async function getCurrentSyllableShapedExpressionV1Report(): Promise<HfieldSyllableShapedExpressionV1Report> {
+  return await invoke<HfieldSyllableShapedExpressionV1Report>("get_current_syllable_shaped_expression_v1_report");
+}
+
+export async function exportCurrentSyllableShapedExpressionV1Json(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_syllable_shaped_expression_v1_json");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {
