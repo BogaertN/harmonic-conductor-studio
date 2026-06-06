@@ -24,6 +24,7 @@ import {
   saveCurrentHcsSqliteMotifsV1,
   listHcsSqliteMotifsV1,
   saveCurrentHcsSqliteReceiptV1,
+  getHcsProductionPackagingV1Report,
   verifyLatestHfieldExportReplayManifestJson,
   getHfieldSchemaVersionMigrationRegistryJson,
   inspectCurrentHfieldSchemaMigrationRegistryJson,
@@ -103,6 +104,7 @@ import {
   type HfieldSyllableShapedExpressionV1Report,
   type HfieldSchemaVersionMigrationRegistryReport,
   type HcsSqliteMotifProjectLibraryV1Report,
+  type HcsProductionPackagingV1Report,
   type HfieldExportReplayVerifierReport,
   type PlaybackReport,
   type StopReport,
@@ -172,6 +174,7 @@ type DiagnosticKey =
   | "cymaticFieldModelV2"
   | "syllableShapedExpressionV1"
   | "hcsSqliteMotifProjectLibraryV1"
+  | "hcsProductionPackagingV1"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -245,6 +248,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "cymaticFieldModelV2", label: "Cymatic Field Model v2" },
   { key: "syllableShapedExpressionV1", label: "Syllable-Shaped Expression v1" },
   { key: "hcsSqliteMotifProjectLibraryV1", label: "SQLite Motif / Project Library v1" },
+  { key: "hcsProductionPackagingV1", label: "Production Packaging v1" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -667,6 +671,7 @@ export default function App() {
   const [syllableShapedExpressionV1Report, setSyllableShapedExpressionV1Report] = useState<HfieldSyllableShapedExpressionV1Report | null>(null);
   const [syllableShapedExpressionV1ExportReport, setSyllableShapedExpressionV1ExportReport] = useState<ExportFileReport | null>(null);
   const [hcsSqliteLibraryV1Report, setHcsSqliteLibraryV1Report] = useState<HcsSqliteMotifProjectLibraryV1Report | null>(null);
+  const [hcsProductionPackagingV1Report, setHcsProductionPackagingV1Report] = useState<HcsProductionPackagingV1Report | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1629,6 +1634,16 @@ export default function App() {
     }
   }
 
+  async function inspectHcsProductionPackagingV1() {
+    setError(null);
+    try {
+      setHcsProductionPackagingV1Report(await getHcsProductionPackagingV1Report());
+      setSelectedDiagnostic("hcsProductionPackagingV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1869,6 +1884,8 @@ export default function App() {
         return syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report;
       case "hcsSqliteMotifProjectLibraryV1":
         return hcsSqliteLibraryV1Report;
+      case "hcsProductionPackagingV1":
+        return hcsProductionPackagingV1Report;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -2357,6 +2374,7 @@ export default function App() {
                   <button onClick={saveCurrentMotifsToHcsSqliteLibraryV1} type="button">Save Motifs to SQLite</button>
                   <button onClick={listHcsSqliteMotifBatchesV1} type="button">List SQLite Motifs</button>
                   <button onClick={saveCurrentReceiptToHcsSqliteLibraryV1} type="button">Save SQLite Receipt</button>
+                  <button onClick={inspectHcsProductionPackagingV1} type="button">Inspect Production Packaging</button>
                   <button onClick={verifyHfieldExportReplayManifest} type="button">Verify Latest Bundle</button>
                   <button onClick={inspectHfieldSchemaMigrationRegistry} type="button">Inspect Schema Registry</button>
                   <button onClick={inspectNineGestureConductorEngine} type="button">Inspect Nine-Gesture Engine</button>
@@ -2374,7 +2392,7 @@ export default function App() {
                   <button onClick={inspectSyllableShapedExpressionV1} type="button">Inspect Syllable Expression</button>
                   <button onClick={exportSyllableShapedExpressionV1Json} type="button">Export Syllable Expression JSON</button>
                 </div>
-                <pre>{JSON.stringify(hcsSqliteLibraryV1Report ?? syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report ?? cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report ?? gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(hcsProductionPackagingV1Report ?? hcsSqliteLibraryV1Report ?? syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report ?? cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report ?? gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">

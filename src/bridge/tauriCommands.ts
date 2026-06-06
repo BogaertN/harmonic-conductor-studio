@@ -386,6 +386,26 @@ export type HcsSqliteMotifProjectLibraryV1Report = {
   [key: string]: unknown;
 };
 
+
+export type HcsProductionPackagingV1Report = {
+  status: string;
+  contract_id: string;
+  profile_id: string;
+  schema_version: string;
+  packaging_role: string;
+  expected_locked_base: unknown;
+  release_targets: unknown;
+  release_scripts: unknown;
+  notices: unknown;
+  release_artifact_policy: unknown;
+  excluded_from_distribution: string[];
+  required_pre_release_gates: string[];
+  authority_boundaries: unknown;
+  readiness_gates: unknown;
+  next_work: string[];
+  [key: string]: unknown;
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1530,6 +1550,11 @@ export async function listHcsSqliteMotifsV1(): Promise<HcsSqliteMotifProjectLibr
 
 export async function saveCurrentHcsSqliteReceiptV1(): Promise<HcsSqliteMotifProjectLibraryV1Report> {
   return await invoke<HcsSqliteMotifProjectLibraryV1Report>("save_current_hcs_sqlite_receipt_v1");
+}
+
+
+export async function getHcsProductionPackagingV1Report(): Promise<HcsProductionPackagingV1Report> {
+  return await invoke<HcsProductionPackagingV1Report>("get_hcs_production_packaging_v1_report");
 }
 
 export async function verifyLatestHfieldExportReplayManifestJson(): Promise<HfieldExportReplayVerifierReport> {

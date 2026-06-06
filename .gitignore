@@ -14,3 +14,5 @@ exports/
 library/
 library/*.sqlite3
 library/*.sqlite3-*
+release/hcs_production_packaging_v1/
+src-tauri/target/release/bundle/

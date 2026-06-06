@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release:hcs:v1": "bash scripts/release/hcs_production_packaging_v1_build.sh",
+    "verify:release:hcs:v1": "bash scripts/release/hcs_production_packaging_v1_verify.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "latest",

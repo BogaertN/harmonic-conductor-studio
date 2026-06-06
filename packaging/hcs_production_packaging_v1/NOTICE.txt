@@ -1,0 +1,12 @@
+Harmonic Conductor Studio — Production Packaging v1 Notice
+
+This release path packages the Harmonic Conductor Studio application only. It must not package local user custody data, local SQLite libraries, private Identity Vault material, exported HFIELD bundles, proof files, or development scratch artifacts.
+
+Authority boundary:
+- Packaging is distribution custody only.
+- Packaging is not .hfield source authority.
+- Packaging is not Forge authority.
+- Packaging performs no Identity Vault live write.
+- Packaging authorizes no health, sensor, or physical measurement claim.
+
+Third-party notices must be generated from Cargo.lock, package-lock/npm metadata, and Tauri bundle metadata before public distribution.

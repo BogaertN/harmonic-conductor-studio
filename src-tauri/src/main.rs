@@ -1612,6 +1612,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "cymatic_field_model_v2_contract_id": "aiweb.hfield.cymatic_field_model.v2",
         "syllable_shaped_expression_v1_contract_id": "aiweb.hfield.syllable_shaped_expression.v1",
         "sqlite_motif_project_library_v1_contract_id": "aiweb.hfield.sqlite_motif_project_library.v1",
+        "production_packaging_v1_contract_id": "aiweb.hfield.production_packaging.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -2829,6 +2830,117 @@ fn save_current_hcs_sqlite_receipt_v1(
     )
 }
 
+const HCS_PRODUCTION_PACKAGING_V1_CONTRACT_ID: &str = "aiweb.hfield.production_packaging.v1";
+const HCS_PRODUCTION_PACKAGING_V1_PROFILE_ID: &str =
+    "tauri_linux_release_notices_and_verification_v1";
+
+#[tauri::command]
+fn get_hcs_production_packaging_v1_report() -> serde_json::Value {
+    let repo_root = app_root_dir();
+    let release_script = repo_root.join("scripts/release/hcs_production_packaging_v1_build.sh");
+    let verify_script = repo_root.join("scripts/release/hcs_production_packaging_v1_verify.sh");
+    let notices_dir = repo_root.join("packaging/hcs_production_packaging_v1");
+    let release_dir = repo_root.join("release/hcs_production_packaging_v1");
+    json!({
+        "status": "ok",
+        "contract_id": HCS_PRODUCTION_PACKAGING_V1_CONTRACT_ID,
+        "profile_id": HCS_PRODUCTION_PACKAGING_V1_PROFILE_ID,
+        "schema_version": "1.0.0",
+        "packaging_role": "governed local-first production release path for Harmonic Conductor Studio after HCS sealed bundles and SQLite custody storage are locked",
+        "expected_locked_base": {
+            "commit": "b4da198",
+            "message": "Add SQLite Motif Project Library v1"
+        },
+        "release_targets": {
+            "linux_deb": {
+                "enabled": true,
+                "tauri_expected_path_glob": "src-tauri/target/release/bundle/deb/*.deb",
+                "purpose": "Ubuntu/Debian installable package"
+            },
+            "linux_appimage": {
+                "enabled": true,
+                "tauri_expected_path_glob": "src-tauri/target/release/bundle/appimage/*.AppImage",
+                "purpose": "portable Linux application image"
+            },
+            "windows_msi_or_nsis": {
+                "enabled": false,
+                "reason": "reserved for a later OS-specific packaging patch"
+            },
+            "macos_dmg": {
+                "enabled": false,
+                "reason": "reserved for a later OS-specific packaging patch"
+            }
+        },
+        "release_scripts": {
+            "build_script": app_relative_export_path(&release_script),
+            "verify_script": app_relative_export_path(&verify_script),
+            "npm_build_script": "release:hcs:v1",
+            "npm_verify_script": "verify:release:hcs:v1"
+        },
+        "notices": {
+            "notice_file": app_relative_export_path(&notices_dir.join("NOTICE.txt")),
+            "release_checklist": app_relative_export_path(&notices_dir.join("RELEASE_CHECKLIST.md")),
+            "third_party_notice_policy": "package manager lockfiles and Tauri/Rust/npm metadata must be used to produce final third-party notices before public distribution"
+        },
+        "release_artifact_policy": {
+            "release_dir": app_relative_export_path(&release_dir),
+            "hash_algorithm": "SHA256 for distributable binaries and BLAKE3 remains used inside HFIELD custody reports",
+            "must_generate_release_manifest": true,
+            "must_record_git_commit": true,
+            "must_record_toolchain_versions": true,
+            "must_record_bundle_manifest_v2_hash": true,
+            "must_verify_no_user_sqlite_database_is_shipped": true,
+            "must_verify_no_private_exports_are_shipped": true,
+            "must_verify_no_development_target_directory_is_shipped": true
+        },
+        "excluded_from_distribution": [
+            "library/hcs_motif_project_library_v1.sqlite3",
+            "library/*.sqlite3-*",
+            "exports/**",
+            "projects/**",
+            "*.hfield.tmp",
+            "target/debug/**",
+            "node_modules/**",
+            "local proof files under /home/nic/Downloads"
+        ],
+        "required_pre_release_gates": [
+            "cargo fmt --all --check",
+            "cargo test --workspace",
+            "cargo clippy --workspace --all-targets -- -D warnings",
+            "npm run typecheck",
+            "npm run build",
+            "npm run tauri info",
+            "npm run tauri build",
+            "verify .deb/AppImage hashes and release inventory",
+            "verify canonical bundle manifest v2 can be exported before public release"
+        ],
+        "authority_boundaries": {
+            "packaging_is_source_authority": false,
+            "packaging_is_forge_authority": false,
+            "packaging_mutates_forge": false,
+            "packaging_performs_identity_vault_write": false,
+            "packaging_exports_private_identity": false,
+            "packaging_authorizes_health_or_sensor_claims": false,
+            "packaging_includes_user_sqlite_library": false,
+            "packaging_includes_user_hfield_exports_by_default": false,
+            "hfield_canonical_bundle_manifest_v2_remains_release_custody_seed": true
+        },
+        "readiness_gates": {
+            "sealed_bundle_v2_locked": true,
+            "sqlite_library_locked": true,
+            "linux_release_path_defined": true,
+            "notices_defined": true,
+            "verification_script_defined": true,
+            "forge_adapter_still_blocked_until_release_and_replay_are_clean": true
+        },
+        "next_work": [
+            "Run npm run release:hcs:v1 when ready to generate .deb/AppImage artifacts on Proto-forge.",
+            "Run npm run verify:release:hcs:v1 after release artifacts exist.",
+            "Proceed to Forge Adapter v1 only after packaging and sealed-bundle replay remain clean."
+        ]
+    })
+}
+
 #[tauri::command]
 fn export_current_hfield_project_json(
     state: tauri::State<'_, AppState>,
@@ -3736,6 +3848,7 @@ fn main() {
             save_current_hcs_sqlite_motifs_v1,
             list_hcs_sqlite_motifs_v1,
             save_current_hcs_sqlite_receipt_v1,
+            get_hcs_production_packaging_v1_report,
             verify_latest_hfield_export_replay_manifest_json,
             verify_hfield_export_replay_manifest_json_by_path,
             get_hfield_schema_version_migration_registry_json,
