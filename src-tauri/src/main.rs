@@ -1596,6 +1596,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "generated_unix_seconds": unix_timestamp_seconds(),
         "format_id": "aiweb.hfield",
         "current_schema_version": "0.1.0",
+        "harmonic_field_score_contract_id": "aiweb.hfield.harmonic_field_score.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -1768,6 +1769,15 @@ fn get_current_nine_gesture_conductor_engine_report(
     let score = current_score_snapshot(&state)?;
     serde_json::to_value(create_nine_gesture_conductor_engine_report(&score))
         .map_err(|err| format!("failed to serialize nine-gesture conductor engine report: {err}"))
+}
+
+#[tauri::command]
+fn get_current_harmonic_field_score_v1_upgrade_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    serde_json::to_value(hfield_domain::create_harmonic_field_score_v1_upgrade_report(&score))
+        .map_err(|err| format!("failed to serialize harmonic field score v1 upgrade report: {err}"))
 }
 
 #[tauri::command]
@@ -2674,6 +2684,7 @@ fn main() {
             get_hfield_schema_version_migration_registry_json,
             inspect_current_hfield_schema_migration_registry_json,
             get_current_nine_gesture_conductor_engine_report,
+            get_current_harmonic_field_score_v1_upgrade_report,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,

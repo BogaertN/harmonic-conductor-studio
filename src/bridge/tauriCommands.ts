@@ -108,6 +108,40 @@ export type HfieldNineGestureConductorEngineReport = {
   current_score_scan: unknown;
 };
 
+
+export type HfieldHarmonicFieldScoreV1UpgradeReport = {
+  status: string;
+  contract_id: string;
+  problem_statement_id: string;
+  render_view_registry_id: string;
+  source_object_role: string;
+  problem_statement: unknown;
+  authority_boundaries: {
+    harmonic_field_score_is_source: boolean;
+    hfield_container_is_persistence_shell: boolean;
+    standard_notation_is_view: boolean;
+    piano_roll_is_view: boolean;
+    tablature_is_view: boolean;
+    audio_is_rendering: boolean;
+    waveform_is_measurement_display: boolean;
+    three_d_field_is_rendering: boolean;
+    cymatic_surface_is_rendering: boolean;
+    forge_bridge_is_adapter: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  source_layer_count: number;
+  source_layers: unknown[];
+  render_view_count: number;
+  render_views: unknown[];
+  accessibility_policy: unknown;
+  current_score_inventory: unknown;
+  readiness_gates: unknown;
+  next_schema_work: string[];
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1241,6 +1275,11 @@ export async function inspectCurrentHfieldSchemaMigrationRegistryJson(): Promise
 
 export async function getCurrentNineGestureConductorEngineReport(): Promise<HfieldNineGestureConductorEngineReport> {
   return await invoke<HfieldNineGestureConductorEngineReport>("get_current_nine_gesture_conductor_engine_report");
+}
+
+
+export async function getCurrentHarmonicFieldScoreV1UpgradeReport(): Promise<HfieldHarmonicFieldScoreV1UpgradeReport> {
+  return await invoke<HfieldHarmonicFieldScoreV1UpgradeReport>("get_current_harmonic_field_score_v1_upgrade_report");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {
