@@ -28,6 +28,8 @@ import {
   exportCurrentDeterministicAudioEngineV2Wav,
   getCurrentTrueConductorGestureReferenceManifestV1Report,
   exportCurrentTrueConductorGestureReferenceManifestV1Json,
+  getCurrentGestureAwareFieldRendererV2Report,
+  exportCurrentGestureAwareFieldRendererV2Json,
   listSavedProjects,
   saveCurrentProjectAs,
   openProjectByFileName,
@@ -85,6 +87,7 @@ import {
   type HfieldMotifLibraryAnnotationLayerV1Report,
   type HfieldDeterministicAudioEngineV2Report,
   type HfieldTrueConductorGestureReferenceManifestV1Report,
+  type HfieldGestureAwareFieldRendererV2Report,
   type HfieldSchemaVersionMigrationRegistryReport,
   type HfieldExportReplayVerifierReport,
   type PlaybackReport,
@@ -151,6 +154,7 @@ type DiagnosticKey =
   | "motifLibraryAnnotationLayerV1"
   | "deterministicAudioEngineV2"
   | "trueConductorGestureReferenceManifestV1"
+  | "gestureAwareFieldRendererV2"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -220,6 +224,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "motifLibraryAnnotationLayerV1", label: "Motif Library + Annotation Layer v1" },
   { key: "deterministicAudioEngineV2", label: "Deterministic Audio Engine v2" },
   { key: "trueConductorGestureReferenceManifestV1", label: "True Gesture Reference Manifest v1" },
+  { key: "gestureAwareFieldRendererV2", label: "Gesture-Aware Field Renderer v2" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -635,6 +640,8 @@ export default function App() {
   const [deterministicAudioEngineV2Report, setDeterministicAudioEngineV2Report] = useState<HfieldDeterministicAudioEngineV2Report | null>(null);
   const [trueConductorGestureReferenceManifestReport, setTrueConductorGestureReferenceManifestReport] = useState<HfieldTrueConductorGestureReferenceManifestV1Report | null>(null);
   const [trueConductorGestureReferenceManifestExportReport, setTrueConductorGestureReferenceManifestExportReport] = useState<ExportFileReport | null>(null);
+  const [gestureAwareFieldRendererV2Report, setGestureAwareFieldRendererV2Report] = useState<HfieldGestureAwareFieldRendererV2Report | null>(null);
+  const [gestureAwareFieldRendererV2ExportReport, setGestureAwareFieldRendererV2ExportReport] = useState<ExportFileReport | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1461,6 +1468,27 @@ export default function App() {
   }
 
 
+
+  async function inspectGestureAwareFieldRendererV2() {
+    setError(null);
+    try {
+      setGestureAwareFieldRendererV2Report(await getCurrentGestureAwareFieldRendererV2Report());
+      setSelectedDiagnostic("gestureAwareFieldRendererV2");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function exportGestureAwareFieldRendererV2Json() {
+    setError(null);
+    try {
+      setGestureAwareFieldRendererV2ExportReport(await exportCurrentGestureAwareFieldRendererV2Json());
+      setSelectedDiagnostic("gestureAwareFieldRendererV2");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1693,7 +1721,9 @@ export default function App() {
         return deterministicAudioEngineV2Report;
       case "trueConductorGestureReferenceManifestV1":
         return trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport;
-case "mappedWav":
+      case "gestureAwareFieldRendererV2":
+        return gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report;
+      case "mappedWav":
         return mappedWavReport;
       case "currentScore":
         return seedMusicScore;
@@ -2184,8 +2214,10 @@ case "mappedWav":
                   <button onClick={exportDeterministicAudioEngineV2Wav} type="button">Export Audio v2 WAV</button>
                   <button onClick={inspectTrueConductorGestureReferenceManifestV1} type="button">Inspect True Gesture Manifest</button>
                   <button onClick={exportTrueConductorGestureReferenceManifestV1Json} type="button">Export True Gesture JSON</button>
+                  <button onClick={inspectGestureAwareFieldRendererV2} type="button">Inspect Gesture-Aware Renderer</button>
+                  <button onClick={exportGestureAwareFieldRendererV2Json} type="button">Export Gesture Renderer JSON</button>
                 </div>
-                <pre>{JSON.stringify(deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">

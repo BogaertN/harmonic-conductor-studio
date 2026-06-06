@@ -1428,6 +1428,7 @@ name = "hfield-field"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "hfield-conductor",
  "hfield-domain",
  "hfield-music",
  "serde",

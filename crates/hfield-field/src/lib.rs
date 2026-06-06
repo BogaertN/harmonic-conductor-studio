@@ -1,3 +1,4 @@
+use hfield_conductor::create_true_conductor_gesture_reference_manifest_v1_report;
 use hfield_domain::{FieldScore, HFIELD_PHASE_ORDER};
 use hfield_music::{midi_note_to_frequency_hz, midi_note_to_name};
 use serde::{Deserialize, Serialize};
@@ -635,6 +636,439 @@ fn stable_report_hash(report: &HfieldFieldSynthesisReport) -> String {
     blake3::hash(&bytes).to_hex().to_string()
 }
 
+pub const GESTURE_AWARE_FIELD_RENDERER_V2_CONTRACT_ID: &str =
+    "aiweb.hfield.gesture_aware_field_renderer.v2";
+pub const GESTURE_AWARE_FIELD_RENDERER_V2_PROFILE_ID: &str =
+    "true_gesture_manifest_driven_field_renderer_v2";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareFieldRendererV2Report {
+    pub status: String,
+    pub contract_id: &'static str,
+    pub profile_id: &'static str,
+    pub renderer_role: &'static str,
+    pub source_field_contract_id: String,
+    pub true_gesture_manifest_contract_id: String,
+    pub authority_boundaries: GestureAwareFieldRendererAuthorityBoundaries,
+    pub renderer_contract: GestureAwareFieldRendererContract,
+    pub field_time_window: FieldTimeWindow,
+    pub anchor_render_nodes: Vec<GestureAwareAnchorRenderNode>,
+    pub renderer_layers: Vec<GestureAwareRendererLayer>,
+    pub gesture_path_count: usize,
+    pub gesture_paths: Vec<GestureAwareFieldPath>,
+    pub current_score_scan: GestureAwareFieldRendererScoreScan,
+    pub readiness_gates: GestureAwareFieldRendererReadinessGates,
+    pub deterministic_renderer_hash: String,
+    pub next_work: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareFieldRendererAuthorityBoundaries {
+    pub renderer_reads_harmonic_field_score: bool,
+    pub renderer_consumes_true_gesture_manifest: bool,
+    pub renderer_may_infer_missing_gesture_geometry: bool,
+    pub renderer_outputs_are_source_authority: bool,
+    pub renderer_outputs_are_forge_operational_meaning: bool,
+    pub mutates_forge: bool,
+    pub performs_identity_vault_write: bool,
+    pub exports_private_identity: bool,
+    pub authorizes_health_or_sensor_claims: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareFieldRendererContract {
+    pub draw_anchor_nodes: bool,
+    pub draw_true_gesture_paths: bool,
+    pub draw_timing_windows: bool,
+    pub draw_motif_candidates: bool,
+    pub draw_intensity_radius: bool,
+    pub draw_operator_markers: bool,
+    pub require_manifest_geometry: bool,
+    pub fallback_to_generic_overlay_allowed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareAnchorRenderNode {
+    pub anchor_id: String,
+    pub phase: u8,
+    pub label: String,
+    pub field_region: String,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub radius: f32,
+    pub glow_intensity: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareRendererLayer {
+    pub layer_id: &'static str,
+    pub source: &'static str,
+    pub renderer_rule: &'static str,
+    pub downstream_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareFieldPath {
+    pub path_id: String,
+    pub reference_id: String,
+    pub gesture_id: String,
+    pub primitive_name: String,
+    pub track_id: String,
+    pub hand_role: String,
+    pub phase: u8,
+    pub anchor_phase: u8,
+    pub field_region: String,
+    pub orbital_direction: String,
+    pub start_ms: u32,
+    pub duration_ms: u32,
+    pub end_ms: u32,
+    pub normalized_start: f32,
+    pub normalized_end: f32,
+    pub radius: f32,
+    pub stroke_weight: f32,
+    pub visual_alpha: f32,
+    pub operator_markers: Vec<String>,
+    pub associated_motif: Option<String>,
+    pub sample_points: Vec<GestureAwareFieldPoint>,
+    pub renderer_may_infer_missing_geometry: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareFieldPoint {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub t_norm: f32,
+    pub phase: u8,
+    pub radius: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareFieldRendererScoreScan {
+    pub note_event_count: usize,
+    pub base_field_event_count: usize,
+    pub true_gesture_reference_count: usize,
+    pub rendered_path_count: usize,
+    pub invalid_reference_count: usize,
+    pub motif_link_count: usize,
+    pub total_duration_ms: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GestureAwareFieldRendererReadinessGates {
+    pub has_base_field_synthesis: bool,
+    pub has_true_gesture_reference_manifest: bool,
+    pub every_path_has_manifest_geometry: bool,
+    pub every_path_has_sample_points: bool,
+    pub every_path_has_timing_window: bool,
+    pub renderer_contract_blocks_generic_overlay_fallback: bool,
+    pub no_live_forge_or_identity_side_effects: bool,
+    pub current_score_can_drive_gesture_aware_field_renderer_v2: bool,
+}
+
+pub fn synthesize_gesture_aware_field_renderer_v2_report(
+    score: &FieldScore,
+) -> GestureAwareFieldRendererV2Report {
+    let base_field = synthesize_hfield_field(score);
+    let true_manifest = create_true_conductor_gesture_reference_manifest_v1_report(score);
+    let gesture_paths = true_manifest
+        .references
+        .iter()
+        .map(|reference| {
+            gesture_aware_field_path_from_reference(reference, &base_field.phase_nodes)
+        })
+        .collect::<Vec<_>>();
+    let current_score_scan = gesture_aware_field_renderer_score_scan(
+        score,
+        &base_field,
+        true_manifest.reference_count,
+        &gesture_paths,
+        true_manifest.current_score_scan.invalid_event_count,
+    );
+    let readiness_gates = gesture_aware_field_renderer_readiness_gates(
+        score,
+        &base_field,
+        &true_manifest,
+        &gesture_paths,
+    );
+
+    let mut report = GestureAwareFieldRendererV2Report {
+        status: if readiness_gates.current_score_can_drive_gesture_aware_field_renderer_v2 {
+            "ok".to_string()
+        } else {
+            "warning".to_string()
+        },
+        contract_id: GESTURE_AWARE_FIELD_RENDERER_V2_CONTRACT_ID,
+        profile_id: GESTURE_AWARE_FIELD_RENDERER_V2_PROFILE_ID,
+        renderer_role: "downstream 3D field renderer data model that draws Rust-owned true conductor gesture paths on the Harmonic Field Score field",
+        source_field_contract_id: base_field.field_contract_id.clone(),
+        true_gesture_manifest_contract_id: true_manifest.contract_id.to_string(),
+        authority_boundaries: GestureAwareFieldRendererAuthorityBoundaries {
+            renderer_reads_harmonic_field_score: true,
+            renderer_consumes_true_gesture_manifest: true,
+            renderer_may_infer_missing_gesture_geometry: false,
+            renderer_outputs_are_source_authority: false,
+            renderer_outputs_are_forge_operational_meaning: false,
+            mutates_forge: false,
+            performs_identity_vault_write: false,
+            exports_private_identity: false,
+            authorizes_health_or_sensor_claims: false,
+        },
+        renderer_contract: GestureAwareFieldRendererContract {
+            draw_anchor_nodes: true,
+            draw_true_gesture_paths: true,
+            draw_timing_windows: true,
+            draw_motif_candidates: true,
+            draw_intensity_radius: true,
+            draw_operator_markers: true,
+            require_manifest_geometry: true,
+            fallback_to_generic_overlay_allowed: false,
+        },
+        field_time_window: base_field.time_window.clone(),
+        anchor_render_nodes: gesture_aware_anchor_render_nodes(&base_field),
+        renderer_layers: gesture_aware_renderer_layers(),
+        gesture_path_count: gesture_paths.len(),
+        gesture_paths,
+        current_score_scan,
+        readiness_gates,
+        deterministic_renderer_hash: String::new(),
+        next_work: vec![
+            "bind gesture-aware field renderer v2 hash into canonical bundle manifest v2",
+            "wire HfieldPhaseFieldViewport to consume this renderer report instead of generic overlays",
+            "add renderer replay verifier coverage for gesture path geometry",
+            "add two-hand visual separation once expressive hand fixtures are expanded",
+            "later add GPU/Three.js optimization without changing Rust-owned path authority",
+        ],
+    };
+    report.deterministic_renderer_hash = stable_gesture_aware_renderer_hash(&report);
+    report
+}
+
+fn gesture_aware_anchor_render_nodes(
+    base_field: &HfieldFieldSynthesisReport,
+) -> Vec<GestureAwareAnchorRenderNode> {
+    vec![
+        gesture_aware_anchor_node("anchor_1", &base_field.anchors.center_1, 0.34, 0.82),
+        gesture_aware_anchor_node("anchor_5", &base_field.anchors.lower_5, 0.42, 0.72),
+        gesture_aware_anchor_node("anchor_9", &base_field.anchors.upper_9, 0.42, 0.78),
+    ]
+}
+
+fn gesture_aware_anchor_node(
+    anchor_id: &str,
+    node: &FieldPhaseNode,
+    radius: f32,
+    glow_intensity: f32,
+) -> GestureAwareAnchorRenderNode {
+    GestureAwareAnchorRenderNode {
+        anchor_id: anchor_id.to_string(),
+        phase: node.phase,
+        label: node.label.clone(),
+        field_region: node.anchor_role.clone(),
+        x: node.x,
+        y: node.y,
+        z: node.z,
+        radius,
+        glow_intensity,
+    }
+}
+
+fn gesture_aware_renderer_layers() -> Vec<GestureAwareRendererLayer> {
+    vec![
+        GestureAwareRendererLayer {
+            layer_id: "anchor_body_layer",
+            source: "HfieldFieldSynthesisReport anchors",
+            renderer_rule: "draw 1/5/9 anchor bodies from Rust field synthesis nodes",
+            downstream_only: true,
+        },
+        GestureAwareRendererLayer {
+            layer_id: "true_gesture_path_layer",
+            source: "TrueConductorGestureReferenceManifestV1 references",
+            renderer_rule: "draw start/control/end/sample path points exactly as the manifest supplies them",
+            downstream_only: true,
+        },
+        GestureAwareRendererLayer {
+            layer_id: "timing_window_layer",
+            source: "true gesture timing references",
+            renderer_rule: "map normalized gesture timing onto field z-depth and path animation windows",
+            downstream_only: true,
+        },
+        GestureAwareRendererLayer {
+            layer_id: "motif_hint_layer",
+            source: "candidate motif references",
+            renderer_rule: "display motif candidates as labels or regions without becoming Forge meaning",
+            downstream_only: true,
+        },
+        GestureAwareRendererLayer {
+            layer_id: "operator_marker_layer",
+            source: "conducting operator references",
+            renderer_rule: "mark prepare, ictus, hold, cutoff, fermata, and cue points without inferring new geometry",
+            downstream_only: true,
+        },
+    ]
+}
+
+fn gesture_aware_field_path_from_reference(
+    reference: &hfield_conductor::TrueGestureReference,
+    phase_nodes: &[FieldPhaseNode],
+) -> GestureAwareFieldPath {
+    let phase = phase_from_gesture(&reference.gesture_id).unwrap_or(1);
+    let anchor_phase =
+        phase_from_gesture(&reference.anchor_gesture_id).unwrap_or(anchor_for_phase(phase));
+    let node = phase_node(phase_nodes, phase);
+    let anchor_node = phase_node(phase_nodes, anchor_phase);
+    let sample_points = reference
+        .path
+        .sample_points
+        .iter()
+        .enumerate()
+        .map(|(index, point)| {
+            let denom = reference.path.sample_points.len().saturating_sub(1).max(1) as f32;
+            let local_t = index as f32 / denom;
+            let t_norm = reference.timing.normalized_start
+                + (reference.timing.normalized_end - reference.timing.normalized_start) * local_t;
+            gesture_aware_field_point(GestureAwareFieldPointInput {
+                local_x: point.x,
+                local_y: point.y,
+                local_z: point.z,
+                t_norm,
+                phase,
+                node: &node,
+                anchor_node: &anchor_node,
+                radius: reference.intensity_radius.path_radius,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    GestureAwareFieldPath {
+        path_id: reference.path.path_id.clone(),
+        reference_id: reference.reference_id.clone(),
+        gesture_id: reference.gesture_id.clone(),
+        primitive_name: reference.primitive_name.clone(),
+        track_id: reference.track_id.clone(),
+        hand_role: reference.hand_role.to_string(),
+        phase,
+        anchor_phase,
+        field_region: reference.field_region.clone(),
+        orbital_direction: reference.orbital_direction.clone(),
+        start_ms: reference.timing.start_ms,
+        duration_ms: reference.timing.duration_ms,
+        end_ms: reference.timing.end_ms,
+        normalized_start: reference.timing.normalized_start,
+        normalized_end: reference.timing.normalized_end,
+        radius: reference.intensity_radius.path_radius,
+        stroke_weight: reference.intensity_radius.stroke_weight,
+        visual_alpha: reference.intensity_radius.visual_alpha,
+        operator_markers: reference.conducting_operators.clone(),
+        associated_motif: reference.associated_motif.clone(),
+        sample_points,
+        renderer_may_infer_missing_geometry: reference
+            .renderer_contract
+            .renderer_may_infer_missing_gesture_geometry,
+    }
+}
+
+struct GestureAwareFieldPointInput<'a> {
+    local_x: f32,
+    local_y: f32,
+    local_z: f32,
+    t_norm: f32,
+    phase: u8,
+    node: &'a FieldPhaseNode,
+    anchor_node: &'a FieldPhaseNode,
+    radius: f32,
+}
+
+fn gesture_aware_field_point(input: GestureAwareFieldPointInput<'_>) -> GestureAwareFieldPoint {
+    let radius = input.radius.clamp(0.05, 1.25);
+    GestureAwareFieldPoint {
+        x: round4(input.anchor_node.x * 0.22 + input.node.x * 0.38 + input.local_x * radius * 0.42),
+        y: round4(input.anchor_node.y * 0.22 + input.node.y * 0.38 + input.local_y * radius * 0.42),
+        z: round4(time_to_z(input.t_norm.clamp(0.0, 1.0)) + input.local_z.clamp(-1.0, 1.0) * 0.28),
+        t_norm: round4(input.t_norm.clamp(0.0, 1.0)),
+        phase: input.phase,
+        radius: round4(radius),
+    }
+}
+
+fn gesture_aware_field_renderer_score_scan(
+    score: &FieldScore,
+    base_field: &HfieldFieldSynthesisReport,
+    true_reference_count: usize,
+    gesture_paths: &[GestureAwareFieldPath],
+    invalid_reference_count: usize,
+) -> GestureAwareFieldRendererScoreScan {
+    GestureAwareFieldRendererScoreScan {
+        note_event_count: score
+            .music
+            .tracks
+            .iter()
+            .map(|track| track.notes.len())
+            .sum(),
+        base_field_event_count: base_field.harmonic_events.len(),
+        true_gesture_reference_count: true_reference_count,
+        rendered_path_count: gesture_paths.len(),
+        invalid_reference_count,
+        motif_link_count: gesture_paths
+            .iter()
+            .filter(|path| path.associated_motif.is_some())
+            .count(),
+        total_duration_ms: base_field.time_window.duration_ms,
+    }
+}
+
+fn gesture_aware_field_renderer_readiness_gates(
+    score: &FieldScore,
+    base_field: &HfieldFieldSynthesisReport,
+    true_manifest: &hfield_conductor::TrueConductorGestureReferenceManifestV1Report,
+    gesture_paths: &[GestureAwareFieldPath],
+) -> GestureAwareFieldRendererReadinessGates {
+    let has_base_field_synthesis =
+        base_field.ready_for_3d_viewport && !base_field.phase_nodes.is_empty();
+    let has_true_gesture_reference_manifest = true_manifest.reference_count > 0
+        && true_manifest
+            .readiness_gates
+            .current_score_can_drive_true_gesture_reference_manifest;
+    let every_path_has_manifest_geometry = gesture_paths
+        .iter()
+        .all(|path| !path.renderer_may_infer_missing_geometry);
+    let every_path_has_sample_points = gesture_paths
+        .iter()
+        .all(|path| path.sample_points.len() >= 3);
+    let every_path_has_timing_window = gesture_paths
+        .iter()
+        .all(|path| path.end_ms >= path.start_ms && path.normalized_end >= path.normalized_start);
+    let no_live_forge_or_identity_side_effects = score.packet.forge_bridge.status == "reserved"
+        && score.packet.forge_bridge.forge_runtime_ref.is_none()
+        && score.provenance.identity_vault.vault_record_ref.is_none()
+        && !score.provenance.raw_private_identity_exported;
+
+    GestureAwareFieldRendererReadinessGates {
+        has_base_field_synthesis,
+        has_true_gesture_reference_manifest,
+        every_path_has_manifest_geometry,
+        every_path_has_sample_points,
+        every_path_has_timing_window,
+        renderer_contract_blocks_generic_overlay_fallback: true,
+        no_live_forge_or_identity_side_effects,
+        current_score_can_drive_gesture_aware_field_renderer_v2: has_base_field_synthesis
+            && has_true_gesture_reference_manifest
+            && !gesture_paths.is_empty()
+            && every_path_has_manifest_geometry
+            && every_path_has_sample_points
+            && every_path_has_timing_window
+            && no_live_forge_or_identity_side_effects,
+    }
+}
+
+fn stable_gesture_aware_renderer_hash(report: &GestureAwareFieldRendererV2Report) -> String {
+    let mut clone = report.clone();
+    clone.deterministic_renderer_hash.clear();
+    let bytes = serde_json::to_vec(&clone).unwrap_or_default();
+    blake3::hash(&bytes).to_hex().to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -719,5 +1153,66 @@ mod tests {
         let b = synthesize_hfield_field(&score);
         assert_eq!(a.deterministic_field_hash, b.deterministic_field_hash);
         assert_eq!(a.cymatic_wave_samples, b.cymatic_wave_samples);
+    }
+
+    #[test]
+    fn gesture_aware_field_renderer_v2_consumes_true_gesture_manifest() {
+        let report = synthesize_gesture_aware_field_renderer_v2_report(&FieldScore::default_hcs());
+
+        assert_eq!(
+            report.contract_id,
+            GESTURE_AWARE_FIELD_RENDERER_V2_CONTRACT_ID
+        );
+        assert!(
+            report
+                .authority_boundaries
+                .renderer_consumes_true_gesture_manifest
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .renderer_may_infer_missing_gesture_geometry
+        );
+        assert!(report.gesture_path_count >= 1);
+        assert_eq!(report.gesture_path_count, report.gesture_paths.len());
+        assert!(report
+            .gesture_paths
+            .iter()
+            .all(|path| path.sample_points.len() >= 3));
+        assert!(
+            report
+                .readiness_gates
+                .current_score_can_drive_gesture_aware_field_renderer_v2
+        );
+    }
+
+    #[test]
+    fn gesture_aware_field_renderer_v2_stays_downstream_of_source_and_forge() {
+        let report = synthesize_gesture_aware_field_renderer_v2_report(&FieldScore::default_hcs());
+        let second = synthesize_gesture_aware_field_renderer_v2_report(&FieldScore::default_hcs());
+
+        assert!(
+            report
+                .authority_boundaries
+                .renderer_reads_harmonic_field_score
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .renderer_outputs_are_source_authority
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .renderer_outputs_are_forge_operational_meaning
+        );
+        assert!(!report.authority_boundaries.mutates_forge);
+        assert!(!report.authority_boundaries.performs_identity_vault_write);
+        assert!(!report.authority_boundaries.exports_private_identity);
+        assert!(!report.renderer_contract.fallback_to_generic_overlay_allowed);
+        assert_eq!(
+            report.deterministic_renderer_hash,
+            second.deterministic_renderer_hash
+        );
     }
 }

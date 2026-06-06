@@ -14,7 +14,7 @@ use hfield_dsp::{
     compile_music_preview, compile_pitch_preview, create_deterministic_audio_engine_v2_report,
     write_wav_i16, CompiledAudio,
 };
-use hfield_field::synthesize_hfield_field;
+use hfield_field::{synthesize_gesture_aware_field_renderer_v2_report, synthesize_hfield_field};
 use hfield_forge_bridge::create_forge_packet_bridge_stub_report;
 use hfield_loop::{create_loop_phrase_report, extract_loop_phrase_score};
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
@@ -1603,6 +1603,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "motif_library_annotation_layer_contract_id": "aiweb.hfield.motif_library_annotation_layer.v1",
         "deterministic_audio_engine_v2_contract_id": "aiweb.hfield.deterministic_audio_engine.v2",
         "true_conductor_gesture_reference_manifest_v1_contract_id": "aiweb.hfield.true_conductor_gesture_reference_manifest.v1",
+        "gesture_aware_field_renderer_v2_contract_id": "aiweb.hfield.gesture_aware_field_renderer.v2",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -1857,6 +1858,26 @@ fn export_current_true_conductor_gesture_reference_manifest_v1_json(
                 })
         },
     )
+}
+
+#[tauri::command]
+fn get_current_gesture_aware_field_renderer_v2_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    serde_json::to_value(synthesize_gesture_aware_field_renderer_v2_report(&score))
+        .map_err(|err| format!("failed to serialize gesture-aware field renderer v2 report: {err}"))
+}
+
+#[tauri::command]
+fn export_current_gesture_aware_field_renderer_v2_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    write_current_score_json_export(state, "gesture_aware_field_renderer_v2", "json", |score| {
+        serde_json::to_value(synthesize_gesture_aware_field_renderer_v2_report(score)).map_err(
+            |err| format!("failed to serialize gesture-aware field renderer v2 export: {err}"),
+        )
+    })
 }
 
 #[tauri::command]
@@ -2770,6 +2791,8 @@ fn main() {
             export_current_deterministic_audio_engine_v2_wav,
             get_current_true_conductor_gesture_reference_manifest_v1_report,
             export_current_true_conductor_gesture_reference_manifest_v1_json,
+            get_current_gesture_aware_field_renderer_v2_report,
+            export_current_gesture_aware_field_renderer_v2_json,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,

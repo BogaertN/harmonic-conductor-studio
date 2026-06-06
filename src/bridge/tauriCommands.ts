@@ -266,6 +266,37 @@ export type HfieldTrueConductorGestureReferenceManifestV1Report = {
   next_work: string[];
 };
 
+
+export type HfieldGestureAwareFieldRendererV2Report = {
+  status: string;
+  contract_id: string;
+  profile_id: string;
+  renderer_role: string;
+  source_field_contract_id: string;
+  true_gesture_manifest_contract_id: string;
+  authority_boundaries: {
+    renderer_reads_harmonic_field_score: boolean;
+    renderer_consumes_true_gesture_manifest: boolean;
+    renderer_may_infer_missing_gesture_geometry: boolean;
+    renderer_outputs_are_source_authority: boolean;
+    renderer_outputs_are_forge_operational_meaning: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  renderer_contract: unknown;
+  field_time_window: unknown;
+  anchor_render_nodes: unknown[];
+  renderer_layers: unknown[];
+  gesture_path_count: number;
+  gesture_paths: unknown[];
+  current_score_scan: unknown;
+  readiness_gates: unknown;
+  deterministic_renderer_hash: string;
+  next_work: string[];
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1433,6 +1464,15 @@ export async function getCurrentTrueConductorGestureReferenceManifestV1Report():
 
 export async function exportCurrentTrueConductorGestureReferenceManifestV1Json(): Promise<ExportFileReport> {
   return await invoke<ExportFileReport>("export_current_true_conductor_gesture_reference_manifest_v1_json");
+}
+
+
+export async function getCurrentGestureAwareFieldRendererV2Report(): Promise<HfieldGestureAwareFieldRendererV2Report> {
+  return await invoke<HfieldGestureAwareFieldRendererV2Report>("get_current_gesture_aware_field_renderer_v2_report");
+}
+
+export async function exportCurrentGestureAwareFieldRendererV2Json(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_gesture_aware_field_renderer_v2_json");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {
