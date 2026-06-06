@@ -19,7 +19,8 @@ members = [
   "crates/hfield-carrier",
   "crates/hfield-playhead",
   "crates/hfield-loop",
-  "src-tauri"
+  "src-tauri",
+  "crates/hfield-coordinate",
 ]
 
 [workspace.package]

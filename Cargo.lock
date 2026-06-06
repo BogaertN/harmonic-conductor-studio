@@ -1383,6 +1383,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hfield-coordinate"
+version = "0.1.0"
+dependencies = [
+ "hfield-domain",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "hfield-cymatics"
 version = "0.1.0"
 dependencies = [
