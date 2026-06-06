@@ -1866,3 +1866,15 @@ body {
   color: rgba(246, 211, 107, 0.84);
 }
 /* END HFIELD Rust Reference Overlay v1 */
+
+
+/* HFIELD Single Clock Playback Scan Sync v1 */
+.field-reader-stage-hint {
+  border-color: rgba(86, 214, 255, 0.24);
+}
+
+.field-reader-stage-hint::before {
+  content: "Single clock active: audio sample playhead drives score cursor, glass scan, and active slice · ";
+  color: rgba(86, 214, 255, 0.86);
+}
+/* END HFIELD Single Clock Playback Scan Sync v1 */

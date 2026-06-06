@@ -37,7 +37,20 @@ use std::time::Duration;
 
 struct ActivePlayback {
     stop_flag: Arc<AtomicBool>,
+    playhead: Arc<AtomicUsize>,
+    sample_rate_hz: u32,
+    sample_count: usize,
+    score_time_offset_ms: u32,
+    score_time_end_ms: Option<u32>,
+    clock_role: String,
     thread: thread::JoinHandle<()>,
+}
+
+struct PlaybackStartup {
+    report: serde_json::Value,
+    playhead: Arc<AtomicUsize>,
+    sample_rate_hz: u32,
+    sample_count: usize,
 }
 
 struct AppState {
@@ -378,9 +391,15 @@ fn play_current_project_phrase_combined_audio(
         extract_loop_phrase_score(&score, start_measure, end_measure)?;
 
     stop_existing_playback(&state)?;
-    let mut playback_report = start_native_playback(state, move |sample_rate_hz| {
-        compile_combined_music_and_conductor_preview(&phrase_score, sample_rate_hz)
-    })?;
+    let mut playback_report = start_native_playback_with_clock(
+        state,
+        phrase_report.start_ms,
+        Some(phrase_report.end_ms),
+        "phrase_combined",
+        move |sample_rate_hz| {
+            compile_combined_music_and_conductor_preview(&phrase_score, sample_rate_hz)
+        },
+    )?;
 
     if let Some(object) = playback_report.as_object_mut() {
         object.insert(
@@ -1199,8 +1218,100 @@ fn stop_playback(state: tauri::State<'_, AppState>) -> Result<serde_json::Value,
     }))
 }
 
+#[tauri::command]
+fn get_playback_clock_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .playback
+        .lock()
+        .map_err(|_| "playback state lock poisoned".to_string())?;
+
+    let Some(active) = guard.as_ref() else {
+        return Ok(json!({
+            "status": "idle",
+            "clock_role": "none",
+            "sample_rate_hz": 0,
+            "sample_index": 0,
+            "sample_count": 0,
+            "playback_elapsed_ms": 0,
+            "playback_duration_ms": 0,
+            "score_time_offset_ms": 0,
+            "score_time_end_ms": null,
+            "current_time_ms": 0,
+            "progress_percent": 0.0,
+            "is_active": false
+        }));
+    };
+
+    Ok(playback_clock_report(active))
+}
+
+fn playback_clock_report(active: &ActivePlayback) -> serde_json::Value {
+    let sample_index = active
+        .playhead
+        .load(Ordering::SeqCst)
+        .min(active.sample_count);
+    let sample_rate_hz = active.sample_rate_hz.max(1);
+    let playback_duration_ms = ((active.sample_count as f64 / sample_rate_hz as f64) * 1000.0)
+        .round()
+        .max(0.0) as u32;
+    let playback_elapsed_ms = ((sample_index as f64 / sample_rate_hz as f64) * 1000.0)
+        .round()
+        .max(0.0) as u32;
+    let score_time_end_ms = active.score_time_end_ms.unwrap_or_else(|| {
+        active
+            .score_time_offset_ms
+            .saturating_add(playback_duration_ms)
+    });
+    let current_time_ms = active
+        .score_time_offset_ms
+        .saturating_add(playback_elapsed_ms)
+        .min(score_time_end_ms);
+    let progress_percent = if playback_duration_ms == 0 {
+        0.0
+    } else {
+        ((playback_elapsed_ms as f64 / playback_duration_ms as f64) * 100.0).clamp(0.0, 100.0)
+    };
+    let status = if active.stop_flag.load(Ordering::SeqCst) {
+        "stopped"
+    } else if sample_index >= active.sample_count {
+        "ended"
+    } else {
+        "playing"
+    };
+
+    json!({
+        "status": status,
+        "clock_role": active.clock_role.clone(),
+        "sample_rate_hz": sample_rate_hz,
+        "sample_index": sample_index,
+        "sample_count": active.sample_count,
+        "playback_elapsed_ms": playback_elapsed_ms,
+        "playback_duration_ms": playback_duration_ms,
+        "score_time_offset_ms": active.score_time_offset_ms,
+        "score_time_end_ms": active.score_time_end_ms,
+        "current_time_ms": current_time_ms,
+        "progress_percent": (progress_percent * 1000.0).round() / 1000.0,
+        "is_active": status == "playing"
+    })
+}
+
 fn start_native_playback<F>(
     state: tauri::State<'_, AppState>,
+    compiler: F,
+) -> Result<serde_json::Value, String>
+where
+    F: FnOnce(u32) -> CompiledAudio + Send + 'static,
+{
+    start_native_playback_with_clock(state, 0, None, "full_project", compiler)
+}
+
+fn start_native_playback_with_clock<F>(
+    state: tauri::State<'_, AppState>,
+    score_time_offset_ms: u32,
+    score_time_end_ms: Option<u32>,
+    clock_role: &'static str,
     compiler: F,
 ) -> Result<serde_json::Value, String>
 where
@@ -1209,14 +1320,14 @@ where
     let stop_flag = Arc::new(AtomicBool::new(false));
     let thread_stop_flag = Arc::clone(&stop_flag);
 
-    let (tx, rx) = mpsc::channel::<Result<serde_json::Value, String>>();
+    let (tx, rx) = mpsc::channel::<Result<PlaybackStartup, String>>();
 
     let playback_thread = thread::spawn(move || {
         run_playback_thread(compiler, thread_stop_flag, tx);
     });
 
-    let startup_report = match rx.recv_timeout(Duration::from_secs(3)) {
-        Ok(Ok(report)) => report,
+    let mut startup = match rx.recv_timeout(Duration::from_secs(3)) {
+        Ok(Ok(startup)) => startup,
         Ok(Err(err)) => {
             let _ = playback_thread.join();
             return Err(err);
@@ -1233,25 +1344,44 @@ where
             .playback
             .lock()
             .map_err(|_| "playback state lock poisoned".to_string())?;
+        if let Some(object) = startup.report.as_object_mut() {
+            object.insert("clock_role".to_string(), json!(clock_role));
+            object.insert(
+                "score_time_offset_ms".to_string(),
+                json!(score_time_offset_ms),
+            );
+            object.insert("score_time_end_ms".to_string(), json!(score_time_end_ms));
+            object.insert(
+                "single_clock_sync".to_string(),
+                json!("hcs_single_clock_playback_scan_sync_v1"),
+            );
+        }
+
         *guard = Some(ActivePlayback {
             stop_flag,
+            playhead: startup.playhead,
+            sample_rate_hz: startup.sample_rate_hz,
+            sample_count: startup.sample_count,
+            score_time_offset_ms,
+            score_time_end_ms,
+            clock_role: clock_role.to_string(),
             thread: playback_thread,
         });
     }
 
-    Ok(startup_report)
+    Ok(startup.report)
 }
 
 fn run_playback_thread<F>(
     compiler: F,
     stop_flag: Arc<AtomicBool>,
-    tx: mpsc::Sender<Result<serde_json::Value, String>>,
+    tx: mpsc::Sender<Result<PlaybackStartup, String>>,
 ) where
     F: FnOnce(u32) -> CompiledAudio,
 {
     let setup = setup_playback_stream(compiler, Arc::clone(&stop_flag));
 
-    let (stream, report, playhead, sample_count) = match setup {
+    let (stream, report, playhead, sample_count, sample_rate_hz) = match setup {
         Ok(value) => value,
         Err(err) => {
             let _ = tx.send(Err(err));
@@ -1264,7 +1394,12 @@ fn run_playback_thread<F>(
         return;
     }
 
-    let _ = tx.send(Ok(report));
+    let _ = tx.send(Ok(PlaybackStartup {
+        report,
+        playhead: Arc::clone(&playhead),
+        sample_rate_hz,
+        sample_count,
+    }));
 
     while !stop_flag.load(Ordering::SeqCst) && playhead.load(Ordering::SeqCst) < sample_count {
         thread::sleep(Duration::from_millis(20));
@@ -1276,7 +1411,16 @@ fn run_playback_thread<F>(
 fn setup_playback_stream<F>(
     compiler: F,
     stop_flag: Arc<AtomicBool>,
-) -> Result<(cpal::Stream, serde_json::Value, Arc<AtomicUsize>, usize), String>
+) -> Result<
+    (
+        cpal::Stream,
+        serde_json::Value,
+        Arc<AtomicUsize>,
+        usize,
+        u32,
+    ),
+    String,
+>
 where
     F: FnOnce(u32) -> CompiledAudio,
 {
@@ -1342,7 +1486,7 @@ where
         "waveform_summary": summary
     });
 
-    Ok((stream, report, playhead, sample_count))
+    Ok((stream, report, playhead, sample_count, sample_rate_hz))
 }
 
 fn build_output_stream<T>(
@@ -1443,6 +1587,7 @@ fn main() {
             play_first_gesture_audio,
             play_seed_music_audio,
             play_seed_combined_audio,
+            get_playback_clock_report,
             stop_playback
         ])
         .run(tauri::generate_context!())

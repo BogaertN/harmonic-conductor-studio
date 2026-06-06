@@ -353,9 +353,8 @@ export default function HfieldVolumetricPacketField({
   const referencePoints = useMemo(() => renderManifest?.reference_points ?? [], [renderManifest]);
   const baseProgress = currentPlayheadProgress(playheadReport);
 
-  useFrame(({ clock }) => {
-    const animatedProgress = ((clock.getElapsedTime() * (1000 / totalDurationMs)) % 1 + 1) % 1;
-    const progress = baseProgress ?? (isPlaying ? animatedProgress : 0);
+  useFrame(() => {
+    const progress = baseProgress ?? 0;
     const scanZ = THREE.MathUtils.lerp(scanMinZ, scanMaxZ, progress);
 
     if (scanRef.current) {

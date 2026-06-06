@@ -61,6 +61,21 @@ export type StopReport = {
   message: string;
 };
 
+export type PlaybackClockReport = {
+  status: "idle" | "playing" | "stopped" | "ended" | string;
+  clock_role: string;
+  sample_rate_hz: number;
+  sample_index: number;
+  sample_count: number;
+  playback_elapsed_ms: number;
+  playback_duration_ms: number;
+  score_time_offset_ms: number;
+  score_time_end_ms: number | null;
+  current_time_ms: number;
+  progress_percent: number;
+  is_active: boolean;
+};
+
 export type HfieldPacketContractReport = {
   status: string;
   contract_id: string;
@@ -1268,6 +1283,10 @@ export async function playSeedMusicAudio(): Promise<PlaybackReport> {
 
 export async function playSeedCombinedAudio(): Promise<PlaybackReport> {
   return await invoke<PlaybackReport>("play_seed_combined_audio");
+}
+
+export async function getPlaybackClockReport(): Promise<PlaybackClockReport> {
+  return await invoke<PlaybackClockReport>("get_playback_clock_report");
 }
 
 export async function stopPlayback(): Promise<StopReport> {

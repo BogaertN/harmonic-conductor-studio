@@ -20,6 +20,7 @@ import {
   getCurrentMusicTimeline,
   getCurrentNotationLayout,
   getCurrentPlayheadCursorReport,
+  getPlaybackClockReport,
   getCurrentLoopPhraseReport,
   getCurrentProjectScore,
   getCurrentResonanceLevelBundle,
@@ -65,6 +66,7 @@ import {
   type NotationEditReport,
   type NotationLayoutReport,
   type PlaybackReport,
+  type PlaybackClockReport,
   type PlayheadCursorReport,
   type PreviewReport,
   type ProjectFileReport,
@@ -90,6 +92,7 @@ type DiagnosticKey =
   | "notationEditReport"
   | "gestureTimeline"
   | "playbackReport"
+  | "playbackClockReport"
   | "stopReport"
   | "musicReport"
   | "rustPreview"
@@ -141,6 +144,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "notationEditReport", label: "Notation Note Edit" },
   { key: "gestureTimeline", label: "Gesture Timeline" },
   { key: "playbackReport", label: "Playback" },
+  { key: "playbackClockReport", label: "Playback Clock" },
   { key: "stopReport", label: "Stop Report" },
   { key: "musicReport", label: "Music Preview" },
   { key: "rustPreview", label: "Rust Preview" },
@@ -549,6 +553,7 @@ export default function App() {
   const [currentProjectMusicWavReport, setCurrentProjectMusicWavReport] = useState<WavRenderReport | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
+  const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
   const [stopReport, setStopReport] = useState<StopReport | null>(null);
   const [deviceReport, setDeviceReport] = useState<unknown>(null);
   const [vocabulary, setVocabulary] = useState<unknown>(null);
@@ -620,6 +625,65 @@ export default function App() {
     setMotionPlaybackEndMs(null);
     setIsMotionPlaying(true);
   }
+
+
+  // Backend audio clock is the authority for score cursor, playhead report, and field scan.
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: number | null = null;
+
+    async function pullPlaybackClock() {
+      try {
+        const clock = await getPlaybackClockReport();
+
+        if (cancelled) {
+          return;
+        }
+
+        setPlaybackClockReport(clock);
+
+        if (clock.status === "playing" || clock.status === "ended") {
+          const nextTimeMs = Math.max(0, Math.round(clock.current_time_ms));
+          setMotionTimeMs(nextTimeMs);
+
+          if (Math.abs(nextTimeMs - playheadReportRequestRef.current) >= 40 || clock.status === "ended") {
+            playheadReportRequestRef.current = nextTimeMs;
+            const nextPlayhead = await getCurrentPlayheadCursorReport(nextTimeMs);
+
+            if (!cancelled) {
+              setPlayheadCursorReport(nextPlayhead);
+            }
+          }
+
+          if (clock.status === "ended") {
+            setIsMotionPlaying(false);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("playback clock sync failed", error);
+        }
+      }
+    }
+
+    const shouldPollClock =
+      isMotionPlaying ||
+      (playbackReport?.status === "ok" && playbackClockReport?.status !== "ended");
+
+    if (shouldPollClock) {
+      void pullPlaybackClock();
+      intervalId = window.setInterval(() => {
+        void pullPlaybackClock();
+      }, 60);
+    }
+
+    return () => {
+      cancelled = true;
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [isMotionPlaying, playbackReport?.status, playbackClockReport?.status]);
 
   function stopMotionAnimation() {
     motionStartRef.current = motionTimeMs;
@@ -1221,6 +1285,7 @@ export default function App() {
     setError(null);
     try {
       setStopReport(await stopPlayback());
+      setPlaybackClockReport(await getPlaybackClockReport());
       setPlayheadCursorReport(await getCurrentPlayheadCursorReport(Math.round(motionTimeMs)));
       setSelectedDiagnostic("stopReport");
       stopMotionAnimation();
@@ -1269,6 +1334,8 @@ export default function App() {
         return gestureTimeline;
       case "playbackReport":
         return playbackReport;
+      case "playbackClockReport":
+        return playbackClockReport;
       case "stopReport":
         return stopReport;
       case "musicReport":
