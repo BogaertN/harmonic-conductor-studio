@@ -22,7 +22,9 @@ use hfield_notation::{
     position_notation_note_start_ms, select_notation_note,
 };
 use hfield_packet::{
-    assert_hfield_packet_openable, canonicalized_hfield_score, validate_hfield_packet_contract,
+    assert_hfield_packet_openable, bind_hfield_identity_vault_reference_only,
+    canonicalized_hfield_score, summarize_hfield_identity_vault_reference_binding,
+    validate_hfield_packet_contract,
 };
 use hfield_playhead::create_playhead_cursor_report;
 use hfield_project::{list_hfield_projects, open_hfield_project, save_hfield_project};
@@ -341,6 +343,36 @@ fn get_current_forge_packet_bridge_stub_report(
 
     serde_json::to_value(create_forge_packet_bridge_stub_report(&guard))
         .map_err(|err| format!("Forge packet bridge stub serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn get_current_hfield_identity_vault_reference_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(summarize_hfield_identity_vault_reference_binding(&guard)).map_err(|err| {
+        format!(".hfield identity vault reference report serialization failed: {err}")
+    })
+}
+
+#[tauri::command]
+fn bind_current_hfield_identity_vault_reference(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    let report = bind_hfield_identity_vault_reference_only(&mut guard);
+
+    serde_json::to_value(report).map_err(|err| {
+        format!(".hfield identity vault reference binding serialization failed: {err}")
+    })
 }
 
 #[tauri::command]
@@ -1728,6 +1760,8 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            get_current_hfield_identity_vault_reference_report,
+            bind_current_hfield_identity_vault_reference,
             get_current_hfield_packet_contract_report,
             get_current_hfield_field_synthesis_report,
             get_current_hfield_cymatic_reader_surface_report,

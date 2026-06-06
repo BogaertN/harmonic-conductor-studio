@@ -81,7 +81,10 @@ import {
   type ProjectListReport,
   type ResonanceLevelBundle,
   type StopReport,
-  type WavRenderReport
+  type WavRenderReport,
+  bindCurrentHfieldIdentityVaultReference,
+  getCurrentHfieldIdentityVaultReferenceReport,
+  type HfieldIdentityVaultReferenceBindingReport,
 } from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
@@ -89,6 +92,7 @@ type DiagnosticKey =
   | "projectReport"
   | "projectList"
   | "packetContract"
+  | "identityVaultReference"
   | "fieldSynthesis"
   | "forgeBridgeStub"
   | "playheadCursor"
@@ -148,6 +152,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "projectReport", label: "Project File Report" },
   { key: "projectList", label: "Project List" },
   { key: "packetContract", label: ".hfield Packet Contract" },
+  { key: "identityVaultReference", label: "Identity Vault Reference" },
   { key: "fieldSynthesis", label: ".hfield Field Synthesis" },
   { key: "forgeBridgeStub", label: "Forge Bridge Stub" },
   { key: "playheadCursor", label: "Playhead Cursor" },
@@ -556,6 +561,7 @@ export default function App() {
   const [projectReport, setProjectReport] = useState<ProjectFileReport | null>(null);
   const [projectList, setProjectList] = useState<ProjectListReport | null>(null);
   const [packetContractReport, setPacketContractReport] = useState<HfieldPacketContractReport | null>(null);
+  const [identityVaultReferenceReport, setIdentityVaultReferenceReport] = useState<HfieldIdentityVaultReferenceBindingReport | null>(null);
   const [fieldSynthesisReport, setFieldSynthesisReport] = useState<HfieldFieldSynthesisReport | null>(null);
   const [forgeBridgeStubReport, setForgeBridgeStubReport] = useState<ForgePacketBridgeStubReport | null>(null);
   const [playheadCursorReport, setPlayheadCursorReport] = useState<PlayheadCursorReport | null>(null);
@@ -1186,6 +1192,29 @@ export default function App() {
   }
 
 
+
+  async function refreshIdentityVaultReference() {
+    setError(null);
+    try {
+      setIdentityVaultReferenceReport(await getCurrentHfieldIdentityVaultReferenceReport());
+      setSelectedDiagnostic("identityVaultReference");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function bindIdentityVaultReferenceOnly() {
+    setError(null);
+    try {
+      const nextReport = await bindCurrentHfieldIdentityVaultReference();
+      setIdentityVaultReferenceReport(nextReport);
+      setPacketContractReport(await getCurrentHfieldPacketContractReport());
+      setSelectedDiagnostic("identityVaultReference");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function exportHfieldProjectJson() {
     setError(null);
     try {
@@ -1412,6 +1441,8 @@ export default function App() {
         return projectList;
       case "packetContract":
         return packetContractReport;
+      case "identityVaultReference":
+        return identityVaultReferenceReport;
       case "fieldSynthesis":
         return fieldSynthesisReport;
       case "forgeBridgeStub":
@@ -1918,6 +1949,24 @@ export default function App() {
                   <button onClick={refreshProjectList} type="button">List Projects</button>
                 </div>
               </div>
+
+              <section className="report-card hfield-identity-vault-panel">
+                <h3>Identity Vault Reference Binding</h3>
+                <p className="note">Binds reference-only custody metadata into the .hfield packet. No private identity is exported, no live Identity Vault write is performed, and Forge is not mutated.</p>
+                <div className="project-row export-button-row">
+                  <button onClick={bindIdentityVaultReferenceOnly} type="button">Bind Reference Only</button>
+                  <button onClick={refreshIdentityVaultReference} type="button">Refresh Reference Report</button>
+                </div>
+                <div className="property-list compact-property-list">
+                  <span><strong>Status</strong>{identityVaultReferenceReport?.status ?? "not checked"}</span>
+                  <span><strong>Vault ref</strong>{identityVaultReferenceReport?.vault_record_ref ?? "unbound"}</span>
+                  <span><strong>Creator</strong>{identityVaultReferenceReport?.creator_principal_id ?? "unbound"}</span>
+                  <span><strong>Private export</strong>{identityVaultReferenceReport?.private_identity_export_disabled === false ? "blocked" : "disabled"}</span>
+                  <span><strong>Live write</strong>{identityVaultReferenceReport?.live_identity_vault_write_performed ? "performed" : "not performed"}</span>
+                  <span><strong>Forge mutation</strong>{identityVaultReferenceReport?.forge_mutation_performed ? "performed" : "not performed"}</span>
+                </div>
+                <pre>{JSON.stringify(identityVaultReferenceReport ?? "No Identity Vault reference report yet.", null, 2)}</pre>
+              </section>
 
               <section className="report-card hfield-export-panel">
                 <h3>Reader Packet Exports</h3>

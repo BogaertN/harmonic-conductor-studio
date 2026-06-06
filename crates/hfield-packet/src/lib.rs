@@ -649,10 +649,361 @@ fn conductor_event_count(score: &FieldScore) -> usize {
     score.conductor.primary_hand_track.events.len()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HfieldIdentityVaultReferenceBindingReport {
+    pub status: String,
+    pub contract_id: String,
+    pub artifact_id: String,
+    pub vault_profile: String,
+    pub vault_record_ref: Option<String>,
+    pub public_identity_ref: Option<String>,
+    pub creator_principal_id: Option<String>,
+    pub creator_identity_vault_ref: Option<String>,
+    pub creator_display_label: Option<String>,
+    pub custody_model: String,
+    pub disclosure_class: String,
+    pub provenance_hash: Option<String>,
+    pub private_identity_export_disabled: bool,
+    pub public_identity_disabled: bool,
+    pub economic_processing_disabled: bool,
+    pub portable_rights_disabled: bool,
+    pub live_identity_vault_write_performed: bool,
+    pub forge_mutation_performed: bool,
+    pub changed_fields: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+pub fn summarize_hfield_identity_vault_reference_binding(
+    score: &FieldScore,
+) -> HfieldIdentityVaultReferenceBindingReport {
+    let warnings = identity_vault_reference_warnings(score);
+    let status = if score.provenance.raw_private_identity_exported
+        || score.provenance.public_identity_authorized
+        || score.provenance.economic_processing_authorized
+        || score.provenance.portable_rights_authorized
+    {
+        "error"
+    } else if score.provenance.identity_vault.vault_record_ref.is_some()
+        && score.provenance.creator.principal_id.is_some()
+        && score.provenance.creator.identity_vault_ref.is_some()
+    {
+        "bound_reference_only"
+    } else {
+        "unbound_reference_only"
+    }
+    .to_string();
+
+    HfieldIdentityVaultReferenceBindingReport {
+        status,
+        contract_id: "aiweb.hfield.identity_vault_reference_binding.v1".to_string(),
+        artifact_id: score.provenance.artifact_id.clone(),
+        vault_profile: score.provenance.identity_vault.vault_profile.clone(),
+        vault_record_ref: score.provenance.identity_vault.vault_record_ref.clone(),
+        public_identity_ref: score.provenance.identity_vault.public_identity_ref.clone(),
+        creator_principal_id: score.provenance.creator.principal_id.clone(),
+        creator_identity_vault_ref: score.provenance.creator.identity_vault_ref.clone(),
+        creator_display_label: score.provenance.creator.display_label.clone(),
+        custody_model: score.provenance.custody_model.clone(),
+        disclosure_class: score.provenance.disclosure_class.clone(),
+        provenance_hash: score.provenance.provenance_hash.clone(),
+        private_identity_export_disabled: !score.provenance.raw_private_identity_exported,
+        public_identity_disabled: !score.provenance.public_identity_authorized,
+        economic_processing_disabled: !score.provenance.economic_processing_authorized,
+        portable_rights_disabled: !score.provenance.portable_rights_authorized,
+        live_identity_vault_write_performed: false,
+        forge_mutation_performed: false,
+        changed_fields: Vec::new(),
+        warnings,
+    }
+}
+
+pub fn bind_hfield_identity_vault_reference_only(
+    score: &mut FieldScore,
+) -> HfieldIdentityVaultReferenceBindingReport {
+    let mut changed_fields = Vec::new();
+
+    let canonical_report = canonicalize_hfield_score(score);
+    changed_fields.extend(
+        canonical_report
+            .changed_fields
+            .into_iter()
+            .map(|field| format!("canonicalize.{field}")),
+    );
+
+    set_string_if_changed(
+        &mut score.provenance.custody_model,
+        "identity_vault_reference_only",
+        "provenance.custody_model",
+        &mut changed_fields,
+    );
+    set_string_if_changed(
+        &mut score.provenance.disclosure_class,
+        "private_reference_only",
+        "provenance.disclosure_class",
+        &mut changed_fields,
+    );
+    set_string_if_changed(
+        &mut score.provenance.identity_vault.status,
+        "reference_bound",
+        "provenance.identity_vault.status",
+        &mut changed_fields,
+    );
+    set_string_if_changed(
+        &mut score.provenance.identity_vault.vault_profile,
+        "aiweb.identity_vault.reference.v1",
+        "provenance.identity_vault.vault_profile",
+        &mut changed_fields,
+    );
+
+    let artifact_id = score.provenance.artifact_id.clone();
+    let vault_record_ref = identity_vault_record_ref_for_artifact(&artifact_id);
+    let creator_principal_id = creator_principal_ref_for_artifact(score);
+    let creator_label = "Private creator reference only - identity not exported".to_string();
+
+    set_option_string_if_changed(
+        &mut score.provenance.identity_vault.vault_record_ref,
+        vault_record_ref.clone(),
+        "provenance.identity_vault.vault_record_ref",
+        &mut changed_fields,
+    );
+    clear_option_string_if_needed(
+        &mut score.provenance.identity_vault.public_identity_ref,
+        "provenance.identity_vault.public_identity_ref",
+        &mut changed_fields,
+    );
+
+    set_option_string_if_changed(
+        &mut score.provenance.creator.principal_id,
+        creator_principal_id.clone(),
+        "provenance.creator.principal_id",
+        &mut changed_fields,
+    );
+    set_string_if_changed(
+        &mut score.provenance.creator.principal_kind,
+        "human_creator",
+        "provenance.creator.principal_kind",
+        &mut changed_fields,
+    );
+    set_option_string_if_changed(
+        &mut score.provenance.creator.display_label,
+        creator_label,
+        "provenance.creator.display_label",
+        &mut changed_fields,
+    );
+    set_option_string_if_changed(
+        &mut score.provenance.creator.identity_vault_ref,
+        vault_record_ref,
+        "provenance.creator.identity_vault_ref",
+        &mut changed_fields,
+    );
+    set_string_if_changed(
+        &mut score.provenance.creator.authority_scope,
+        "creator_reference_private_no_export",
+        "provenance.creator.authority_scope",
+        &mut changed_fields,
+    );
+
+    set_bool_false_if_needed(
+        &mut score.provenance.raw_private_identity_exported,
+        "provenance.raw_private_identity_exported",
+        &mut changed_fields,
+    );
+    set_bool_false_if_needed(
+        &mut score.provenance.public_identity_authorized,
+        "provenance.public_identity_authorized",
+        &mut changed_fields,
+    );
+    set_bool_false_if_needed(
+        &mut score.provenance.economic_processing_authorized,
+        "provenance.economic_processing_authorized",
+        &mut changed_fields,
+    );
+    set_bool_false_if_needed(
+        &mut score.provenance.portable_rights_authorized,
+        "provenance.portable_rights_authorized",
+        &mut changed_fields,
+    );
+
+    let provenance_hash = compute_hfield_provenance_hash(score);
+    if score.provenance.provenance_hash.as_deref() != Some(provenance_hash.as_str()) {
+        score.provenance.provenance_hash = Some(provenance_hash);
+        changed_fields.push("provenance.provenance_hash".to_string());
+    }
+
+    let mut report = summarize_hfield_identity_vault_reference_binding(score);
+    report.changed_fields = changed_fields;
+    report
+}
+
+fn identity_vault_reference_warnings(score: &FieldScore) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    if score.provenance.identity_vault.vault_record_ref.is_none() {
+        warnings.push("Identity Vault vault_record_ref is not bound".to_string());
+    }
+
+    if score.provenance.creator.principal_id.is_none() {
+        warnings.push("creator principal reference is not bound".to_string());
+    }
+
+    if score
+        .provenance
+        .identity_vault
+        .public_identity_ref
+        .is_some()
+    {
+        warnings.push(
+            "public identity reference is present but v1 binding expects no public identity export"
+                .to_string(),
+        );
+    }
+
+    warnings.push("reference-only binding: no live Identity Vault write was performed".to_string());
+    warnings.push("reference-only binding: no Forge mutation was performed".to_string());
+
+    warnings
+}
+
+fn identity_vault_record_ref_for_artifact(artifact_id: &str) -> String {
+    format!(
+        "identity_vault://reference-only/hfield_artifacts/{}",
+        sanitize_reference_token(artifact_id)
+    )
+}
+
+fn creator_principal_ref_for_artifact(score: &FieldScore) -> String {
+    let provenance_hash = compute_hfield_provenance_hash(score);
+    let short_hash = provenance_hash.chars().take(16).collect::<String>();
+
+    format!("principal://private_creator_reference/{short_hash}")
+}
+
+fn sanitize_reference_token(value: &str) -> String {
+    let mut cleaned = value
+        .trim()
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+
+    while cleaned.contains("__") {
+        cleaned = cleaned.replace("__", "_");
+    }
+
+    cleaned = cleaned.trim_matches('_').to_string();
+
+    if cleaned.is_empty() {
+        "hfield_artifact_unbound".to_string()
+    } else {
+        cleaned.chars().take(96).collect()
+    }
+}
+
+fn set_string_if_changed(
+    target: &mut String,
+    expected: &str,
+    label: &str,
+    changed_fields: &mut Vec<String>,
+) {
+    if target != expected {
+        *target = expected.to_string();
+        changed_fields.push(label.to_string());
+    }
+}
+
+fn set_option_string_if_changed(
+    target: &mut Option<String>,
+    expected: String,
+    label: &str,
+    changed_fields: &mut Vec<String>,
+) {
+    if target.as_deref() != Some(expected.as_str()) {
+        *target = Some(expected);
+        changed_fields.push(label.to_string());
+    }
+}
+
+fn clear_option_string_if_needed(
+    target: &mut Option<String>,
+    label: &str,
+    changed_fields: &mut Vec<String>,
+) {
+    if target.is_some() {
+        *target = None;
+        changed_fields.push(label.to_string());
+    }
+}
+
+fn set_bool_false_if_needed(target: &mut bool, label: &str, changed_fields: &mut Vec<String>) {
+    if *target {
+        *target = false;
+        changed_fields.push(label.to_string());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use hfield_domain::{FieldScore, NoteEvent};
+
+    #[test]
+    fn binds_identity_vault_reference_without_private_export_or_live_write() {
+        let mut score = FieldScore::default_hcs();
+
+        let report = bind_hfield_identity_vault_reference_only(&mut score);
+        let validation = validate_hfield_packet_contract(&score);
+
+        assert_eq!(report.status, "bound_reference_only");
+        assert!(report.vault_record_ref.is_some());
+        assert!(report.creator_principal_id.is_some());
+        assert!(report.creator_identity_vault_ref.is_some());
+        assert!(report.private_identity_export_disabled);
+        assert!(report.public_identity_disabled);
+        assert!(report.economic_processing_disabled);
+        assert!(report.portable_rights_disabled);
+        assert!(!report.live_identity_vault_write_performed);
+        assert!(!report.forge_mutation_performed);
+        assert!(score
+            .provenance
+            .identity_vault
+            .public_identity_ref
+            .is_none());
+        assert!(!score.provenance.raw_private_identity_exported);
+        assert!(!score.provenance.public_identity_authorized);
+        assert!(!score.provenance.economic_processing_authorized);
+        assert!(!score.provenance.portable_rights_authorized);
+        assert!(validation.fatal_errors.is_empty());
+        assert!(!validation
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("Identity Vault reference is unbound")));
+    }
+
+    #[test]
+    fn identity_vault_reference_binding_is_stable_for_same_artifact() {
+        let mut first = FieldScore::default_hcs();
+        let mut second = FieldScore::default_hcs();
+
+        first.provenance.artifact_id = "hfield_artifact_test_reference".to_string();
+        second.provenance.artifact_id = "hfield_artifact_test_reference".to_string();
+
+        let first_report = bind_hfield_identity_vault_reference_only(&mut first);
+        let second_report = bind_hfield_identity_vault_reference_only(&mut second);
+
+        assert_eq!(
+            first_report.vault_record_ref,
+            second_report.vault_record_ref
+        );
+        assert_eq!(
+            first.provenance.identity_vault.vault_record_ref,
+            second.provenance.identity_vault.vault_record_ref
+        );
+    }
 
     #[test]
     fn canonicalizes_unbound_artifact_and_seals_provenance_hash() {

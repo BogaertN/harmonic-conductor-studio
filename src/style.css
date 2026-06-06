@@ -1900,3 +1900,21 @@ body {
   max-height: 220px;
 }
 /* END HFIELD Reader Packet Save Open Export v1 */
+
+
+
+
+
+/* HFIELD Identity Vault Reference Binding v1 */
+.hfield-identity-vault-panel {
+  grid-column: 1 / -1;
+  border-color: rgba(246, 211, 107, 0.26);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(246, 211, 107, 0.08), transparent 32%),
+    rgba(5, 10, 14, 0.82);
+}
+
+.hfield-identity-vault-panel pre {
+  max-height: 240px;
+}
+/* END HFIELD Identity Vault Reference Binding v1 */

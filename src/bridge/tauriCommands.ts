@@ -87,6 +87,30 @@ export type PlaybackClockReport = {
   is_active: boolean;
 };
 
+
+export type HfieldIdentityVaultReferenceBindingReport = {
+  status: string;
+  contract_id: string;
+  artifact_id: string;
+  vault_profile: string;
+  vault_record_ref: string | null;
+  public_identity_ref: string | null;
+  creator_principal_id: string | null;
+  creator_identity_vault_ref: string | null;
+  creator_display_label: string | null;
+  custody_model: string;
+  disclosure_class: string;
+  provenance_hash: string | null;
+  private_identity_export_disabled: boolean;
+  public_identity_disabled: boolean;
+  economic_processing_disabled: boolean;
+  portable_rights_disabled: boolean;
+  live_identity_vault_write_performed: boolean;
+  forge_mutation_performed: boolean;
+  changed_fields: string[];
+  warnings: string[];
+};
+
 export type HfieldPacketContractReport = {
   status: string;
   contract_id: string;
@@ -1016,6 +1040,15 @@ export type HfieldRustRenderManifestReport = {
   }>;
   warnings: string[];
 };
+
+
+export async function getCurrentHfieldIdentityVaultReferenceReport(): Promise<HfieldIdentityVaultReferenceBindingReport> {
+  return await invoke<HfieldIdentityVaultReferenceBindingReport>("get_current_hfield_identity_vault_reference_report");
+}
+
+export async function bindCurrentHfieldIdentityVaultReference(): Promise<HfieldIdentityVaultReferenceBindingReport> {
+  return await invoke<HfieldIdentityVaultReferenceBindingReport>("bind_current_hfield_identity_vault_reference");
+}
 
 export async function getCurrentHfieldPacketContractReport(): Promise<HfieldPacketContractReport> {
   return await invoke<HfieldPacketContractReport>("get_current_hfield_packet_contract_report");
