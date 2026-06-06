@@ -1,3 +1,4 @@
+import { OrbitControls } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -602,6 +603,17 @@ export default function HfieldVolumetricPacketField({
       <directionalLight position={[4, 5, 4]} intensity={1.15} />
       <pointLight position={[0, 2.6, 1.2]} intensity={1.4} color="#c9f9ff" />
       <pointLight position={[-2.8, 1.8, -1.8]} intensity={0.76} color="#f6d36b" />
+
+      <OrbitControls
+        makeDefault
+        enablePan
+        enableZoom
+        enableRotate
+        autoRotate={false}
+        minDistance={1.6}
+        maxDistance={15}
+        target={[0, 1.05, 0]}
+      />
 
       <ReaderGrid />
 
