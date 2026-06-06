@@ -11,7 +11,9 @@ use hfield_dsp::{
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
 use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
 use hfield_notation::{
-    create_notation_layout_report, delete_notation_note, edit_notation_note, select_notation_note,
+    create_notation_layout_report, delete_notation_note, edit_notation_note,
+    nudge_notation_note_by_beats, position_notation_note_measure_beat,
+    position_notation_note_start_ms, select_notation_note,
 };
 use hfield_project::{list_hfield_projects, open_hfield_project, save_hfield_project};
 use hfield_resonance::create_resonance_level_bundle;
@@ -428,6 +430,71 @@ fn delete_current_notation_note(
 
     serde_json::to_value(delete_notation_note(&mut guard, &track_id, event_index)?)
         .map_err(|err| format!("notation delete report serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn position_current_notation_note_start_ms(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+    event_index: usize,
+    start_ms: u32,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(position_notation_note_start_ms(
+        &mut guard,
+        &track_id,
+        event_index,
+        start_ms,
+    )?)
+    .map_err(|err| format!("notation timing report serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn position_current_notation_note_measure_beat(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+    event_index: usize,
+    measure_index: u32,
+    beat_in_measure: f64,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(position_notation_note_measure_beat(
+        &mut guard,
+        &track_id,
+        event_index,
+        measure_index,
+        beat_in_measure,
+    )?)
+    .map_err(|err| format!("notation measure/beat report serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn nudge_current_notation_note_beats(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+    event_index: usize,
+    beat_delta: i32,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(nudge_notation_note_by_beats(
+        &mut guard,
+        &track_id,
+        event_index,
+        beat_delta,
+    )?)
+    .map_err(|err| format!("notation nudge report serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -1165,6 +1232,9 @@ fn main() {
             select_current_notation_note,
             edit_current_notation_note,
             delete_current_notation_note,
+            position_current_notation_note_start_ms,
+            position_current_notation_note_measure_beat,
+            nudge_current_notation_note_beats,
             get_current_notation_layout,
             get_current_music_timeline,
             append_note_to_current_track,

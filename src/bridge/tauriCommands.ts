@@ -448,6 +448,45 @@ export async function editCurrentNotationNote(
   });
 }
 
+
+export async function positionCurrentNotationNoteStartMs(
+  trackId: string,
+  eventIndex: number,
+  startMs: number
+): Promise<NotationEditReport> {
+  return await invoke<NotationEditReport>("position_current_notation_note_start_ms", {
+    trackId,
+    eventIndex,
+    startMs
+  });
+}
+
+export async function positionCurrentNotationNoteMeasureBeat(
+  trackId: string,
+  eventIndex: number,
+  measureIndex: number,
+  beatInMeasure: number
+): Promise<NotationEditReport> {
+  return await invoke<NotationEditReport>("position_current_notation_note_measure_beat", {
+    trackId,
+    eventIndex,
+    measureIndex,
+    beatInMeasure
+  });
+}
+
+export async function nudgeCurrentNotationNoteBeats(
+  trackId: string,
+  eventIndex: number,
+  beatDelta: number
+): Promise<NotationEditReport> {
+  return await invoke<NotationEditReport>("nudge_current_notation_note_beats", {
+    trackId,
+    eventIndex,
+    beatDelta
+  });
+}
+
 export async function deleteCurrentNotationNote(
   trackId: string,
   eventIndex: number

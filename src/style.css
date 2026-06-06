@@ -1385,3 +1385,37 @@ body {
   outline: 2px solid rgba(231, 216, 164, 0.55);
   outline-offset: 2px;
 }
+
+
+.note-timing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(231, 216, 164, 0.16);
+}
+
+.note-timing-grid label {
+  display: grid;
+  gap: 0.32rem;
+  color: #f4ead0;
+  font-weight: 800;
+  font-size: 0.72rem;
+}
+
+.note-timing-grid input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid rgba(231, 216, 164, 0.28);
+  border-radius: 10px;
+  background: rgba(5, 7, 12, 0.72);
+  color: #fff7df;
+  padding: 0.55rem 0.6rem;
+  font: inherit;
+  font-weight: 800;
+}
+
+.timing-button-row button {
+  min-width: 86px;
+}

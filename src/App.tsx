@@ -22,6 +22,9 @@ import {
   listSavedProjects,
   loadSeedMusicProject,
   openProjectByFileName,
+  nudgeCurrentNotationNoteBeats,
+  positionCurrentNotationNoteMeasureBeat,
+  positionCurrentNotationNoteStartMs,
   playCurrentProjectCombinedAudio,
   playCurrentProjectConductorAudio,
   playCurrentProjectMusicAudio,
@@ -451,6 +454,9 @@ export default function App() {
   const [noteEditDurationMs, setNoteEditDurationMs] = useState("714");
   const [noteEditVelocity, setNoteEditVelocity] = useState("0.8");
   const [noteEditTrackId, setNoteEditTrackId] = useState("lead_voice");
+  const [noteEditStartMs, setNoteEditStartMs] = useState("0");
+  const [noteEditMeasureIndex, setNoteEditMeasureIndex] = useState("1");
+  const [noteEditBeatInMeasure, setNoteEditBeatInMeasure] = useState("1");
   const [gestureTimeline, setGestureTimeline] = useState<GestureTimelineReport | null>(null);
   const [mappingReport, setMappingReport] = useState<ConductorMappingReport | null>(null);
   const [motionReport, setMotionReport] = useState<ConductorMotionReport | null>(null);
@@ -530,6 +536,9 @@ export default function App() {
     setNoteEditDurationMs(String(note.duration_ms));
     setNoteEditVelocity(String(Math.round(note.velocity * 100) / 100));
     setNoteEditTrackId(note.track_id);
+    setNoteEditStartMs(String(note.start_ms));
+    setNoteEditMeasureIndex(String(note.measure_index));
+    setNoteEditBeatInMeasure(String(note.beat_in_measure));
   }
 
   async function refreshAllCurrentProjectViews() {
@@ -632,6 +641,17 @@ export default function App() {
     }
   }
 
+  async function refreshAfterNotationEdit(editReport: NotationEditReport) {
+    setNotationEditReport(editReport);
+    setNotationLayout(editReport.layout);
+    setSelectedNoteForEditing(editReport.selected_note ?? editReport.layout.selected_note);
+    setMusicTimeline(await getCurrentMusicTimeline());
+    setMappingReport(await getCurrentConductorMappingReport());
+    setMotionReport(await getCurrentConductorMotionReport());
+    setSeedMusicScore(await getCurrentProjectScore());
+    setSelectedDiagnostic("notationEditReport");
+  }
+
   async function editSelectedNotationNote() {
     setError(null);
     if (!selectedNotationNote) {
@@ -649,14 +669,69 @@ export default function App() {
         noteEditTrackId
       );
 
-      setNotationEditReport(editReport);
-      setNotationLayout(editReport.layout);
-      setSelectedNoteForEditing(editReport.selected_note ?? editReport.layout.selected_note);
-      setMusicTimeline(await getCurrentMusicTimeline());
-      setMappingReport(await getCurrentConductorMappingReport());
-      setMotionReport(await getCurrentConductorMotionReport());
-      setSeedMusicScore(await getCurrentProjectScore());
-      setSelectedDiagnostic("notationEditReport");
+      await refreshAfterNotationEdit(editReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+
+  async function positionSelectedNotationNoteStartMs() {
+    setError(null);
+    if (!selectedNotationNote) {
+      setError("Select a notation note before positioning.");
+      return;
+    }
+
+    try {
+      const editReport = await positionCurrentNotationNoteStartMs(
+        selectedNotationNote.track_id,
+        selectedNotationNote.event_index,
+        Number(noteEditStartMs)
+      );
+
+      await refreshAfterNotationEdit(editReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function positionSelectedNotationNoteMeasureBeat() {
+    setError(null);
+    if (!selectedNotationNote) {
+      setError("Select a notation note before positioning.");
+      return;
+    }
+
+    try {
+      const editReport = await positionCurrentNotationNoteMeasureBeat(
+        selectedNotationNote.track_id,
+        selectedNotationNote.event_index,
+        Number(noteEditMeasureIndex),
+        Number(noteEditBeatInMeasure)
+      );
+
+      await refreshAfterNotationEdit(editReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function nudgeSelectedNotationNote(beatDelta: number) {
+    setError(null);
+    if (!selectedNotationNote) {
+      setError("Select a notation note before nudging.");
+      return;
+    }
+
+    try {
+      const editReport = await nudgeCurrentNotationNoteBeats(
+        selectedNotationNote.track_id,
+        selectedNotationNote.event_index,
+        beatDelta
+      );
+
+      await refreshAfterNotationEdit(editReport);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -675,14 +750,7 @@ export default function App() {
         selectedNotationNote.event_index
       );
 
-      setNotationEditReport(editReport);
-      setNotationLayout(editReport.layout);
-      setSelectedNoteForEditing(editReport.selected_note ?? editReport.layout.selected_note);
-      setMusicTimeline(await getCurrentMusicTimeline());
-      setMappingReport(await getCurrentConductorMappingReport());
-      setMotionReport(await getCurrentConductorMotionReport());
-      setSeedMusicScore(await getCurrentProjectScore());
-      setSelectedDiagnostic("notationEditReport");
+      await refreshAfterNotationEdit(editReport);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -1068,7 +1136,8 @@ export default function App() {
   const depthTrack = musicTimeline?.tracks.find((track) => track.track_id === "depth_voice") ?? null;
   const fieldTrack = musicTimeline?.tracks.find((track) => track.track_id === "field_voice") ?? null;
   const activeEvent = getActiveEvent(motionReport, motionTimeMs);
-  const selectedNote = selectedNotationNote ?? notationLayout?.selected_note ?? leadTrack?.notes[0] ?? null;
+  const firstNotationNote = notationLayout?.voices.flatMap((voice) => voice.notes)[0] ?? null;
+  const selectedNote = selectedNotationNote ?? notationLayout?.selected_note ?? firstNotationNote;
   const selectedNoteKey = selectedNotationNote ? `${selectedNotationNote.track_id}:${selectedNotationNote.event_index}` : null;
   const beginnerBlocks = resonanceBundle?.beginner_view.slice(0, 8) ?? [];
   const conductorCues = resonanceBundle?.conductor_view.slice(0, 8) ?? [];
@@ -1475,6 +1544,9 @@ export default function App() {
                   <span><strong>Event</strong>{selectedNotationNote?.event_index ?? "—"}</span>
                   <span><strong>MIDI</strong>{selectedNote?.midi_note ?? "—"}</span>
                   <span><strong>Frequency</strong>{selectedNote ? `${selectedNote.frequency_hz.toFixed(2)} Hz` : "—"}</span>
+                  <span><strong>Start</strong>{selectedNote ? `${selectedNote.start_ms} ms` : "—"}</span>
+                  <span><strong>Measure</strong>{selectedNote ? `M${selectedNote.measure_index}` : "—"}</span>
+                  <span><strong>Beat</strong>{selectedNote ? selectedNote.beat_in_measure : "—"}</span>
                   <span><strong>Lane</strong>{selectedNote?.resonance_lane ?? "—"}</span>
                 </div>
               </section>
@@ -1503,6 +1575,30 @@ export default function App() {
                       <option value="field_voice">Field</option>
                     </select>
                   </label>
+                </div>
+                <div className="note-timing-grid">
+                  <label>
+                    <span>Start ms</span>
+                    <input value={noteEditStartMs} onChange={(event) => setNoteEditStartMs(event.target.value)} inputMode="numeric" />
+                  </label>
+                  <label>
+                    <span>Measure</span>
+                    <input value={noteEditMeasureIndex} onChange={(event) => setNoteEditMeasureIndex(event.target.value)} inputMode="numeric" />
+                  </label>
+                  <label>
+                    <span>Beat</span>
+                    <input value={noteEditBeatInMeasure} onChange={(event) => setNoteEditBeatInMeasure(event.target.value)} inputMode="decimal" />
+                  </label>
+                </div>
+                <div className="button-row timing-button-row">
+                  <button onClick={positionSelectedNotationNoteStartMs} disabled={!selectedNotationNote} type="button">Apply Start</button>
+                  <button onClick={positionSelectedNotationNoteMeasureBeat} disabled={!selectedNotationNote} type="button">Apply Measure / Beat</button>
+                </div>
+                <div className="button-row timing-button-row">
+                  <button onClick={() => nudgeSelectedNotationNote(-4)} disabled={!selectedNotationNote} type="button">- Measure</button>
+                  <button onClick={() => nudgeSelectedNotationNote(-1)} disabled={!selectedNotationNote} type="button">- Beat</button>
+                  <button onClick={() => nudgeSelectedNotationNote(1)} disabled={!selectedNotationNote} type="button">+ Beat</button>
+                  <button onClick={() => nudgeSelectedNotationNote(4)} disabled={!selectedNotationNote} type="button">+ Measure</button>
                 </div>
                 <div className="button-row">
                   <button onClick={editSelectedNotationNote} disabled={!selectedNotationNote} type="button">Apply Note Edit</button>

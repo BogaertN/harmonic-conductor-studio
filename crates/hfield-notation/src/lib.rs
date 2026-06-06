@@ -406,6 +406,85 @@ pub fn edit_notation_note(
     })
 }
 
+pub fn position_notation_note_start_ms(
+    score: &mut FieldScore,
+    track_id: &str,
+    event_index: usize,
+    start_ms: u32,
+) -> Result<NotationEditReport, String> {
+    let track_position = score
+        .music
+        .tracks
+        .iter()
+        .position(|track| track.track_id == track_id)
+        .ok_or_else(|| format!("music track not found: {track_id}"))?;
+
+    let note_position = sorted_note_source_index(&score.music.tracks[track_position], event_index)?;
+    let (midi_note, duration_ms) = {
+        let note = &mut score.music.tracks[track_position].notes[note_position];
+        note.start_ms = start_ms;
+        (note.midi_note, note.duration_ms)
+    };
+
+    let layout = create_notation_layout_report(score);
+    let selected_note =
+        find_selected_note_by_identity(&layout, track_id, start_ms, midi_note, duration_ms)
+            .or_else(|| layout.selected_note.clone());
+
+    Ok(NotationEditReport {
+        status: "ok".to_string(),
+        action: "position_note_start_ms".to_string(),
+        selected_note,
+        layout,
+    })
+}
+
+pub fn position_notation_note_measure_beat(
+    score: &mut FieldScore,
+    track_id: &str,
+    event_index: usize,
+    measure_index: u32,
+    beat_in_measure: f64,
+) -> Result<NotationEditReport, String> {
+    let (beats_per_measure, _) = parse_meter(&score.music.meter);
+    let quarter_ms = quarter_note_ms(score.music.tempo_bpm);
+    let measure_index = measure_index.max(1);
+    let beat_in_measure = beat_in_measure.clamp(1.0, beats_per_measure as f64);
+    let absolute_beat =
+        (measure_index - 1) as f64 * beats_per_measure as f64 + (beat_in_measure - 1.0);
+    let start_ms = (absolute_beat * quarter_ms).round().max(0.0) as u32;
+
+    position_notation_note_start_ms(score, track_id, event_index, start_ms).map(|mut report| {
+        report.action = "position_note_measure_beat".to_string();
+        report
+    })
+}
+
+pub fn nudge_notation_note_by_beats(
+    score: &mut FieldScore,
+    track_id: &str,
+    event_index: usize,
+    beat_delta: i32,
+) -> Result<NotationEditReport, String> {
+    let track_position = score
+        .music
+        .tracks
+        .iter()
+        .position(|track| track.track_id == track_id)
+        .ok_or_else(|| format!("music track not found: {track_id}"))?;
+
+    let note_position = sorted_note_source_index(&score.music.tracks[track_position], event_index)?;
+    let current_start = score.music.tracks[track_position].notes[note_position].start_ms;
+    let quarter_ms = quarter_note_ms(score.music.tempo_bpm).round().max(1.0) as i64;
+    let delta_ms = beat_delta as i64 * quarter_ms;
+    let start_ms = (current_start as i64 + delta_ms).max(0) as u32;
+
+    position_notation_note_start_ms(score, track_id, event_index, start_ms).map(|mut report| {
+        report.action = "nudge_note_by_beats".to_string();
+        report
+    })
+}
+
 pub fn delete_notation_note(
     score: &mut FieldScore,
     track_id: &str,
@@ -737,5 +816,52 @@ mod tests {
         assert_eq!(selected.note_name, "C3");
         assert!(score.music.tracks[0].notes.is_empty());
         assert_eq!(score.music.tracks[1].notes.len(), 1);
+    }
+
+    #[test]
+    fn positions_notation_note_by_start_time_and_measure_beat() {
+        let mut score = seed_position_test_score();
+
+        let report = position_notation_note_start_ms(&mut score, "lead_voice", 1, 1428)
+            .expect("position by start ms");
+
+        let selected = report.selected_note.expect("selected note");
+        assert_eq!(selected.start_ms, 1428);
+        assert_eq!(selected.measure_index, 1);
+        assert_eq!(selected.beat_in_measure, 3.0);
+
+        let report = position_notation_note_measure_beat(&mut score, "lead_voice", 1, 2, 1.0)
+            .expect("position by measure beat");
+
+        let selected = report.selected_note.expect("selected note");
+        assert_eq!(selected.start_ms, 2856);
+        assert_eq!(selected.measure_index, 2);
+        assert_eq!(selected.beat_in_measure, 1.0);
+    }
+
+    #[test]
+    fn nudges_notation_note_by_beat_without_negative_time() {
+        let mut score = seed_position_test_score();
+
+        let report =
+            nudge_notation_note_by_beats(&mut score, "lead_voice", 1, 1).expect("nudge right");
+        let selected = report.selected_note.expect("selected after nudge right");
+        assert_eq!(selected.start_ms, 714);
+
+        let report = nudge_notation_note_by_beats(&mut score, "lead_voice", 1, -3)
+            .expect("nudge left below zero clamps");
+        let selected = report.selected_note.expect("selected after nudge left");
+        assert_eq!(selected.start_ms, 0);
+    }
+
+    fn seed_position_test_score() -> FieldScore {
+        let mut score = FieldScore::default_hcs();
+        score.music.tracks[0].notes = vec![NoteEvent {
+            midi_note: 64,
+            start_ms: 0,
+            duration_ms: 714,
+            velocity: 0.8,
+        }];
+        score
     }
 }
