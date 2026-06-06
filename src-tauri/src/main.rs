@@ -1588,6 +1588,178 @@ fn verify_hfield_export_replay_manifest_json_by_path(
     verify_hfield_canonical_bundle_manifest_file(&std::path::PathBuf::from(manifest_path))
 }
 
+fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
+    json!({
+        "status": "ok",
+        "contract_id": "aiweb.hfield.schema_version_migration_registry.v1",
+        "generated_unix_seconds": unix_timestamp_seconds(),
+        "format_id": "aiweb.hfield",
+        "current_schema_version": "0.1.0",
+        "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
+        "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
+        "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
+        "schema_authority": {
+            "source_object": ".hfield FieldScore",
+            "meaning_bearing_object": "Harmonic Field Score",
+            "renderings_are_downstream": true,
+            "audio_is_not_source": true,
+            "visuals_are_not_source": true,
+            "forge_bridge_is_not_source": true,
+            "identity_vault_reference_is_not_source": true
+        },
+        "version_policy": {
+            "missing_format": "legacy_input_requires_canonicalization",
+            "missing_version": "legacy_input_requires_canonicalization",
+            "missing_packet_contract": "restore_default_packet_contract_then_validate",
+            "invalid_phase_count": "reject",
+            "private_identity_export_attempt": "reject",
+            "live_identity_vault_write": "not_authorized_in_hcs_registry_v1",
+            "forge_mutation": "not_authorized_in_hcs_registry_v1",
+            "unknown_future_version": "read_only_reject_until_migrator_registered",
+            "canonical_output_required_before_export": true,
+            "replay_verification_required_for_bundle_trust": true
+        },
+        "supported_input_versions": [
+            {
+                "version_id": "legacy_unversioned",
+                "status": "migration_supported",
+                "accepts_missing_format": true,
+                "accepts_missing_version": true,
+                "accepts_missing_packet_contract": true,
+                "canonical_target_version": "0.1.0",
+                "required_gate": "canonicalized_hfield_score_then_assert_hfield_packet_openable"
+            },
+            {
+                "version_id": "0.1.0",
+                "status": "current",
+                "accepts_missing_format": false,
+                "accepts_missing_version": false,
+                "accepts_missing_packet_contract": false,
+                "canonical_target_version": "0.1.0",
+                "required_gate": "assert_hfield_packet_openable"
+            }
+        ],
+        "registered_migration_steps": [
+            {
+                "step_id": "legacy.restore_format_id",
+                "from": "missing_or_legacy_format",
+                "to": "aiweb.hfield",
+                "authority": "hfield_packet canonicalization",
+                "mutates_live_project": false,
+                "requires_user_save_for_persistence": true
+            },
+            {
+                "step_id": "legacy.restore_schema_version",
+                "from": "missing_version",
+                "to": "0.1.0",
+                "authority": "hfield_packet canonicalization",
+                "mutates_live_project": false,
+                "requires_user_save_for_persistence": true
+            },
+            {
+                "step_id": "legacy.restore_packet_contract",
+                "from": "missing_packet_contract",
+                "to": "aiweb.hfield.packet_contract.v1",
+                "authority": "hfield_packet canonicalization",
+                "mutates_live_project": false,
+                "requires_user_save_for_persistence": true
+            },
+            {
+                "step_id": "identity.reference_only_binding_preserved",
+                "from": "unbound_or_reference_bound_identity_state",
+                "to": "private_by_default_reference_only_state",
+                "authority": "hfield_packet identity provenance contract",
+                "mutates_live_identity_vault": false,
+                "exports_private_identity": false
+            }
+        ],
+        "required_post_migration_gates": [
+            "assert_hfield_packet_openable",
+            "validate_hfield_packet_contract",
+            "score_hash_hex",
+            "canonical_bundle_manifest_export_before_bundle_trust",
+            "export_replay_verifier_before_bundle_acceptance"
+        ],
+        "explicit_non_authorities": {
+            "does_not_authorize_forge_mutation": true,
+            "does_not_authorize_identity_vault_live_write": true,
+            "does_not_authorize_public_identity_export": true,
+            "does_not_authorize_economic_processing": true,
+            "does_not_authorize_portable_rights_transfer": true,
+            "does_not_authorize_health_or_sensor_claims": true
+        },
+        "next_schema_registry_work": [
+            "move registry into hfield-domain crate when schema surface stabilizes",
+            "add file-level migrator unit tests for archived legacy .hfield examples",
+            "add explicit future-version rejection fixture",
+            "bind schema registry hash into canonical bundle manifest v2"
+        ]
+    })
+}
+
+fn hfield_schema_summary_from_value(value: &serde_json::Value) -> serde_json::Value {
+    let packet_contract_id = value
+        .get("packet_contract")
+        .and_then(|packet_contract| json_str_field(packet_contract, "contract_id"))
+        .or_else(|| json_str_field(value, "packet_contract"))
+        .unwrap_or("<missing>");
+
+    json!({
+        "format": json_str_field(value, "format").unwrap_or("<missing>"),
+        "version": json_str_field(value, "version").unwrap_or("<missing>"),
+        "packet_contract_id": packet_contract_id,
+        "title": json_str_field(value, "title").unwrap_or("<missing>")
+    })
+}
+
+#[tauri::command]
+fn get_hfield_schema_version_migration_registry_json() -> Result<serde_json::Value, String> {
+    Ok(hfield_schema_version_migration_registry_payload())
+}
+
+#[tauri::command]
+fn inspect_current_hfield_schema_migration_registry_json(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let score = current_score_snapshot(&state)?;
+    let original_score_value = serde_json::to_value(&score)
+        .map_err(|err| format!("failed to serialize current score for schema inspection: {err}"))?;
+    let (canonical_score, migration_report) = canonicalized_hfield_score(&score);
+    assert_hfield_packet_openable(&canonical_score)?;
+    let canonical_score_value = serde_json::to_value(&canonical_score).map_err(|err| {
+        format!("failed to serialize canonical score for schema inspection: {err}")
+    })?;
+    let canonical_score_hash = score_hash_hex(&canonical_score)
+        .map_err(|err| format!("failed to hash canonical score for schema inspection: {err}"))?;
+    let packet_contract = validate_hfield_packet_contract(&canonical_score);
+    let identity_summary = summarize_hfield_identity_vault_reference_binding(&canonical_score);
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": "aiweb.hfield.current_schema_migration_inspection.v1",
+        "generated_unix_seconds": unix_timestamp_seconds(),
+        "registry": hfield_schema_version_migration_registry_payload(),
+        "original_score_schema": hfield_schema_summary_from_value(&original_score_value),
+        "canonical_score_schema": hfield_schema_summary_from_value(&canonical_score_value),
+        "migration_report": migration_report,
+        "canonical_score_hash": canonical_score_hash,
+        "packet_contract_gate": packet_contract,
+        "identity_vault_reference_summary": identity_summary,
+        "authority_boundaries": {
+            "live_identity_vault_write_performed": false,
+            "forge_mutation_performed": false,
+            "private_identity_export_performed": false,
+            "inspection_is_read_only": true
+        },
+        "registry_result": {
+            "schema_registry_contract_locked": true,
+            "current_score_canonicalizable": true,
+            "current_score_packet_openable": true,
+            "canonical_score_hash_available": true
+        }
+    }))
+}
+
 #[tauri::command]
 fn export_current_hfield_project_json(
     state: tauri::State<'_, AppState>,
@@ -2489,6 +2661,8 @@ fn main() {
             export_current_hfield_canonical_bundle_manifest_json,
             verify_latest_hfield_export_replay_manifest_json,
             verify_hfield_export_replay_manifest_json_by_path,
+            get_hfield_schema_version_migration_registry_json,
+            inspect_current_hfield_schema_migration_registry_json,
             list_saved_projects,
             save_current_project_as,
             open_project_by_file_name,

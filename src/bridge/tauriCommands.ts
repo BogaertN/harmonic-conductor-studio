@@ -81,6 +81,34 @@ export type HfieldCanonicalBundleManifestExportReport = {
 };
 
 
+
+export type HfieldSchemaVersionMigrationRegistryReport = {
+  status: string;
+  contract_id: string;
+  generated_unix_seconds: number;
+  format_id?: string;
+  current_schema_version?: string;
+  current_packet_contract_id?: string;
+  canonical_bundle_manifest_contract_id?: string;
+  export_replay_verifier_contract_id?: string;
+  schema_authority?: unknown;
+  version_policy?: unknown;
+  supported_input_versions?: unknown[];
+  registered_migration_steps?: unknown[];
+  required_post_migration_gates?: unknown[];
+  explicit_non_authorities?: unknown;
+  next_schema_registry_work?: unknown[];
+  registry?: unknown;
+  original_score_schema?: unknown;
+  canonical_score_schema?: unknown;
+  migration_report?: unknown;
+  canonical_score_hash?: string;
+  packet_contract_gate?: unknown;
+  identity_vault_reference_summary?: unknown;
+  authority_boundaries?: unknown;
+  registry_result?: unknown;
+};
+
 export type HfieldExportReplayVerifierReport = {
   status: "ok" | "failed" | string;
   replay_verifier_contract_id: string;
@@ -1173,6 +1201,15 @@ export async function verifyLatestHfieldExportReplayManifestJson(): Promise<Hfie
 
 export async function verifyHfieldExportReplayManifestJsonByPath(manifestPath: string): Promise<HfieldExportReplayVerifierReport> {
   return await invoke<HfieldExportReplayVerifierReport>("verify_hfield_export_replay_manifest_json_by_path", { manifestPath });
+}
+
+
+export async function getHfieldSchemaVersionMigrationRegistryJson(): Promise<HfieldSchemaVersionMigrationRegistryReport> {
+  return await invoke<HfieldSchemaVersionMigrationRegistryReport>("get_hfield_schema_version_migration_registry_json");
+}
+
+export async function inspectCurrentHfieldSchemaMigrationRegistryJson(): Promise<HfieldSchemaVersionMigrationRegistryReport> {
+  return await invoke<HfieldSchemaVersionMigrationRegistryReport>("inspect_current_hfield_schema_migration_registry_json");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

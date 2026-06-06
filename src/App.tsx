@@ -13,6 +13,8 @@ import {
   exportCurrentHfieldCombinedWav,
   exportCurrentHfieldCanonicalBundleManifestJson,
   verifyLatestHfieldExportReplayManifestJson,
+  getHfieldSchemaVersionMigrationRegistryJson,
+  inspectCurrentHfieldSchemaMigrationRegistryJson,
   exportCurrentHfieldCymaticSurfaceJson,
   exportCurrentHfieldPacketContractJson,
   exportCurrentHfieldProjectJson,
@@ -89,6 +91,7 @@ import {
   type HfieldIdentityVaultReferenceBindingReport,
   type HfieldCanonicalBundleManifestExportReport,
   type HfieldExportReplayVerifierReport,
+  type HfieldSchemaVersionMigrationRegistryReport,
 } from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
@@ -127,6 +130,7 @@ type DiagnosticKey =
   | "hfieldCombinedWavExport"
   | "hfieldCanonicalBundleManifestExport"
   | "hfieldExportReplayVerifier"
+  | "hfieldSchemaMigrationRegistry"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -189,6 +193,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "hfieldCombinedWavExport", label: ".hfield Combined WAV Export" },
   { key: "hfieldCanonicalBundleManifestExport", label: "Canonical Bundle Manifest Export" },
   { key: "hfieldExportReplayVerifier", label: "Export Replay Verifier" },
+  { key: "hfieldSchemaMigrationRegistry", label: "Schema Migration Registry" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -596,6 +601,7 @@ export default function App() {
   const [hfieldCombinedWavExportReport, setHfieldCombinedWavExportReport] = useState<WavRenderReport | null>(null);
   const [hfieldCanonicalBundleManifestExportReport, setHfieldCanonicalBundleManifestExportReport] = useState<HfieldCanonicalBundleManifestExportReport | null>(null);
   const [hfieldExportReplayVerifierReport, setHfieldExportReplayVerifierReport] = useState<HfieldExportReplayVerifierReport | null>(null);
+  const [hfieldSchemaMigrationRegistryReport, setHfieldSchemaMigrationRegistryReport] = useState<HfieldSchemaVersionMigrationRegistryReport | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1317,6 +1323,22 @@ export default function App() {
     }
   }
 
+
+  async function inspectHfieldSchemaMigrationRegistry() {
+    setError(null);
+    try {
+      const registry = await getHfieldSchemaVersionMigrationRegistryJson();
+      const inspection = await inspectCurrentHfieldSchemaMigrationRegistryJson();
+      setHfieldSchemaMigrationRegistryReport({
+        ...inspection,
+        registry,
+      });
+      setSelectedDiagnostic("hfieldSchemaMigrationRegistry");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1535,6 +1557,8 @@ export default function App() {
         return hfieldCanonicalBundleManifestExportReport;
       case "hfieldExportReplayVerifier":
         return hfieldExportReplayVerifierReport;
+      case "hfieldSchemaMigrationRegistry":
+        return hfieldSchemaMigrationRegistryReport;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -2017,8 +2041,9 @@ export default function App() {
                   <button onClick={exportHfieldCombinedWav} type="button">Export Combined WAV</button>
                   <button onClick={exportHfieldCanonicalBundleManifest} type="button">Export Bundle Manifest</button>
                   <button onClick={verifyHfieldExportReplayManifest} type="button">Verify Latest Bundle</button>
+                  <button onClick={inspectHfieldSchemaMigrationRegistry} type="button">Inspect Schema Registry</button>
                 </div>
-                <pre>{JSON.stringify(hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">
