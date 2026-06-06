@@ -257,7 +257,7 @@ function RuntimeCarrierScene({ fieldReport, cymaticReport, carrierReport, playhe
       <directionalLight position={[4, 6, 4]} intensity={1.25} />
       <pointLight position={[-3, 3, -2]} intensity={0.5} color="#54d6ff" />
       <pointLight position={[3, 2, 2]} intensity={0.45} color="#ffb23f" />
-      <group ref={groupRef} rotation={[-0.22, 0.08, 0]}>
+      <group ref={groupRef} rotation={[-0.22, 0.08, 0]} scale={[1.22, 1.22, 1.22]} position={[0, 0.04, 0]}>
         <GridPlane />
         <GlassReaderSurfaceMesh cymaticReport={cymaticReport} />
         <RootCarrierWave carrierReport={carrierReport} />
@@ -267,7 +267,7 @@ function RuntimeCarrierScene({ fieldReport, cymaticReport, carrierReport, playhe
         <AnchorMarkers fieldReport={fieldReport} />
         <PlayheadPlane playheadReport={playheadReport} />
       </group>
-      <OrbitControls enablePan enableZoom enableRotate autoRotate={false} minDistance={4.5} maxDistance={11} />
+      <OrbitControls enablePan enableZoom enableRotate autoRotate={false} minDistance={2.4} maxDistance={10.5} />
     </>
   );
 }
@@ -289,6 +289,8 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
   const [cymaticReport, setCymaticReport] = useState<HfieldCymaticReaderSurfaceReport | null>(null);
   const [carrierReport, setCarrierReport] = useState<HfieldRuntimeCarrierPacketReport | null>(null);
   const [readerError, setReaderError] = useState<string | null>(null);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [cameraRevision, setCameraRevision] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -329,8 +331,15 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
     );
   }
 
+  const panelClassName = isFocusMode
+    ? "panel field-viewport-panel carrier-reader-panel field-reader-focus-active"
+    : "panel field-viewport-panel carrier-reader-panel";
+
+  const cameraPosition: [number, number, number] = isFocusMode ? [0, 2.0, 4.45] : [0, 2.35, 5.25];
+  const cameraFov = isFocusMode ? 36 : 40;
+
   return (
-    <section className="panel field-viewport-panel carrier-reader-panel">
+    <section className={panelClassName}>
       <div className="section-heading-row">
         <div>
           <p className="eyebrow">.hfield runtime carrier reader</p>
@@ -339,17 +348,20 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
             The glass plane is the reader. The file identity carrier is derived from the packet identity, while runtime path carriers and played note payloads create the ripples through time.
           </p>
         </div>
-        <div className="toolbar-row">
+        <div className="toolbar-row field-reader-stage-toolbar">
           <button type="button" className="btn" onClick={onRefresh}>Refresh Reader</button>
+          <button type="button" className="btn" onClick={() => setCameraRevision((value) => value + 1)}>Reset Camera</button>
+          <button type="button" className="btn" onClick={() => setIsFocusMode((value) => !value)}>{isFocusMode ? "Exit Focus" : "Focus Stage"}</button>
           <button type="button" className="btn" onClick={onPlay}>Play</button>
           <button type="button" className="btn btn-danger" onClick={onStop}>Stop</button>
         </div>
       </div>
 
       <div className="field-canvas-shell carrier-reader-canvas-shell">
-        <Canvas camera={{ position: [0, 3.3, 7.2], fov: 48 }} dpr={[1, 1.5]} gl={{ antialias: true }}>
+        <Canvas key={`carrier-reader-${isFocusMode ? "focus" : "inline"}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
           <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} playheadReport={playheadReport} isPlaying={isPlaying} />
         </Canvas>
+        <div className="field-reader-stage-hint">Orbit: drag · Zoom: wheel · Pan: right-drag · Reset Camera returns the packet to inspection view</div>
       </div>
 
       {readerError ? <p className="error-text">{readerError}</p> : null}
