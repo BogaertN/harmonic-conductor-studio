@@ -1,0 +1,291 @@
+{
+  "format": "aiweb.hfield",
+  "version": "0.1.0",
+  "packet": {
+    "contract_id": "aiweb.hfield.packet_contract.v1",
+    "packet_kind": "harmonic_symbolic_field_packet",
+    "packet_role": "canonical_reader_load_file_for_temporal_cymatic_packet_validation",
+    "source_system": "HCS",
+    "target_systems": [
+      "HCS",
+      "Forge"
+    ],
+    "analog_bridge_intent": "read_file_identity_runtime_paths_payload_frequencies_and_information_ripples_as_temporal_cymatic_slices",
+    "phase_profile": {
+      "phase_count": 9,
+      "phase_order": [
+        2,
+        1,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9,
+        8
+      ],
+      "anchor_layout": "center_1_lower_5_upper_9",
+      "root_frequency_hz": 144.0,
+      "communication_mode": "nine_phase_frequency_packet"
+    },
+    "payload_layers": [
+      "score",
+      "frequency_phase",
+      "gesture",
+      "field",
+      "render",
+      "forge_bridge",
+      "file_identity_carrier",
+      "runtime_path_carriers",
+      "single_payload_tone_slice",
+      "two_tone_interference_slice",
+      "three_tone_chord_slice",
+      "information_ripples",
+      "temporal_cymatic_reader"
+    ],
+    "render_targets": [
+      "notation",
+      "audio",
+      "conductor_motion",
+      "glass_cymatic_reader",
+      "temporal_cymatic_extrusion"
+    ],
+    "forge_bridge": {
+      "status": "reserved",
+      "bridge_profile": "forge_packet_bridge_v0_reserved",
+      "forge_runtime_ref": null,
+      "symbolic_trace_ref": null,
+      "validation_ref": null
+    },
+    "migration_profile": "canonical_reader_load_file_v1"
+  },
+  "provenance": {
+    "contract_id": "aiweb.hfield.identity_provenance_contract.v1",
+    "artifact_id": "aiweb.hfield.reader_packet.canonical_v1",
+    "artifact_kind": "harmonic_field_packet",
+    "custody_model": "identity_vault_reference_only",
+    "disclosure_class": "private_reference_only",
+    "identity_vault": {
+      "status": "reference_only",
+      "vault_profile": "aiweb.identity_vault.reference.v1",
+      "vault_record_ref": "aiweb.identity_vault.hcs.reader_packet.canonical_v1",
+      "public_identity_ref": null
+    },
+    "creator": {
+      "principal_id": "aiweb.hcs.system.canonical_reader_generator",
+      "principal_kind": "system",
+      "display_label": "AI.Web HCS canonical reader generator",
+      "identity_vault_ref": null,
+      "authority_scope": "system_generated_private_reference_only"
+    },
+    "contributors": [],
+    "parent_artifacts": [],
+    "derivative_chain": [],
+    "forge_trace_ref": null,
+    "memory_capsule_ref": "aiweb.memory_capsule.hfield.reader_packet.canonical_v1",
+    "authority_receipt_ref": null,
+    "consent_event_ref": null,
+    "license_ref": null,
+    "rights_policy_ref": null,
+    "signature_ref": null,
+    "provenance_hash": null,
+    "raw_private_identity_exported": false,
+    "public_identity_authorized": false,
+    "economic_processing_authorized": false,
+    "portable_rights_authorized": false
+  },
+  "title": "AI.Web HFIELD Canonical Reader Packet v1",
+  "root_frequency_hz": 144.0,
+  "anchors": {
+    "anchor_1": {
+      "ratio": 1.0,
+      "role": "center_home_root_presence"
+    },
+    "anchor_5": {
+      "ratio": 0.5,
+      "role": "lower_depth_weight_transformation"
+    },
+    "anchor_9": {
+      "ratio": 3.0,
+      "role": "upper_lift_expression_release"
+    }
+  },
+  "gesture_vocabulary": "nine_gesture_conductor_v0",
+  "coupling_profile": "canonical_reader_packet_carrier_payload_slice_v1",
+  "music": {
+    "tempo_bpm": 60.0,
+    "meter": "4/4",
+    "tuning_mode": "twelve_tone_equal_temperament_reader_proof",
+    "tracks": [
+      {
+        "track_id": "lead_voice",
+        "role": "payload_primary_tone_path",
+        "notes": [
+          {
+            "midi_note": 60,
+            "start_ms": 0,
+            "duration_ms": 2000,
+            "velocity": 0.72
+          },
+          {
+            "midi_note": 60,
+            "start_ms": 2000,
+            "duration_ms": 2000,
+            "velocity": 0.72
+          },
+          {
+            "midi_note": 60,
+            "start_ms": 4000,
+            "duration_ms": 2000,
+            "velocity": 0.7
+          },
+          {
+            "midi_note": 67,
+            "start_ms": 6000,
+            "duration_ms": 2000,
+            "velocity": 0.76
+          }
+        ]
+      },
+      {
+        "track_id": "depth_voice",
+        "role": "runtime_depth_path_lower_anchor_5",
+        "notes": [
+          {
+            "midi_note": 55,
+            "start_ms": 4000,
+            "duration_ms": 2000,
+            "velocity": 0.46
+          },
+          {
+            "midi_note": 48,
+            "start_ms": 6000,
+            "duration_ms": 2000,
+            "velocity": 0.42
+          }
+        ]
+      },
+      {
+        "track_id": "field_voice",
+        "role": "runtime_field_support_path_upper_anchor_9",
+        "notes": [
+          {
+            "midi_note": 67,
+            "start_ms": 2000,
+            "duration_ms": 2000,
+            "velocity": 0.42
+          },
+          {
+            "midi_note": 64,
+            "start_ms": 4000,
+            "duration_ms": 2000,
+            "velocity": 0.44
+          },
+          {
+            "midi_note": 72,
+            "start_ms": 6000,
+            "duration_ms": 2000,
+            "velocity": 0.36
+          }
+        ]
+      }
+    ]
+  },
+  "conductor": {
+    "field_layout": "center_1_lower_5_upper_9",
+    "primary_hand_track": {
+      "track_id": "primary_hand",
+      "events": [
+        {
+          "gesture_id": "g2",
+          "start_ms": 0,
+          "duration_ms": 650,
+          "intensity": 0.34,
+          "operator": "prepare_reader_single_tone"
+        },
+        {
+          "gesture_id": "g1",
+          "start_ms": 650,
+          "duration_ms": 650,
+          "intensity": 0.42,
+          "operator": "root_identity_carrier_align"
+        },
+        {
+          "gesture_id": "g3",
+          "start_ms": 1300,
+          "duration_ms": 700,
+          "intensity": 0.46,
+          "operator": "single_payload_ripple_stabilize"
+        },
+        {
+          "gesture_id": "g4",
+          "start_ms": 2000,
+          "duration_ms": 900,
+          "intensity": 0.52,
+          "operator": "two_tone_interference_entry"
+        },
+        {
+          "gesture_id": "g5",
+          "start_ms": 2900,
+          "duration_ms": 800,
+          "intensity": 0.56,
+          "operator": "lower_anchor_weight_check"
+        },
+        {
+          "gesture_id": "g7",
+          "start_ms": 4000,
+          "duration_ms": 850,
+          "intensity": 0.62,
+          "operator": "three_tone_chord_gather"
+        },
+        {
+          "gesture_id": "g9",
+          "start_ms": 4850,
+          "duration_ms": 900,
+          "intensity": 0.7,
+          "operator": "formed_cymatic_slice_hold"
+        },
+        {
+          "gesture_id": "g8",
+          "start_ms": 6000,
+          "duration_ms": 900,
+          "intensity": 0.58,
+          "operator": "packet_information_emit"
+        },
+        {
+          "gesture_id": "g1",
+          "start_ms": 6900,
+          "duration_ms": 1100,
+          "intensity": 0.48,
+          "operator": "return_to_reader_root"
+        }
+      ]
+    },
+    "expressive_hand_track": {
+      "track_id": "expressive_hand",
+      "events": [
+        {
+          "gesture_id": "g1",
+          "start_ms": 0,
+          "duration_ms": 2000,
+          "intensity": 0.22,
+          "operator": "identity_carrier_reference"
+        },
+        {
+          "gesture_id": "g5",
+          "start_ms": 4000,
+          "duration_ms": 2000,
+          "intensity": 0.32,
+          "operator": "depth_path_bound"
+        },
+        {
+          "gesture_id": "g9",
+          "start_ms": 6000,
+          "duration_ms": 2000,
+          "intensity": 0.36,
+          "operator": "upper_field_path_bound"
+        }
+      ]
+    }
+  }
+}
