@@ -1,4 +1,4 @@
-import { OrbitControls } from "@react-three/drei";
+import { Line, OrbitControls } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -15,6 +15,8 @@ export type HfieldVolumetricPacketFieldProps = {
 
 type ManifestBody = HfieldRustRenderManifestReport["field_bodies"][number];
 type ManifestBridge = HfieldRustRenderManifestReport["bridge_bodies"][number];
+type ManifestReferenceLine = HfieldRustRenderManifestReport["reference_lines"][number];
+type ManifestReferencePoint = HfieldRustRenderManifestReport["reference_points"][number];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -219,6 +221,54 @@ function ReaderGrid({ width, scanMinZ, scanMaxZ }: { width: number; scanMinZ: nu
   );
 }
 
+
+function ReferenceLineMesh({ line }: { line: ManifestReferenceLine }) {
+  const points = useMemo(
+    () => line.points.map((point) => [point.x, point.y, point.z] as [number, number, number]),
+    [line.points],
+  );
+
+  return (
+    <Line
+      points={points}
+      color={line.color_hex}
+      lineWidth={line.width}
+      transparent
+      opacity={line.opacity}
+    />
+  );
+}
+
+function ReferencePointMesh({ point }: { point: ManifestReferencePoint }) {
+  const isAnchor = point.point_role === "phase_anchor_reference";
+
+  return (
+    <group position={[point.x, point.y, point.z]}>
+      <mesh>
+        <sphereGeometry args={[point.radius, 18, 12]} />
+        <meshStandardMaterial
+          color={point.color_hex}
+          emissive={point.color_hex}
+          emissiveIntensity={isAnchor ? 0.34 : 0.18}
+          transparent
+          opacity={isAnchor ? 0.92 : 0.74}
+          roughness={0.32}
+          metalness={0.04}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {isAnchor ? (
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[point.radius * 1.72, 0.01, 8, 72]} />
+          <meshBasicMaterial color={point.color_hex} transparent opacity={0.62} depthWrite={false} />
+        </mesh>
+      ) : null}
+    </group>
+  );
+}
+
+
 function ToneBodyMesh({ body }: { body: ManifestBody }) {
   return (
     <group position={[body.x, body.y, body.z_center]}>
@@ -299,6 +349,8 @@ export default function HfieldVolumetricPacketField({
   const totalDurationMs = Math.max(1, renderManifest?.total_duration_ms ?? 8000);
   const bodies = useMemo(() => renderManifest?.field_bodies ?? [], [renderManifest]);
   const bridges = useMemo(() => renderManifest?.bridge_bodies ?? [], [renderManifest]);
+  const referenceLines = useMemo(() => renderManifest?.reference_lines ?? [], [renderManifest]);
+  const referencePoints = useMemo(() => renderManifest?.reference_points ?? [], [renderManifest]);
   const baseProgress = currentPlayheadProgress(playheadReport);
 
   useFrame(({ clock }) => {
@@ -347,12 +399,20 @@ export default function HfieldVolumetricPacketField({
 
       <ReaderGrid width={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
 
+      {referenceLines.map((line) => (
+        <ReferenceLineMesh key={line.line_id} line={line} />
+      ))}
+
       {bridges.map((bridge) => (
         <BridgeMesh key={bridge.bridge_id} bridge={bridge} />
       ))}
 
       {bodies.map((body) => (
         <ToneBodyMesh key={body.body_id} body={body} />
+      ))}
+
+      {referencePoints.map((point) => (
+        <ReferencePointMesh key={point.point_id} point={point} />
       ))}
 
       <group ref={scanRef}>

@@ -1858,3 +1858,11 @@ body {
   content: " · React renders only the Rust-owned coordinate truth · no frontend pitch guessing";
 }
 /* END HFIELD Rust Render Manifest v1 */
+
+
+/* HFIELD Rust Reference Overlay v1 */
+.field-reader-stage-hint::before {
+  content: "Rust reference overlay: conductor guides, phase anchors, start/end body points · ";
+  color: rgba(246, 211, 107, 0.84);
+}
+/* END HFIELD Rust Reference Overlay v1 */

@@ -338,6 +338,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
         <div className="mini-stat"><span>operating field</span><strong>{carrierReport?.operating_field.key_signature_proxy ?? "—"}</strong></div>
         <div className="mini-stat"><span>runtime paths</span><strong>{carrierReport?.runtime_paths.length ?? 0}</strong></div>
         <div className="mini-stat"><span>render bodies</span><strong>{renderManifest?.field_bodies.length ?? 0}</strong></div>
+        <div className="mini-stat"><span>reference pts</span><strong>{renderManifest?.reference_points.length ?? 0}</strong></div>
         <div className="mini-stat"><span>ripples</span><strong>{carrierReport?.information_ripples.length ?? 0}</strong></div>
         <div className="mini-stat"><span>surface</span><strong>{cymaticReport ? `${cymaticReport.reader_surface.vertex_count} vertices` : "—"}</strong></div>
         <div className="mini-stat"><span>meaning</span><strong>{carrierReport?.readable_packet_model ?? "waiting"}</strong></div>

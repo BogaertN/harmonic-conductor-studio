@@ -955,6 +955,32 @@ export type HfieldRustRenderManifestReport = {
     color_b_hex: string;
     blend_strength: number;
   }>;
+  reference_lines: Array<{
+    line_id: string;
+    line_role: string;
+    label: string;
+    points: Array<{
+      x: number;
+      y: number;
+      z: number;
+    }>;
+    color_hex: string;
+    opacity: number;
+    width: number;
+  }>;
+  reference_points: Array<{
+    point_id: string;
+    point_role: string;
+    label: string;
+    x: number;
+    y: number;
+    z: number;
+    radius: number;
+    color_hex: string;
+    phase: number | null;
+    time_ms: number | null;
+    frequency_hz: number | null;
+  }>;
   proof_windows: Array<{
     label: string;
     time_ms: number;

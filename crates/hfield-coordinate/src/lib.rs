@@ -480,6 +480,8 @@ pub struct HfieldRustRenderManifest {
     pub field_height: f64,
     pub field_bodies: Vec<HfieldRustRenderBody>,
     pub bridge_bodies: Vec<HfieldRustRenderBridge>,
+    pub reference_lines: Vec<HfieldRustRenderReferenceLine>,
+    pub reference_points: Vec<HfieldRustRenderReferencePoint>,
     pub proof_windows: Vec<HfieldRustRenderProofWindow>,
     pub warnings: Vec<String>,
 }
@@ -533,6 +535,39 @@ pub struct HfieldRustRenderBridge {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HfieldRustRenderVec3 {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HfieldRustRenderReferenceLine {
+    pub line_id: String,
+    pub line_role: String,
+    pub label: String,
+    pub points: Vec<HfieldRustRenderVec3>,
+    pub color_hex: String,
+    pub opacity: f64,
+    pub width: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HfieldRustRenderReferencePoint {
+    pub point_id: String,
+    pub point_role: String,
+    pub label: String,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub radius: f64,
+    pub color_hex: String,
+    pub phase: Option<u8>,
+    pub time_ms: Option<u32>,
+    pub frequency_hz: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HfieldRustRenderProofWindow {
     pub label: String,
     pub time_ms: u32,
@@ -550,6 +585,8 @@ pub fn create_hfield_rust_render_manifest(score: &FieldScore) -> HfieldRustRende
         .collect::<Vec<_>>();
 
     let bridge_bodies = render_bridges_from_manifest(&registry, &field_bodies);
+    let reference_lines = render_reference_lines_from_manifest(&registry, &field_bodies);
+    let reference_points = render_reference_points_from_manifest(&field_bodies);
 
     let proof_windows = vec![
         render_proof_window("single tone proof", 1000, &field_bodies),
@@ -570,6 +607,8 @@ pub fn create_hfield_rust_render_manifest(score: &FieldScore) -> HfieldRustRende
         field_height: 3.8,
         field_bodies,
         bridge_bodies,
+        reference_lines,
+        reference_points,
         proof_windows,
         warnings: Vec::new(),
     }
@@ -672,6 +711,234 @@ fn render_bridges_from_manifest(
     }
 
     bridges
+}
+
+fn render_reference_lines_from_manifest(
+    registry: &HarmonicCoordinateRegistry,
+    bodies: &[HfieldRustRenderBody],
+) -> Vec<HfieldRustRenderReferenceLine> {
+    let mut lines = vec![
+        HfieldRustRenderReferenceLine {
+            line_id: "axis:glass_reader_center".to_string(),
+            line_role: "reader_axis".to_string(),
+            label: "glass reader center scan axis".to_string(),
+            points: vec![
+                point3(0.0, 0.04, FIELD_Z_MIN),
+                point3(0.0, 0.04, FIELD_Z_MAX),
+            ],
+            color_hex: "#eaffff".to_string(),
+            opacity: 0.52,
+            width: 1.5,
+        },
+        HfieldRustRenderReferenceLine {
+            line_id: "axis:payload_pitch_reference".to_string(),
+            line_role: "payload_reference_axis".to_string(),
+            label: "payload pitch reference line".to_string(),
+            points: vec![
+                point3(FIELD_X_MIN, lane_to_y(&VerticalLane::PayloadLead), 0.0),
+                point3(FIELD_X_MAX, lane_to_y(&VerticalLane::PayloadLead), 0.0),
+            ],
+            color_hex: "#fff2ad".to_string(),
+            opacity: 0.34,
+            width: 1.2,
+        },
+        HfieldRustRenderReferenceLine {
+            line_id: "axis:runtime_depth_reference".to_string(),
+            line_role: "runtime_reference_axis".to_string(),
+            label: "lower runtime path reference line".to_string(),
+            points: vec![
+                point3(FIELD_X_MIN, lane_to_y(&VerticalLane::RuntimeDepth), 0.0),
+                point3(FIELD_X_MAX, lane_to_y(&VerticalLane::RuntimeDepth), 0.0),
+            ],
+            color_hex: "#56d6ff".to_string(),
+            opacity: 0.28,
+            width: 1.1,
+        },
+        HfieldRustRenderReferenceLine {
+            line_id: "axis:runtime_field_reference".to_string(),
+            line_role: "runtime_reference_axis".to_string(),
+            label: "upper runtime field reference line".to_string(),
+            points: vec![
+                point3(FIELD_X_MIN, lane_to_y(&VerticalLane::RuntimeField), 0.0),
+                point3(FIELD_X_MAX, lane_to_y(&VerticalLane::RuntimeField), 0.0),
+            ],
+            color_hex: "#56d6ff".to_string(),
+            opacity: 0.28,
+            width: 1.1,
+        },
+    ];
+
+    let mut seen_tracks: Vec<String> = Vec::new();
+
+    for body in bodies
+        .iter()
+        .filter(|body| body.layer_key != "file_identity_carrier")
+    {
+        if seen_tracks
+            .iter()
+            .any(|track_id| track_id == &body.track_id)
+        {
+            continue;
+        }
+
+        seen_tracks.push(body.track_id.clone());
+
+        let track_bodies = bodies
+            .iter()
+            .filter(|candidate| candidate.track_id == body.track_id)
+            .collect::<Vec<_>>();
+
+        let average_x = if track_bodies.is_empty() {
+            body.x
+        } else {
+            track_bodies
+                .iter()
+                .map(|candidate| candidate.x)
+                .sum::<f64>()
+                / track_bodies.len() as f64
+        };
+
+        let lane = registry
+            .entries
+            .iter()
+            .find(|entry| entry.track_id == body.track_id)
+            .map(|entry| entry.lane.clone())
+            .unwrap_or(VerticalLane::RuntimeOther);
+
+        lines.push(HfieldRustRenderReferenceLine {
+            line_id: format!("track_guide:{}", body.track_id),
+            line_role: "track_conductor_guide".to_string(),
+            label: format!("{} conductor guide", body.track_id),
+            points: vec![
+                point3(round4(average_x), lane_to_y(&lane), FIELD_Z_MIN),
+                point3(round4(average_x), lane_to_y(&lane), FIELD_Z_MAX),
+            ],
+            color_hex: body.layer_color_hex.clone(),
+            opacity: 0.42,
+            width: 1.4,
+        });
+    }
+
+    lines
+}
+
+fn render_reference_points_from_manifest(
+    bodies: &[HfieldRustRenderBody],
+) -> Vec<HfieldRustRenderReferencePoint> {
+    let mut points = vec![
+        phase_anchor_point(
+            1,
+            "center/home/root presence",
+            0.0,
+            lane_to_y(&VerticalLane::PayloadLead),
+            0.0,
+            "#f6f1c8",
+        ),
+        phase_anchor_point(
+            5,
+            "lower/depth/constraint anchor",
+            FIELD_X_MIN,
+            lane_to_y(&VerticalLane::RuntimeDepth),
+            0.0,
+            "#ffb23f",
+        ),
+        phase_anchor_point(
+            9,
+            "upper/field/formed return anchor",
+            FIELD_X_MAX,
+            lane_to_y(&VerticalLane::RuntimeField),
+            0.0,
+            "#9d7cff",
+        ),
+    ];
+
+    for body in bodies {
+        if body.layer_key == "file_identity_carrier" {
+            points.push(HfieldRustRenderReferencePoint {
+                point_id: "reference:file_identity_origin".to_string(),
+                point_role: "file_identity_reference".to_string(),
+                label: "file identity carrier reference".to_string(),
+                x: body.x,
+                y: body.y,
+                z: body.z_center,
+                radius: 0.09,
+                color_hex: body.color_hex.clone(),
+                phase: None,
+                time_ms: Some(body.start_ms),
+                frequency_hz: Some(body.frequency_hz),
+            });
+            continue;
+        }
+
+        points.push(HfieldRustRenderReferencePoint {
+            point_id: format!("note_start:{}", body.body_id),
+            point_role: "body_start_reference".to_string(),
+            label: format!("{} start", body.label),
+            x: body.x,
+            y: body.y,
+            z: body.z_start,
+            radius: if body.layer_key == "payload_tone" {
+                0.07
+            } else {
+                0.055
+            },
+            color_hex: body.color_hex.clone(),
+            phase: body.midi_note.map(|midi| midi % 12),
+            time_ms: Some(body.start_ms),
+            frequency_hz: Some(body.frequency_hz),
+        });
+
+        points.push(HfieldRustRenderReferencePoint {
+            point_id: format!("note_end:{}", body.body_id),
+            point_role: "body_end_reference".to_string(),
+            label: format!("{} end", body.label),
+            x: body.x,
+            y: body.y,
+            z: body.z_end,
+            radius: if body.layer_key == "payload_tone" {
+                0.052
+            } else {
+                0.045
+            },
+            color_hex: body.layer_color_hex.clone(),
+            phase: body.midi_note.map(|midi| midi % 12),
+            time_ms: Some(body.end_ms),
+            frequency_hz: Some(body.frequency_hz),
+        });
+    }
+
+    points
+}
+
+fn point3(x: f64, y: f64, z: f64) -> HfieldRustRenderVec3 {
+    HfieldRustRenderVec3 {
+        x: round4(x),
+        y: round4(y),
+        z: round4(z),
+    }
+}
+
+fn phase_anchor_point(
+    phase: u8,
+    label: &str,
+    x: f64,
+    y: f64,
+    z: f64,
+    color_hex: &str,
+) -> HfieldRustRenderReferencePoint {
+    HfieldRustRenderReferencePoint {
+        point_id: format!("phase_anchor:{phase}"),
+        point_role: "phase_anchor_reference".to_string(),
+        label: label.to_string(),
+        x: round4(x),
+        y: round4(y),
+        z: round4(z),
+        radius: if phase == 1 { 0.13 } else { 0.11 },
+        color_hex: color_hex.to_string(),
+        phase: Some(phase),
+        time_ms: None,
+        frequency_hz: None,
+    }
 }
 
 fn render_proof_window(
@@ -865,5 +1132,63 @@ mod render_manifest_tests {
             .bridge_bodies
             .iter()
             .all(|bridge| bridge.overlap_ms > 0 && bridge.z_body_length > 0.0));
+    }
+}
+
+#[cfg(test)]
+mod render_reference_overlay_tests {
+    use super::*;
+
+    fn canonical_score() -> FieldScore {
+        serde_json::from_str(include_str!(
+            "../../../projects/hcs_canonical_reader_packet_v1.hfield"
+        ))
+        .expect("canonical reader must parse")
+    }
+
+    #[test]
+    fn render_manifest_exports_conductor_reference_lines() {
+        let score = canonical_score();
+        let manifest = create_hfield_rust_render_manifest(&score);
+
+        assert!(manifest
+            .reference_lines
+            .iter()
+            .any(|line| line.line_role == "track_conductor_guide"));
+        assert!(manifest
+            .reference_lines
+            .iter()
+            .any(|line| line.line_id == "axis:glass_reader_center"));
+        assert!(manifest
+            .reference_lines
+            .iter()
+            .all(|line| line.points.len() >= 2));
+    }
+
+    #[test]
+    fn render_manifest_exports_phase_and_body_reference_points() {
+        let score = canonical_score();
+        let manifest = create_hfield_rust_render_manifest(&score);
+
+        assert!(manifest
+            .reference_points
+            .iter()
+            .any(|point| point.point_id == "phase_anchor:1"));
+        assert!(manifest
+            .reference_points
+            .iter()
+            .any(|point| point.point_id == "phase_anchor:5"));
+        assert!(manifest
+            .reference_points
+            .iter()
+            .any(|point| point.point_id == "phase_anchor:9"));
+        assert!(manifest
+            .reference_points
+            .iter()
+            .any(|point| point.point_role == "body_start_reference"));
+        assert!(manifest
+            .reference_points
+            .iter()
+            .any(|point| point.point_role == "body_end_reference"));
     }
 }
