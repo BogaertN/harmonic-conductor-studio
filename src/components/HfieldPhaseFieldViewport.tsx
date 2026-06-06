@@ -1,3 +1,4 @@
+import HfieldVolumetricPacketField, { type HfieldVolumetricPacketFieldProps } from "./HfieldVolumetricPacketField";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Line, OrbitControls } from "@react-three/drei";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -242,47 +243,8 @@ function AnchorMarkers({ fieldReport }: { fieldReport: HfieldFieldSynthesisRepor
   );
 }
 
-function RuntimeCarrierScene({ fieldReport, cymaticReport, carrierReport, playheadReport, isPlaying }: SceneProps) {
-  const groupRef = useRef<Group | null>(null);
-
-  useFrame((_, delta) => {
-    if (groupRef.current && isPlaying) {
-      groupRef.current.rotation.y += delta * 0.025;
-    }
-  });
-
-  return (
-    <>
-      <ambientLight intensity={0.42} />
-      <directionalLight position={[4, 6, 4]} intensity={1.25} />
-      <pointLight position={[-3, 3, -2]} intensity={0.5} color="#54d6ff" />
-      <pointLight position={[3, 2, 2]} intensity={0.45} color="#ffb23f" />
-      <group ref={groupRef} rotation={[-0.22, 0.08, 0]} scale={[1.22, 1.22, 1.22]} position={[0, 0.04, 0]}>
-        <GridPlane />
-        <GlassReaderSurfaceMesh cymaticReport={cymaticReport} />
-        <RootCarrierWave carrierReport={carrierReport} />
-        <RuntimePathRails carrierReport={carrierReport} />
-        <CarrierTimeScanLines carrierReport={carrierReport} />
-        <CarrierRippleRings carrierReport={carrierReport} />
-        <AnchorMarkers fieldReport={fieldReport} />
-        <PlayheadPlane playheadReport={playheadReport} />
-      </group>
-      <OrbitControls enablePan enableZoom enableRotate autoRotate={false} minDistance={2.4} maxDistance={10.5} />
-    </>
-  );
-}
-
-function GridPlane() {
-  return (
-    <group position={[0, -0.16, 0]}>
-      {[-3, -2, -1, 0, 1, 2, 3].map((x) => (
-        <Line key={`x-${x}`} points={[[x, 0, -2.95], [x, 0, 2.95]]} color="#304050" lineWidth={0.6} transparent opacity={0.28} />
-      ))}
-      {[-2, -1, 0, 1, 2].map((z) => (
-        <Line key={`z-${z}`} points={[[-3.35, 0, z], [3.35, 0, z]]} color="#304050" lineWidth={0.6} transparent opacity={0.28} />
-      ))}
-    </group>
-  );
+function RuntimeCarrierScene(props: HfieldVolumetricPacketFieldProps) {
+  return <HfieldVolumetricPacketField {...props} />;
 }
 
 export default function HfieldPhaseFieldViewport({ report, playheadReport, isPlaying, onRefresh, onPlay, onStop }: ViewportProps) {

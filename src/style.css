@@ -1818,3 +1818,19 @@ body {
   }
 }
 /* END HFIELD Field Viewport Focus Layout v1 */
+
+
+/* HFIELD Volumetric Packet Field v1 */
+.carrier-reader-canvas-shell {
+  isolation: isolate;
+}
+
+.field-reader-stage-hint::after {
+  content: " · X reader position · Y cymatic displacement · Z field depth · glass slider = T scan";
+  color: rgba(86, 214, 255, 0.78);
+}
+
+.field-reader-focus-active .field-reader-stage-hint::after {
+  content: " · volumetric packet field active · tone bodies persist until the glass slider reveals their cymatic slice";
+}
+/* END HFIELD Volumetric Packet Field v1 */
