@@ -11,3 +11,4 @@ serde_json.workspace = true
 blake3.workspace = true
 hfield-domain = { path = "../hfield-domain" }
 hfield-storage = { path = "../hfield-storage" }
+hfield-packet = { path = "../hfield-packet" }

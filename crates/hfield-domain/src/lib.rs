@@ -2,12 +2,18 @@ use serde::{Deserialize, Serialize};
 
 pub const HFIELD_FORMAT_ID: &str = "aiweb.hfield";
 pub const HFIELD_VERSION: &str = "0.1.0";
+pub const HFIELD_PACKET_CONTRACT_ID: &str = "aiweb.hfield.packet_contract.v1";
 pub const DEFAULT_ROOT_FREQUENCY_HZ: f64 = 144.0;
+pub const HFIELD_PHASE_COUNT: u8 = 9;
+pub const HFIELD_PHASE_ORDER: [u8; 9] = [2, 1, 3, 4, 5, 6, 7, 9, 8];
+pub const HFIELD_ANCHOR_LAYOUT_ID: &str = "center_1_lower_5_upper_9";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FieldScore {
     pub format: String,
     pub version: String,
+    #[serde(default)]
+    pub packet: HfieldPacketContract,
     pub title: String,
     pub root_frequency_hz: f64,
     pub anchors: AnchorModel,
@@ -22,6 +28,7 @@ impl FieldScore {
         Self {
             format: HFIELD_FORMAT_ID.to_string(),
             version: HFIELD_VERSION.to_string(),
+            packet: HfieldPacketContract::default(),
             title: "Untitled Harmonic Conductor Score".to_string(),
             root_frequency_hz: DEFAULT_ROOT_FREQUENCY_HZ,
             anchors: AnchorModel::default(),
@@ -29,6 +36,95 @@ impl FieldScore {
             coupling_profile: "pitch_preview_v0".to_string(),
             music: MusicScore::default(),
             conductor: ConductedPerformance::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HfieldPacketContract {
+    pub contract_id: String,
+    pub packet_kind: String,
+    pub packet_role: String,
+    pub source_system: String,
+    pub target_systems: Vec<String>,
+    pub analog_bridge_intent: String,
+    pub phase_profile: NinePhaseProfile,
+    pub payload_layers: Vec<String>,
+    pub render_targets: Vec<String>,
+    pub forge_bridge: ForgeBridgeDescriptor,
+    pub migration_profile: String,
+}
+
+impl Default for HfieldPacketContract {
+    fn default() -> Self {
+        Self {
+            contract_id: HFIELD_PACKET_CONTRACT_ID.to_string(),
+            packet_kind: "harmonic_symbolic_field_packet".to_string(),
+            packet_role: "human_readable_and_forge_bridgeable_source_object".to_string(),
+            source_system: "HCS".to_string(),
+            target_systems: vec!["HCS".to_string(), "Forge".to_string()],
+            analog_bridge_intent: "render_digital_symbolic_state_as_score_sound_gesture_and_field"
+                .to_string(),
+            phase_profile: NinePhaseProfile::default(),
+            payload_layers: vec![
+                "score".to_string(),
+                "frequency_phase".to_string(),
+                "gesture".to_string(),
+                "field".to_string(),
+                "render".to_string(),
+                "forge_bridge".to_string(),
+            ],
+            render_targets: vec![
+                "notation".to_string(),
+                "audio".to_string(),
+                "conductor_motion".to_string(),
+                "three_dimensional_field_reserved".to_string(),
+                "cymatic_field_reserved".to_string(),
+            ],
+            forge_bridge: ForgeBridgeDescriptor::default(),
+            migration_profile: "no_migration_required_v1".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NinePhaseProfile {
+    pub phase_count: u8,
+    pub phase_order: Vec<u8>,
+    pub anchor_layout: String,
+    pub root_frequency_hz: f64,
+    pub communication_mode: String,
+}
+
+impl Default for NinePhaseProfile {
+    fn default() -> Self {
+        Self {
+            phase_count: HFIELD_PHASE_COUNT,
+            phase_order: HFIELD_PHASE_ORDER.to_vec(),
+            anchor_layout: HFIELD_ANCHOR_LAYOUT_ID.to_string(),
+            root_frequency_hz: DEFAULT_ROOT_FREQUENCY_HZ,
+            communication_mode: "nine_phase_frequency_packet".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ForgeBridgeDescriptor {
+    pub status: String,
+    pub bridge_profile: String,
+    pub forge_runtime_ref: Option<String>,
+    pub symbolic_trace_ref: Option<String>,
+    pub validation_ref: Option<String>,
+}
+
+impl Default for ForgeBridgeDescriptor {
+    fn default() -> Self {
+        Self {
+            status: "reserved".to_string(),
+            bridge_profile: "forge_packet_bridge_v0_reserved".to_string(),
+            forge_runtime_ref: None,
+            symbolic_trace_ref: None,
+            validation_ref: None,
         }
     }
 }
@@ -125,7 +221,7 @@ pub struct ConductedPerformance {
 impl Default for ConductedPerformance {
     fn default() -> Self {
         Self {
-            field_layout: "center_1_lower_5_upper_9".to_string(),
+            field_layout: HFIELD_ANCHOR_LAYOUT_ID.to_string(),
             primary_hand_track: GestureTrack {
                 track_id: "primary_hand".to_string(),
                 events: vec![
@@ -182,5 +278,44 @@ mod tests {
         assert_eq!(score.format, HFIELD_FORMAT_ID);
         assert_eq!(score.root_frequency_hz, 144.0);
         assert_eq!(score.conductor.field_layout, "center_1_lower_5_upper_9");
+    }
+
+    #[test]
+    fn default_score_has_packet_contract() {
+        let score = FieldScore::default_hcs();
+        assert_eq!(score.packet.contract_id, HFIELD_PACKET_CONTRACT_ID);
+        assert_eq!(score.packet.phase_profile.phase_count, 9);
+        assert_eq!(
+            score.packet.phase_profile.phase_order,
+            vec![2, 1, 3, 4, 5, 6, 7, 9, 8]
+        );
+        assert!(score
+            .packet
+            .target_systems
+            .iter()
+            .any(|target| target == "Forge"));
+    }
+
+    #[test]
+    fn old_hfield_json_without_packet_defaults_contract() {
+        let old_json = r#"{
+            "format":"aiweb.hfield",
+            "version":"0.1.0",
+            "title":"Old Packet",
+            "root_frequency_hz":144.0,
+            "anchors":{
+                "anchor_1":{"ratio":1.0,"role":"center_home_root_presence"},
+                "anchor_5":{"ratio":0.5,"role":"lower_depth_weight_transformation"},
+                "anchor_9":{"ratio":3.0,"role":"upper_lift_expression_release"}
+            },
+            "gesture_vocabulary":"nine_gesture_conductor_v0",
+            "coupling_profile":"pitch_preview_v0",
+            "music":{"tempo_bpm":84.0,"meter":"4/4","tuning_mode":"twelve_tone_equal_temperament","tracks":[]},
+            "conductor":{"field_layout":"center_1_lower_5_upper_9","primary_hand_track":{"track_id":"primary_hand","events":[]},"expressive_hand_track":null}
+        }"#;
+
+        let score: FieldScore = serde_json::from_str(old_json).expect("old .hfield parses");
+        assert_eq!(score.packet.contract_id, HFIELD_PACKET_CONTRACT_ID);
+        assert_eq!(score.packet.phase_profile.phase_count, 9);
     }
 }

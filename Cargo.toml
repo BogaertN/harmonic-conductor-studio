@@ -12,6 +12,7 @@ members = [
   "crates/hfield-visual",
   "crates/hfield-project",
   "crates/hfield-notation",
+  "crates/hfield-packet",
   "src-tauri"
 ]
 

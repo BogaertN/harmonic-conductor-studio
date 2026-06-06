@@ -15,6 +15,7 @@ use hfield_notation::{
     nudge_notation_note_by_beats, position_notation_note_measure_beat,
     position_notation_note_start_ms, select_notation_note,
 };
+use hfield_packet::validate_hfield_packet_contract;
 use hfield_project::{list_hfield_projects, open_hfield_project, save_hfield_project};
 use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
@@ -253,6 +254,19 @@ fn stop_existing_playback(state: &AppState) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn get_current_hfield_packet_contract_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(validate_hfield_packet_contract(&guard))
+        .map_err(|err| format!(".hfield packet contract serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -1222,6 +1236,7 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            get_current_hfield_packet_contract_report,
             get_current_conductor_motion_report,
             get_generated_conductor_motion_report,
             get_current_conductor_mapping_report,

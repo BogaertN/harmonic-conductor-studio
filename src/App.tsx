@@ -13,6 +13,7 @@ import {
   getCurrentConductorMappingReport,
   getCurrentConductorMotionReport,
   getCurrentGestureTimeline,
+  getCurrentHfieldPacketContractReport,
   getCurrentMusicTimeline,
   getCurrentNotationLayout,
   getCurrentProjectScore,
@@ -49,6 +50,7 @@ import {
   type ConductorMotionPoint,
   type ConductorMotionReport,
   type GestureTimelineReport,
+  type HfieldPacketContractReport,
   type MusicPreviewReport,
   type MusicTimelineReport,
   type NotationEditReport,
@@ -66,6 +68,7 @@ type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "project" | 
 type DiagnosticKey =
   | "projectReport"
   | "projectList"
+  | "packetContract"
   | "motionReport"
   | "mappingReport"
   | "musicTimeline"
@@ -112,6 +115,7 @@ const gestureAppendPlan = [
 const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "projectReport", label: "Project File Report" },
   { key: "projectList", label: "Project List" },
+  { key: "packetContract", label: ".hfield Packet Contract" },
   { key: "motionReport", label: "Conductor Motion" },
   { key: "mappingReport", label: "Conductor Mapping" },
   { key: "musicTimeline", label: "Music Timeline" },
@@ -464,6 +468,7 @@ export default function App() {
   const [projectFileName, setProjectFileName] = useState("ode_to_joy_mapped_v1.hfield");
   const [projectReport, setProjectReport] = useState<ProjectFileReport | null>(null);
   const [projectList, setProjectList] = useState<ProjectListReport | null>(null);
+  const [packetContractReport, setPacketContractReport] = useState<HfieldPacketContractReport | null>(null);
   const [isMotionPlaying, setIsMotionPlaying] = useState(false);
   const motionStartRef = useRef(0);
   const wallClockStartRef = useRef(0);
@@ -552,6 +557,7 @@ export default function App() {
     setGestureTimeline(await getCurrentGestureTimeline());
     setMappingReport(await getCurrentConductorMappingReport());
     setMotionReport(await getCurrentConductorMotionReport());
+    setPacketContractReport(await getCurrentHfieldPacketContractReport());
     resetMotionAnimation();
   }
 
@@ -1069,6 +1075,7 @@ export default function App() {
   const currentNoteCount = musicTimeline?.total_note_count ?? projectReport?.note_count ?? 0;
   const currentGestureCount = gestureTimeline?.event_count ?? projectReport?.conductor_event_count ?? motionReport?.event_count ?? 0;
   const alignmentStatus = mappingReport?.alignment_status ?? "not generated";
+  const packetStatus = packetContractReport?.status ?? "not checked";
 
   function diagnosticPayload() {
     switch (selectedDiagnostic) {
@@ -1076,6 +1083,8 @@ export default function App() {
         return projectReport;
       case "projectList":
         return projectList;
+      case "packetContract":
+        return packetContractReport;
       case "motionReport":
         return motionReport;
       case "mappingReport":
@@ -1158,6 +1167,7 @@ export default function App() {
           <StatusChip label="Notes" value={currentNoteCount} />
           <StatusChip label="Gestures" value={currentGestureCount} />
           <StatusChip label="Alignment" value={alignmentStatus} />
+          <StatusChip label="Packet" value={packetStatus} />
         </div>
 
         <div className="global-transport">

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
+use hfield_packet::{assert_hfield_packet_openable, validate_hfield_packet_contract};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProjectFileReport {
     pub status: String,
@@ -17,6 +18,9 @@ pub struct ProjectFileReport {
     pub title: String,
     pub format: String,
     pub version: String,
+    pub packet_status: String,
+    pub packet_contract_id: String,
+    pub fatal_errors: Vec<String>,
     pub note_count: usize,
     pub conductor_event_count: usize,
     pub warnings: Vec<String>,
@@ -103,6 +107,7 @@ pub fn save_hfield_project(
     std::fs::create_dir_all(&project_dir)
         .map_err(|err| format!("failed to create project directory: {err}"))?;
 
+    assert_hfield_packet_openable(score)?;
     let warnings = validate_score(score);
     let json = score_to_pretty_json(score)
         .map_err(|err| format!("failed to serialize score as .hfield JSON: {err}"))?;
@@ -128,6 +133,7 @@ pub fn open_hfield_project(
     let score: FieldScore = serde_json::from_str(&json)
         .map_err(|err| format!("failed to parse .hfield project JSON: {err}"))?;
 
+    assert_hfield_packet_openable(&score)?;
     let warnings = validate_score(&score);
     let report = create_file_report("open", &project_dir, &file_name, &path, &score, warnings)?;
 
@@ -248,6 +254,7 @@ fn create_file_report(
     let file_hash = blake3::hash(&file_bytes).to_hex().to_string();
     let score_hash =
         score_hash_hex(score).map_err(|err| format!("failed to hash .hfield score: {err}"))?;
+    let packet_report = validate_hfield_packet_contract(score);
 
     Ok(ProjectFileReport {
         status: "ok".to_string(),
@@ -261,6 +268,9 @@ fn create_file_report(
         title: score.title.clone(),
         format: score.format.clone(),
         version: score.version.clone(),
+        packet_status: packet_report.status,
+        packet_contract_id: packet_report.contract_id,
+        fatal_errors: packet_report.fatal_errors,
         note_count: note_count(score),
         conductor_event_count: conductor_event_count(score),
         warnings,
@@ -269,6 +279,14 @@ fn create_file_report(
 
 fn validate_score(score: &FieldScore) -> Vec<String> {
     let mut warnings = Vec::new();
+    let packet_report = validate_hfield_packet_contract(score);
+    warnings.extend(packet_report.warnings.clone());
+    warnings.extend(
+        packet_report
+            .fatal_errors
+            .iter()
+            .map(|error| format!("fatal packet error: {error}")),
+    );
 
     if score.format != "aiweb.hfield" {
         warnings.push(format!("unexpected format: {}", score.format));

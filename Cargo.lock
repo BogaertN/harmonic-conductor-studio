@@ -1300,6 +1300,7 @@ dependencies = [
  "hfield-mapping",
  "hfield-music",
  "hfield-notation",
+ "hfield-packet",
  "hfield-project",
  "hfield-resonance",
  "hfield-storage",
@@ -1369,6 +1370,7 @@ name = "hfield-domain"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1409,11 +1411,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hfield-packet"
+version = "0.1.0"
+dependencies = [
+ "hfield-domain",
+ "hfield-storage",
+ "serde",
+]
+
+[[package]]
 name = "hfield-project"
 version = "0.1.0"
 dependencies = [
  "blake3",
  "hfield-domain",
+ "hfield-packet",
  "hfield-storage",
  "serde",
  "serde_json",

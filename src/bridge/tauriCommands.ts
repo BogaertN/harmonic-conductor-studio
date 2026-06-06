@@ -61,6 +61,37 @@ export type StopReport = {
   message: string;
 };
 
+export type HfieldPacketContractReport = {
+  status: string;
+  contract_id: string;
+  file_format: string;
+  file_version: string;
+  packet_kind: string;
+  packet_role: string;
+  source_system: string;
+  target_systems: string[];
+  analog_bridge_intent: string;
+  root_frequency_hz: number;
+  phase_count: number;
+  phase_order: number[];
+  anchor_layout: string;
+  payload_layers: string[];
+  render_targets: string[];
+  forge_bridge_status: string;
+  forge_bridge_profile: string;
+  note_count: number;
+  conductor_event_count: number;
+  packet_hash: string;
+  readiness: {
+    hcs_readable: boolean;
+    analog_renderable: boolean;
+    forge_bridge_reserved: boolean;
+    forge_runtime_bound: boolean;
+  };
+  fatal_errors: string[];
+  warnings: string[];
+};
+
 export type ProjectFileReport = {
   status: string;
   action: string;
@@ -351,6 +382,10 @@ export type ResonanceLevelBundle = {
   accessibility_guidance: string[];
   professional_boundary: string;
 };
+
+export async function getCurrentHfieldPacketContractReport(): Promise<HfieldPacketContractReport> {
+  return await invoke<HfieldPacketContractReport>("get_current_hfield_packet_contract_report");
+}
 
 export async function listSavedProjects(): Promise<ProjectListReport> {
   return await invoke<ProjectListReport>("list_saved_projects");
