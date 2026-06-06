@@ -1,5 +1,7 @@
 use hfield_domain::{FieldScore, HFIELD_PHASE_ORDER};
-use hfield_field::{synthesize_hfield_field, FieldHarmonicEvent};
+use hfield_field::{
+    synthesize_gesture_aware_field_renderer_v2_report, synthesize_hfield_field, FieldHarmonicEvent,
+};
 use hfield_music::midi_note_to_name;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
@@ -137,6 +139,497 @@ pub struct AmbientCymaticFieldPoint {
     pub z: f32,
     pub color_hex: String,
     pub role: String,
+}
+
+pub const CYMATIC_FIELD_MODEL_V2_CONTRACT_ID: &str = "aiweb.hfield.cymatic_field_model.v2";
+pub const CYMATIC_FIELD_MODEL_V2_PROFILE_ID: &str =
+    "glass_plate_gesture_aware_interference_model_v2";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticFieldModelV2Report {
+    pub status: String,
+    pub contract_id: &'static str,
+    pub profile_id: &'static str,
+    pub model_role: &'static str,
+    pub source_reader_contract_id: String,
+    pub source_field_contract_id: String,
+    pub gesture_aware_renderer_contract_id: String,
+    pub authority_boundaries: CymaticFieldModelV2AuthorityBoundaries,
+    pub physical_claim_policy: CymaticPhysicalClaimPolicy,
+    pub medium_model: CymaticMediumModel,
+    pub model_layers: Vec<CymaticFieldModelLayer>,
+    pub nodal_ring_count: usize,
+    pub nodal_rings: Vec<CymaticNodalRing>,
+    pub resonance_node_count: usize,
+    pub resonance_nodes: Vec<CymaticResonanceNode>,
+    pub gesture_cymatic_path_count: usize,
+    pub gesture_cymatic_paths: Vec<CymaticGesturePathProjection>,
+    pub interference_summary: CymaticFieldInterferenceSummary,
+    pub current_score_scan: CymaticFieldModelScoreScan,
+    pub readiness_gates: CymaticFieldModelReadinessGates,
+    pub deterministic_model_hash: String,
+    pub next_work: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticFieldModelV2AuthorityBoundaries {
+    pub model_reads_harmonic_field_score: bool,
+    pub model_reads_cymatic_reader_surface_v1: bool,
+    pub model_reads_gesture_aware_renderer_v2: bool,
+    pub model_outputs_are_rendering_data: bool,
+    pub model_outputs_are_source_authority: bool,
+    pub model_outputs_are_physical_sensor_measurements: bool,
+    pub model_outputs_are_forge_operational_meaning: bool,
+    pub open_source_simulation_tools_are_source_authority: bool,
+    pub mutates_forge: bool,
+    pub performs_identity_vault_write: bool,
+    pub exports_private_identity: bool,
+    pub authorizes_health_or_sensor_claims: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticPhysicalClaimPolicy {
+    pub synthesized_not_measured: bool,
+    pub requires_future_sensor_calibration_for_physical_claims: bool,
+    pub microphone_or_camera_input_used: bool,
+    pub glass_chip_reader_input_used: bool,
+    pub physical_reader_calibration_status: &'static str,
+    pub claim_boundary: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticMediumModel {
+    pub medium_id: &'static str,
+    pub medium_label: &'static str,
+    pub reader_plane: GlassReaderPlane,
+    pub x_segments: usize,
+    pub t_segments: usize,
+    pub displacement_axis: &'static str,
+    pub time_axis: &'static str,
+    pub frequency_axis: &'static str,
+    pub boundary_condition: &'static str,
+    pub damping_model: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticFieldModelLayer {
+    pub layer_id: &'static str,
+    pub source: &'static str,
+    pub model_rule: &'static str,
+    pub downstream_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticNodalRing {
+    pub ring_id: String,
+    pub phase: u8,
+    pub anchor_role: String,
+    pub base_frequency_hz: f64,
+    pub normalized_radius: f32,
+    pub nodal_line_count: usize,
+    pub color_hex: String,
+    pub stable_anchor: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticResonanceNode {
+    pub node_id: String,
+    pub source_vertex_index: usize,
+    pub time_ms: u32,
+    pub x_norm: f32,
+    pub time_norm: f32,
+    pub displacement: f32,
+    pub intensity: f32,
+    pub active_tone_count: usize,
+    pub dominant_phase: u8,
+    pub dominant_frequency_hz: f64,
+    pub color_hex: String,
+    pub node_role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticGesturePathProjection {
+    pub projection_id: String,
+    pub source_path_id: String,
+    pub gesture_id: String,
+    pub primitive_name: String,
+    pub field_region: String,
+    pub orbital_direction: String,
+    pub start_ms: u32,
+    pub end_ms: u32,
+    pub radius: f32,
+    pub operator_markers: Vec<String>,
+    pub associated_motif: Option<String>,
+    pub cymatic_points: Vec<CymaticGesturePoint>,
+    pub renderer_may_infer_missing_geometry: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct CymaticGesturePoint {
+    pub x_norm: f32,
+    pub y_norm: f32,
+    pub time_norm: f32,
+    pub displacement_bias: f32,
+    pub phase: u8,
+    pub radius: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticFieldInterferenceSummary {
+    pub surface_vertex_count: usize,
+    pub surface_triangle_count: usize,
+    pub max_abs_displacement: f32,
+    pub polyphonic_interference_count: usize,
+    pub constructive_slice_count: usize,
+    pub destructive_slice_count: usize,
+    pub dominant_phase_histogram: Vec<CymaticPhaseHistogramEntry>,
+    pub highest_intensity_time_ms: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticPhaseHistogramEntry {
+    pub phase: u8,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticFieldModelScoreScan {
+    pub title: String,
+    pub root_frequency_hz: f64,
+    pub active_tone_count: usize,
+    pub gesture_path_count: usize,
+    pub resonance_node_count: usize,
+    pub nodal_ring_count: usize,
+    pub total_duration_ms: u32,
+    pub source_reader_hash: String,
+    pub gesture_renderer_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CymaticFieldModelReadinessGates {
+    pub has_reader_surface: bool,
+    pub has_gesture_aware_renderer: bool,
+    pub has_resonance_nodes: bool,
+    pub has_nodal_rings: bool,
+    pub every_gesture_projection_has_manifest_geometry: bool,
+    pub physical_claim_boundary_is_explicit: bool,
+    pub output_is_deterministic: bool,
+    pub no_live_forge_or_identity_side_effects: bool,
+    pub current_score_can_drive_cymatic_field_model_v2: bool,
+}
+
+pub fn synthesize_cymatic_field_model_v2_report(score: &FieldScore) -> CymaticFieldModelV2Report {
+    let reader = synthesize_hfield_cymatic_reader_surface(score);
+    let gesture_renderer = synthesize_gesture_aware_field_renderer_v2_report(score);
+    let nodal_rings = cymatic_nodal_rings_v2(&reader.anchor_colors);
+    let resonance_nodes = cymatic_resonance_nodes_v2(&reader);
+    let gesture_cymatic_paths = gesture_renderer
+        .gesture_paths
+        .iter()
+        .map(cymatic_gesture_path_projection_v2)
+        .collect::<Vec<_>>();
+    let interference_summary = cymatic_field_interference_summary_v2(&reader);
+    let no_live_forge_or_identity_side_effects = score.packet.forge_bridge.status == "reserved"
+        && score.packet.forge_bridge.forge_runtime_ref.is_none()
+        && score.provenance.identity_vault.vault_record_ref.is_none()
+        && !score.provenance.raw_private_identity_exported;
+    let every_gesture_projection_has_manifest_geometry = gesture_cymatic_paths
+        .iter()
+        .all(|path| !path.renderer_may_infer_missing_geometry && path.cymatic_points.len() >= 3);
+    let has_reader_surface = reader.reader_surface.vertex_count > 0;
+    let has_gesture_aware_renderer = gesture_renderer
+        .readiness_gates
+        .current_score_can_drive_gesture_aware_field_renderer_v2;
+    let has_resonance_nodes = !resonance_nodes.is_empty();
+    let has_nodal_rings = nodal_rings.len() >= 9;
+
+    let mut report = CymaticFieldModelV2Report {
+        status: if has_reader_surface
+            && has_gesture_aware_renderer
+            && has_resonance_nodes
+            && has_nodal_rings
+            && every_gesture_projection_has_manifest_geometry
+            && no_live_forge_or_identity_side_effects
+        {
+            "ok".to_string()
+        } else {
+            "warning".to_string()
+        },
+        contract_id: CYMATIC_FIELD_MODEL_V2_CONTRACT_ID,
+        profile_id: CYMATIC_FIELD_MODEL_V2_PROFILE_ID,
+        model_role: "deterministic downstream cymatic field model combining glass reader surface interference, nodal rings, and gesture-aware field paths",
+        source_reader_contract_id: reader.cymatic_reader_contract_id.clone(),
+        source_field_contract_id: reader.source_field_contract_id.clone(),
+        gesture_aware_renderer_contract_id: gesture_renderer.contract_id.to_string(),
+        authority_boundaries: CymaticFieldModelV2AuthorityBoundaries {
+            model_reads_harmonic_field_score: true,
+            model_reads_cymatic_reader_surface_v1: true,
+            model_reads_gesture_aware_renderer_v2: true,
+            model_outputs_are_rendering_data: true,
+            model_outputs_are_source_authority: false,
+            model_outputs_are_physical_sensor_measurements: false,
+            model_outputs_are_forge_operational_meaning: false,
+            open_source_simulation_tools_are_source_authority: false,
+            mutates_forge: false,
+            performs_identity_vault_write: false,
+            exports_private_identity: false,
+            authorizes_health_or_sensor_claims: false,
+        },
+        physical_claim_policy: CymaticPhysicalClaimPolicy {
+            synthesized_not_measured: true,
+            requires_future_sensor_calibration_for_physical_claims: true,
+            microphone_or_camera_input_used: false,
+            glass_chip_reader_input_used: false,
+            physical_reader_calibration_status: "not_calibrated_synthetic_model_only",
+            claim_boundary: "This report models what the score-driven field would render as a cymatic pattern; it is not a physical measurement until a future calibrated reader/sensor packet exists.",
+        },
+        medium_model: CymaticMediumModel {
+            medium_id: "hcs_glass_plate_field_model_v2",
+            medium_label: "synthetic transparent glass cymatic field plate",
+            reader_plane: reader.glass_reader.clone(),
+            x_segments: reader.reader_surface.x_segments,
+            t_segments: reader.reader_surface.t_segments,
+            displacement_axis: "signed_surface_displacement",
+            time_axis: "front_to_back_packet_time",
+            frequency_axis: "left_to_right_phase_frequency_interference",
+            boundary_condition: "fixed_edge_synthetic_plate_with_phase_anchor_bias",
+            damping_model: "deterministic_amplitude_envelope_from_score_events_no_random_noise",
+        },
+        model_layers: cymatic_field_model_layers_v2(),
+        nodal_ring_count: nodal_rings.len(),
+        nodal_rings,
+        resonance_node_count: resonance_nodes.len(),
+        resonance_nodes,
+        gesture_cymatic_path_count: gesture_cymatic_paths.len(),
+        gesture_cymatic_paths,
+        interference_summary,
+        current_score_scan: CymaticFieldModelScoreScan {
+            title: reader.title.clone(),
+            root_frequency_hz: reader.root_frequency_hz,
+            active_tone_count: reader.active_tones.len(),
+            gesture_path_count: gesture_renderer.gesture_path_count,
+            resonance_node_count: 0,
+            nodal_ring_count: 0,
+            total_duration_ms: reader
+                .interference_slices
+                .last()
+                .map(|slice| slice.time_ms)
+                .unwrap_or(0),
+            source_reader_hash: reader.deterministic_reader_hash.clone(),
+            gesture_renderer_hash: gesture_renderer.deterministic_renderer_hash.clone(),
+        },
+        readiness_gates: CymaticFieldModelReadinessGates {
+            has_reader_surface,
+            has_gesture_aware_renderer,
+            has_resonance_nodes,
+            has_nodal_rings,
+            every_gesture_projection_has_manifest_geometry,
+            physical_claim_boundary_is_explicit: true,
+            output_is_deterministic: true,
+            no_live_forge_or_identity_side_effects,
+            current_score_can_drive_cymatic_field_model_v2: has_reader_surface
+                && has_gesture_aware_renderer
+                && has_resonance_nodes
+                && has_nodal_rings
+                && every_gesture_projection_has_manifest_geometry
+                && no_live_forge_or_identity_side_effects,
+        },
+        deterministic_model_hash: String::new(),
+        next_work: vec![
+            "bind cymatic field model v2 hash into canonical bundle manifest v2",
+            "add renderer replay verifier coverage for cymatic model v2 exports",
+            "wire the visual layer to display nodal rings and gesture-cymatic paths",
+            "evaluate open-source FFT/simulation helpers only through license and local-first gates",
+            "later add calibrated microphone/camera/glass-chip reader packet before making physical measurement claims",
+        ],
+    };
+    report.current_score_scan.resonance_node_count = report.resonance_node_count;
+    report.current_score_scan.nodal_ring_count = report.nodal_ring_count;
+    report.deterministic_model_hash = stable_cymatic_field_model_v2_hash(&report);
+    report
+}
+
+fn cymatic_field_model_layers_v2() -> Vec<CymaticFieldModelLayer> {
+    vec![
+        CymaticFieldModelLayer {
+            layer_id: "glass_reader_surface_layer",
+            source: "HfieldCymaticReaderSurfaceReport v1",
+            model_rule: "reuse the deterministic reader mesh vertices as the bounded cymatic surface substrate",
+            downstream_only: true,
+        },
+        CymaticFieldModelLayer {
+            layer_id: "nodal_ring_layer",
+            source: "phase color bands and root frequency",
+            model_rule: "derive stable phase rings for 1-9 with anchors 1, 5, and 9 emphasized",
+            downstream_only: true,
+        },
+        CymaticFieldModelLayer {
+            layer_id: "gesture_cymatic_projection_layer",
+            source: "Gesture-Aware Field Renderer v2 paths",
+            model_rule: "project Rust-owned gesture paths into normalized cymatic displacement space without inferring missing geometry",
+            downstream_only: true,
+        },
+        CymaticFieldModelLayer {
+            layer_id: "interference_summary_layer",
+            source: "reader surface interference slices",
+            model_rule: "summarize constructive/destructive interference deterministically for replay verification",
+            downstream_only: true,
+        },
+        CymaticFieldModelLayer {
+            layer_id: "future_sensor_calibration_boundary",
+            source: "no live sensor input in v2",
+            model_rule: "reserve physical measurement claims for future calibrated reader packets only",
+            downstream_only: true,
+        },
+    ]
+}
+
+fn cymatic_nodal_rings_v2(color_bands: &[PhaseColorBand]) -> Vec<CymaticNodalRing> {
+    HFIELD_PHASE_ORDER
+        .iter()
+        .map(|phase| {
+            let color = phase_color_band(color_bands, *phase);
+            let anchor_boost = if [1, 5, 9].contains(phase) { 0.08 } else { 0.0 };
+            CymaticNodalRing {
+                ring_id: format!("phase_{phase}_nodal_ring"),
+                phase: *phase,
+                anchor_role: color.anchor_role.clone(),
+                base_frequency_hz: color.base_frequency_hz,
+                normalized_radius: round4(
+                    (0.16 + *phase as f32 * 0.075 + anchor_boost).clamp(0.16, 0.92),
+                ),
+                nodal_line_count: (*phase as usize).max(1),
+                color_hex: color.color_hex.clone(),
+                stable_anchor: [1, 5, 9].contains(phase),
+            }
+        })
+        .collect()
+}
+
+fn cymatic_resonance_nodes_v2(
+    reader: &HfieldCymaticReaderSurfaceReport,
+) -> Vec<CymaticResonanceNode> {
+    let mut vertices = reader.reader_surface.vertices.clone();
+    vertices.sort_by(|left, right| {
+        right
+            .intensity
+            .partial_cmp(&left.intensity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left.vertex_index.cmp(&right.vertex_index))
+    });
+
+    vertices
+        .into_iter()
+        .filter(|vertex| vertex.intensity > 0.0 || vertex.active_tone_count > 0)
+        .take(96)
+        .enumerate()
+        .map(|(index, vertex)| CymaticResonanceNode {
+            node_id: format!("resonance_node_{}", index + 1),
+            source_vertex_index: vertex.vertex_index,
+            time_ms: vertex.time_ms,
+            x_norm: vertex.x_norm,
+            time_norm: vertex.time_norm,
+            displacement: vertex.displacement,
+            intensity: vertex.intensity,
+            active_tone_count: vertex.active_tone_count,
+            dominant_phase: vertex.dominant_phase,
+            dominant_frequency_hz: vertex.dominant_frequency_hz,
+            color_hex: vertex.color_hex,
+            node_role: if vertex.active_tone_count > 1 {
+                "polyphonic_interference_node".to_string()
+            } else {
+                "single_tone_resonance_node".to_string()
+            },
+        })
+        .collect()
+}
+
+fn cymatic_gesture_path_projection_v2(
+    path: &hfield_field::GestureAwareFieldPath,
+) -> CymaticGesturePathProjection {
+    CymaticGesturePathProjection {
+        projection_id: format!("{}_cymatic_projection", path.path_id),
+        source_path_id: path.path_id.clone(),
+        gesture_id: path.gesture_id.clone(),
+        primitive_name: path.primitive_name.clone(),
+        field_region: path.field_region.clone(),
+        orbital_direction: path.orbital_direction.clone(),
+        start_ms: path.start_ms,
+        end_ms: path.end_ms,
+        radius: round4(path.radius),
+        operator_markers: path.operator_markers.clone(),
+        associated_motif: path.associated_motif.clone(),
+        cymatic_points: path
+            .sample_points
+            .iter()
+            .map(|point| CymaticGesturePoint {
+                x_norm: round4(point.x.clamp(-1.0, 1.0)),
+                y_norm: round4(point.y.clamp(-1.0, 1.0)),
+                time_norm: round4(point.t_norm.clamp(0.0, 1.0)),
+                displacement_bias: round4((point.z * 0.35 + path.radius * 0.08).clamp(-1.0, 1.0)),
+                phase: point.phase,
+                radius: round4(point.radius),
+            })
+            .collect(),
+        renderer_may_infer_missing_geometry: path.renderer_may_infer_missing_geometry,
+    }
+}
+
+fn cymatic_field_interference_summary_v2(
+    reader: &HfieldCymaticReaderSurfaceReport,
+) -> CymaticFieldInterferenceSummary {
+    let constructive_slice_count = reader
+        .interference_slices
+        .iter()
+        .filter(|slice| slice.constructive_energy >= slice.destructive_energy)
+        .count();
+    let destructive_slice_count = reader
+        .interference_slices
+        .len()
+        .saturating_sub(constructive_slice_count);
+    let highest_intensity_time_ms = reader
+        .interference_slices
+        .iter()
+        .max_by(|left, right| {
+            let left_energy = left.constructive_energy + left.destructive_energy;
+            let right_energy = right.constructive_energy + right.destructive_energy;
+            left_energy
+                .partial_cmp(&right_energy)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|slice| slice.time_ms)
+        .unwrap_or(0);
+
+    CymaticFieldInterferenceSummary {
+        surface_vertex_count: reader.reader_surface.vertex_count,
+        surface_triangle_count: reader.reader_surface.triangle_count,
+        max_abs_displacement: reader.reader_surface.max_abs_displacement,
+        polyphonic_interference_count: reader.reader_surface.polyphonic_interference_count,
+        constructive_slice_count,
+        destructive_slice_count,
+        dominant_phase_histogram: cymatic_phase_histogram_v2(&reader.interference_slices),
+        highest_intensity_time_ms,
+    }
+}
+
+fn cymatic_phase_histogram_v2(slices: &[InterferenceTimeSlice]) -> Vec<CymaticPhaseHistogramEntry> {
+    HFIELD_PHASE_ORDER
+        .iter()
+        .map(|phase| CymaticPhaseHistogramEntry {
+            phase: *phase,
+            count: slices
+                .iter()
+                .filter(|slice| slice.dominant_phase == *phase)
+                .count(),
+        })
+        .collect()
+}
+
+fn stable_cymatic_field_model_v2_hash(report: &CymaticFieldModelV2Report) -> String {
+    let mut clone = report.clone();
+    clone.deterministic_model_hash.clear();
+    let bytes = serde_json::to_vec(&clone).unwrap_or_default();
+    blake3::hash(&bytes).to_hex().to_string()
 }
 
 pub fn synthesize_hfield_cymatic_reader_surface(
@@ -762,6 +1255,78 @@ mod tests {
         assert_eq!(a.deterministic_reader_hash, b.deterministic_reader_hash);
         assert_eq!(a.reader_surface.vertices, b.reader_surface.vertices);
         assert_eq!(a.interference_slices, b.interference_slices);
+    }
+
+    #[test]
+    fn cymatic_field_model_v2_consumes_reader_and_gesture_renderer() {
+        let report = synthesize_cymatic_field_model_v2_report(&FieldScore::default_hcs());
+
+        assert_eq!(report.contract_id, CYMATIC_FIELD_MODEL_V2_CONTRACT_ID);
+        assert!(
+            report
+                .authority_boundaries
+                .model_reads_cymatic_reader_surface_v1
+        );
+        assert!(
+            report
+                .authority_boundaries
+                .model_reads_gesture_aware_renderer_v2
+        );
+        assert!(report.nodal_ring_count >= 9);
+        assert_eq!(report.nodal_ring_count, report.nodal_rings.len());
+        assert!(report.resonance_node_count >= 1);
+        assert_eq!(report.resonance_node_count, report.resonance_nodes.len());
+        assert!(report.gesture_cymatic_path_count >= 1);
+        assert_eq!(
+            report.gesture_cymatic_path_count,
+            report.gesture_cymatic_paths.len()
+        );
+        assert!(
+            report
+                .readiness_gates
+                .current_score_can_drive_cymatic_field_model_v2
+        );
+    }
+
+    #[test]
+    fn cymatic_field_model_v2_stays_downstream_and_synthetic() {
+        let report = synthesize_cymatic_field_model_v2_report(&FieldScore::default_hcs());
+        let second = synthesize_cymatic_field_model_v2_report(&FieldScore::default_hcs());
+
+        assert!(report.authority_boundaries.model_outputs_are_rendering_data);
+        assert!(
+            !report
+                .authority_boundaries
+                .model_outputs_are_source_authority
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .model_outputs_are_physical_sensor_measurements
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .model_outputs_are_forge_operational_meaning
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .open_source_simulation_tools_are_source_authority
+        );
+        assert!(!report.authority_boundaries.mutates_forge);
+        assert!(!report.authority_boundaries.performs_identity_vault_write);
+        assert!(!report.authority_boundaries.exports_private_identity);
+        assert!(report.physical_claim_policy.synthesized_not_measured);
+        assert!(
+            report
+                .physical_claim_policy
+                .requires_future_sensor_calibration_for_physical_claims
+        );
+        assert_eq!(
+            report.deterministic_model_hash,
+            second.deterministic_model_hash
+        );
     }
 
     #[test]

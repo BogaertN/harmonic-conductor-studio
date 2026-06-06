@@ -297,6 +297,45 @@ export type HfieldGestureAwareFieldRendererV2Report = {
   next_work: string[];
 };
 
+
+export type HfieldCymaticFieldModelV2Report = {
+  status: string;
+  contract_id: string;
+  profile_id: string;
+  model_role: string;
+  source_reader_contract_id: string;
+  source_field_contract_id: string;
+  gesture_aware_renderer_contract_id: string;
+  authority_boundaries: {
+    model_reads_harmonic_field_score: boolean;
+    model_reads_cymatic_reader_surface_v1: boolean;
+    model_reads_gesture_aware_renderer_v2: boolean;
+    model_outputs_are_rendering_data: boolean;
+    model_outputs_are_source_authority: boolean;
+    model_outputs_are_physical_sensor_measurements: boolean;
+    model_outputs_are_forge_operational_meaning: boolean;
+    open_source_simulation_tools_are_source_authority: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  physical_claim_policy: unknown;
+  medium_model: unknown;
+  model_layers: unknown[];
+  nodal_ring_count: number;
+  nodal_rings: unknown[];
+  resonance_node_count: number;
+  resonance_nodes: unknown[];
+  gesture_cymatic_path_count: number;
+  gesture_cymatic_paths: unknown[];
+  interference_summary: unknown;
+  current_score_scan: unknown;
+  readiness_gates: unknown;
+  deterministic_model_hash: string;
+  next_work: string[];
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1473,6 +1512,15 @@ export async function getCurrentGestureAwareFieldRendererV2Report(): Promise<Hfi
 
 export async function exportCurrentGestureAwareFieldRendererV2Json(): Promise<ExportFileReport> {
   return await invoke<ExportFileReport>("export_current_gesture_aware_field_renderer_v2_json");
+}
+
+
+export async function getCurrentCymaticFieldModelV2Report(): Promise<HfieldCymaticFieldModelV2Report> {
+  return await invoke<HfieldCymaticFieldModelV2Report>("get_current_cymatic_field_model_v2_report");
+}
+
+export async function exportCurrentCymaticFieldModelV2Json(): Promise<ExportFileReport> {
+  return await invoke<ExportFileReport>("export_current_cymatic_field_model_v2_json");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {
