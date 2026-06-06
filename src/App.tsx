@@ -17,6 +17,7 @@ import {
   getCurrentForgePacketBridgeStubReport,
   getCurrentMusicTimeline,
   getCurrentNotationLayout,
+  getCurrentPlayheadCursorReport,
   getCurrentProjectScore,
   getCurrentResonanceLevelBundle,
   getGeneratedConductorMotionReport,
@@ -58,6 +59,7 @@ import {
   type NotationEditReport,
   type NotationLayoutReport,
   type PlaybackReport,
+  type PlayheadCursorReport,
   type PreviewReport,
   type ProjectFileReport,
   type ProjectListReport,
@@ -72,6 +74,7 @@ type DiagnosticKey =
   | "projectList"
   | "packetContract"
   | "forgeBridgeStub"
+  | "playheadCursor"
   | "motionReport"
   | "mappingReport"
   | "musicTimeline"
@@ -120,6 +123,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "projectList", label: "Project List" },
   { key: "packetContract", label: ".hfield Packet Contract" },
   { key: "forgeBridgeStub", label: "Forge Bridge Stub" },
+  { key: "playheadCursor", label: "Playhead Cursor" },
   { key: "motionReport", label: "Conductor Motion" },
   { key: "mappingReport", label: "Conductor Mapping" },
   { key: "musicTimeline", label: "Music Timeline" },
@@ -239,6 +243,7 @@ function NotationSpine({
   gestureTimeline,
   motionReport,
   motionTimeMs,
+  playheadReport,
   modeLabel,
   selectedNoteKey,
   onSelectNote,
@@ -249,6 +254,7 @@ function NotationSpine({
   gestureTimeline: GestureTimelineReport | null;
   motionReport: ConductorMotionReport | null;
   motionTimeMs: number;
+  playheadReport?: PlayheadCursorReport | null;
   modeLabel: string;
   selectedNoteKey?: string | null;
   onSelectNote?: (trackId: string, eventIndex: number) => void;
@@ -295,8 +301,12 @@ function NotationSpine({
   const voices = notationLayout?.voices ?? fallbackVoices;
   const cueBlocks = notationLayout?.cue_strip ?? fallbackCueStrip;
   const durationMs = Math.max(1, notationLayout?.total_duration_ms ?? motionReport?.total_duration_ms ?? musicTimeline?.total_duration_ms ?? 1);
-  const cursorPercent = Math.min(99, Math.max(0, (motionTimeMs / durationMs) * 100));
   const activeEvent = getActiveEvent(motionReport, motionTimeMs);
+  const cursorPercent = Math.min(99, Math.max(0, playheadReport?.score_cursor_x_percent ?? (motionTimeMs / durationMs) * 100));
+  const activeNoteKeys = new Set((playheadReport?.active_notes ?? []).map((note) => `${note.track_id}:${note.event_index}`));
+  const activeCueIndex = playheadReport?.active_conductor_cue?.event_index ?? null;
+  const activeCueLabel = playheadReport?.active_gesture_id ?? activeEvent?.gesture_id ?? "—";
+  const playheadLabel = playheadReport ? `M${playheadReport.current_measure} · beat ${playheadReport.current_beat_in_measure}` : `${Math.round(motionTimeMs)}ms`;
   const measureCount = Math.max(4, notationLayout?.measure_count ?? Math.ceil((musicTimeline?.total_duration_seconds ?? 0) / 2.856));
   const ruler = Array.from({ length: Math.min(12, measureCount) }, (_, index) => index + 1);
   const meter = notationLayout?.meter ?? musicTimeline?.meter ?? "4/4";
@@ -314,7 +324,8 @@ function NotationSpine({
           <StatusChip label="Meter" value={meter} />
           <StatusChip label="Tempo" value={`${tempo} BPM`} />
           <StatusChip label="Notes" value={noteCount} />
-          <StatusChip label="Cue" value={activeEvent?.gesture_id ?? "—"} />
+          <StatusChip label="Cue" value={activeCueLabel} />
+          <StatusChip label="Playhead" value={playheadLabel} />
         </div>
       </div>
 
@@ -328,10 +339,18 @@ function NotationSpine({
                 {[0, 1, 2, 3, 4].map((line) => <span key={line} className="notation-staff-line" />)}
                 {voice.notes.slice(0, 32).map((note) => {
                   const noteKey = `${note.track_id}:${note.event_index}`;
+                  const noteClasses = ["notation-note", note.resonance_lane];
+                  if (selectedNoteKey === noteKey) {
+                    noteClasses.push("selected");
+                  }
+                  if (activeNoteKeys.has(noteKey)) {
+                    noteClasses.push("playing");
+                  }
+
                   return (
                     <button
                       key={`${voice.track_id}-${note.event_index}-${note.start_ms}-${note.midi_note}`}
-                      className={selectedNoteKey === noteKey ? `notation-note selected ${note.resonance_lane}` : `notation-note ${note.resonance_lane}`}
+                      className={noteClasses.join(" ")}
                       style={{ left: `${note.x_percent}%`, top: `${note.y_percent}%`, width: `${note.width_percent}%` }}
                       title={`${note.note_name} · M${note.measure_index} beat ${note.beat_in_measure} · ${note.frequency_hz.toFixed(2)} Hz`}
                       onClick={() => onSelectNote?.(note.track_id, note.event_index)}
@@ -345,20 +364,23 @@ function NotationSpine({
             </div>
           ))}
         </div>
-        <div className="notation-playhead" style={{ left: `${cursorPercent}%` }}><span>{Math.round(motionTimeMs)}ms</span></div>
+        <div className="notation-playhead" style={{ left: `${cursorPercent}%` }}><span>{playheadLabel}</span></div>
       </div>
 
       <div className="notation-cue-strip">
-        {cueBlocks.slice(0, 24).map((cue) => (
-          <span
-            key={`${cue.event_index}-${cue.gesture_id}-${cue.start_ms}`}
-            className={activeEvent?.gesture_id === cue.gesture_id ? "notation-cue active" : "notation-cue"}
-            style={{ left: `${cue.x_percent}%`, width: `${cue.width_percent}%` }}
-            title={`${cue.cue_text} · M${cue.measure_index} beat ${cue.beat_in_measure}`}
-          >
-            {cue.gesture_id} · {cue.gesture_name}
-          </span>
-        ))}
+        {cueBlocks.slice(0, 24).map((cue) => {
+          const cueActive = activeCueIndex === cue.event_index || activeEvent?.gesture_id === cue.gesture_id;
+          return (
+            <span
+              key={`${cue.event_index}-${cue.gesture_id}-${cue.start_ms}`}
+              className={cueActive ? "notation-cue active" : "notation-cue"}
+              style={{ left: `${cue.x_percent}%`, width: `${cue.width_percent}%` }}
+              title={`${cue.cue_text} · M${cue.measure_index} beat ${cue.beat_in_measure}`}
+            >
+              {cue.gesture_id} · {cue.gesture_name}
+            </span>
+          );
+        })}
         {cueBlocks.length === 0 && <span className="notation-cue empty">Load or map a conductor path to show cues.</span>}
       </div>
     </section>
@@ -474,8 +496,10 @@ export default function App() {
   const [projectList, setProjectList] = useState<ProjectListReport | null>(null);
   const [packetContractReport, setPacketContractReport] = useState<HfieldPacketContractReport | null>(null);
   const [forgeBridgeStubReport, setForgeBridgeStubReport] = useState<ForgePacketBridgeStubReport | null>(null);
+  const [playheadCursorReport, setPlayheadCursorReport] = useState<PlayheadCursorReport | null>(null);
   const [isMotionPlaying, setIsMotionPlaying] = useState(false);
   const motionStartRef = useRef(0);
+  const playheadReportRequestRef = useRef(-10000);
   const wallClockStartRef = useRef(0);
 
   const [wavReport, setWavReport] = useState<WavRenderReport | null>(null);
@@ -519,6 +543,36 @@ export default function App() {
       cancelAnimationFrame(animationFrame);
     };
   }, [isMotionPlaying, motionReport]);
+
+  // Rust-owned playhead cursor sync. The UI clock supplies time; Rust computes
+  // measure, beat, active notes, and active conductor cue for that instant.
+  useEffect(() => {
+    if (!notationLayout && !musicTimeline) {
+      return;
+    }
+
+    const roundedTime = Math.round(motionTimeMs);
+    if (isMotionPlaying && Math.abs(roundedTime - playheadReportRequestRef.current) < 120) {
+      return;
+    }
+
+    playheadReportRequestRef.current = roundedTime;
+    let cancelled = false;
+
+    getCurrentPlayheadCursorReport(roundedTime)
+      .then((nextReport) => {
+        if (!cancelled) {
+          setPlayheadCursorReport(nextReport);
+        }
+      })
+      .catch(() => {
+        // Keep playback smooth if the diagnostic cursor endpoint is temporarily unavailable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [motionTimeMs, isMotionPlaying, notationLayout?.total_duration_ms, musicTimeline?.total_duration_ms]);
 
   function startMotionAnimation() {
     motionStartRef.current = motionTimeMs;
@@ -564,6 +618,7 @@ export default function App() {
     setMotionReport(await getCurrentConductorMotionReport());
     setPacketContractReport(await getCurrentHfieldPacketContractReport());
     setForgeBridgeStubReport(await getCurrentForgePacketBridgeStubReport());
+    setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
     resetMotionAnimation();
   }
 
@@ -661,6 +716,7 @@ export default function App() {
     setMappingReport(await getCurrentConductorMappingReport());
     setMotionReport(await getCurrentConductorMotionReport());
     setSeedMusicScore(await getCurrentProjectScore());
+    setPlayheadCursorReport(await getCurrentPlayheadCursorReport(editReport.selected_note?.start_ms ?? 0));
     setSelectedDiagnostic("notationEditReport");
   }
 
@@ -1032,7 +1088,11 @@ export default function App() {
     setError(null);
     try {
       setPlaybackReport(await playCurrentProjectMusicAudio());
+      setMotionReport(await getCurrentConductorMotionReport());
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
       setSelectedDiagnostic("playbackReport");
+      resetMotionAnimation();
+      setIsMotionPlaying(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -1043,6 +1103,7 @@ export default function App() {
     try {
       setPlaybackReport(await playCurrentProjectConductorAudio());
       setMotionReport(await getCurrentConductorMotionReport());
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
       setSelectedDiagnostic("playbackReport");
       resetMotionAnimation();
       setIsMotionPlaying(true);
@@ -1056,6 +1117,7 @@ export default function App() {
     try {
       setPlaybackReport(await playCurrentProjectCombinedAudio());
       setMotionReport(await getCurrentConductorMotionReport());
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
       setSelectedDiagnostic("playbackReport");
       resetMotionAnimation();
       setIsMotionPlaying(true);
@@ -1068,6 +1130,7 @@ export default function App() {
     setError(null);
     try {
       setStopReport(await stopPlayback());
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(Math.round(motionTimeMs)));
       setSelectedDiagnostic("stopReport");
       stopMotionAnimation();
     } catch (err) {
@@ -1082,6 +1145,7 @@ export default function App() {
   const currentGestureCount = gestureTimeline?.event_count ?? projectReport?.conductor_event_count ?? motionReport?.event_count ?? 0;
   const alignmentStatus = mappingReport?.alignment_status ?? "not generated";
   const packetStatus = packetContractReport?.status ?? "not checked";
+  const currentMeasureBeat = playheadCursorReport ? `M${playheadCursorReport.current_measure} beat ${playheadCursorReport.current_beat_in_measure}` : "—";
 
   function diagnosticPayload() {
     switch (selectedDiagnostic) {
@@ -1093,6 +1157,8 @@ export default function App() {
         return packetContractReport;
       case "forgeBridgeStub":
         return forgeBridgeStubReport;
+      case "playheadCursor":
+        return playheadCursorReport;
       case "motionReport":
         return motionReport;
       case "mappingReport":
@@ -1172,6 +1238,7 @@ export default function App() {
           <StatusChip label="Mode" value={activeModeLabel} />
           <StatusChip label="Project" value={currentProjectStatus} />
           <StatusChip label="Duration" value={formatMs(currentDuration)} />
+          <StatusChip label="Playhead" value={currentMeasureBeat} />
           <StatusChip label="Notes" value={currentNoteCount} />
           <StatusChip label="Gestures" value={currentGestureCount} />
           <StatusChip label="Alignment" value={alignmentStatus} />
@@ -1219,6 +1286,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                playheadReport={playheadCursorReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1322,6 +1390,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                playheadReport={playheadCursorReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1334,6 +1403,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                playheadReport={playheadCursorReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1379,6 +1449,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                playheadReport={playheadCursorReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1466,6 +1537,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                playheadReport={playheadCursorReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
@@ -1531,6 +1603,7 @@ export default function App() {
                 gestureTimeline={gestureTimeline}
                 motionReport={motionReport}
                 motionTimeMs={motionTimeMs}
+                playheadReport={playheadCursorReport}
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}

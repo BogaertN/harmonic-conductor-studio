@@ -14,6 +14,7 @@ members = [
   "crates/hfield-notation",
   "crates/hfield-packet",
   "crates/hfield-forge-bridge",
+  "crates/hfield-playhead",
   "src-tauri"
 ]
 

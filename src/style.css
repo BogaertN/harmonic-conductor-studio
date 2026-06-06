@@ -1419,3 +1419,18 @@ body {
 .timing-button-row button {
   min-width: 86px;
 }
+
+.notation-note.playing {
+  box-shadow: 0 0 0 3px rgba(255, 247, 207, 0.92), 0 0 28px rgba(255, 209, 102, 0.68);
+  transform: translateY(-1px) scale(1.04);
+  z-index: 8;
+}
+
+.notation-playhead span {
+  min-width: max-content;
+  white-space: nowrap;
+}
+
+.notation-cue.active {
+  box-shadow: 0 0 0 2px rgba(255, 247, 207, 0.74), 0 0 24px rgba(130, 210, 255, 0.42);
+}

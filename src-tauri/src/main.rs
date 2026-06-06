@@ -17,6 +17,7 @@ use hfield_notation::{
     position_notation_note_start_ms, select_notation_note,
 };
 use hfield_packet::validate_hfield_packet_contract;
+use hfield_playhead::create_playhead_cursor_report;
 use hfield_project::{list_hfield_projects, open_hfield_project, save_hfield_project};
 use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
@@ -281,6 +282,20 @@ fn get_current_hfield_packet_contract_report(
 
     serde_json::to_value(validate_hfield_packet_contract(&guard))
         .map_err(|err| format!(".hfield packet contract serialization failed: {err}"))
+}
+
+#[tauri::command]
+fn get_current_playhead_cursor_report(
+    state: tauri::State<'_, AppState>,
+    time_ms: u32,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(create_playhead_cursor_report(&guard, time_ms))
+        .map_err(|err| format!("playhead cursor report serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -1252,6 +1267,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_current_hfield_packet_contract_report,
             get_current_forge_packet_bridge_stub_report,
+            get_current_playhead_cursor_report,
             get_current_conductor_motion_report,
             get_generated_conductor_motion_report,
             get_current_conductor_mapping_report,

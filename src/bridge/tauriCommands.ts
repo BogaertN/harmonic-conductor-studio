@@ -164,6 +164,72 @@ export type ForgePacketBridgeStubReport = {
   fatal_errors: string[];
 };
 
+export type PlayheadCursorReport = {
+  strategy: string;
+  title: string;
+  status: string;
+  current_time_ms: number;
+  current_time_seconds: number;
+  total_duration_ms: number;
+  total_duration_seconds: number;
+  progress_percent: number;
+  score_cursor_x_percent: number;
+  tempo_bpm: number;
+  meter: string;
+  beats_per_measure: number;
+  beat_unit: number;
+  quarter_note_ms: number;
+  current_absolute_beat: number;
+  current_measure: number;
+  current_beat_in_measure: number;
+  active_note_count: number;
+  active_notes: Array<{
+    event_index: number;
+    track_id: string;
+    role: string;
+    midi_note: number;
+    note_name: string;
+    frequency_hz: number;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    measure_index: number;
+    beat_in_measure: number;
+    velocity: number;
+    resonance_lane: string;
+  }>;
+  next_note: {
+    event_index: number;
+    track_id: string;
+    note_name: string;
+    start_ms: number;
+    measure_index: number;
+    beat_in_measure: number;
+  } | null;
+  active_conductor_cue: {
+    event_index: number;
+    gesture_id: string;
+    operator: string | null;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    measure_index: number;
+    beat_in_measure: number;
+    intensity: number;
+  } | null;
+  next_conductor_cue: {
+    event_index: number;
+    gesture_id: string;
+    operator: string | null;
+    start_ms: number;
+    measure_index: number;
+    beat_in_measure: number;
+  } | null;
+  active_gesture_id: string | null;
+  active_operator: string | null;
+  warnings: string[];
+};
+
 export type ProjectFileReport = {
   status: string;
   action: string;
@@ -468,6 +534,10 @@ export async function getCurrentHfieldPacketContractReport(): Promise<HfieldPack
 
 export async function getCurrentForgePacketBridgeStubReport(): Promise<ForgePacketBridgeStubReport> {
   return await invoke<ForgePacketBridgeStubReport>("get_current_forge_packet_bridge_stub_report");
+}
+
+export async function getCurrentPlayheadCursorReport(timeMs: number): Promise<PlayheadCursorReport> {
+  return await invoke<PlayheadCursorReport>("get_current_playhead_cursor_report", { timeMs });
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {
