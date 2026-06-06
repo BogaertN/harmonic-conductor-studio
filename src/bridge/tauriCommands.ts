@@ -120,6 +120,104 @@ export type HfieldPacketContractReport = {
   warnings: string[];
 };
 
+
+export type HfieldFieldSynthesisReport = {
+  strategy: string;
+  status: string;
+  field_contract_id: string;
+  title: string;
+  source_format: string;
+  source_version: string;
+  root_frequency_hz: number;
+  phase_count: number;
+  phase_order: number[];
+  phase_grid_rows: number[][];
+  anchor_layout: string;
+  renderer_intent: string;
+  open_source_renderer_profile: string;
+  time_window: {
+    start_ms: number;
+    end_ms: number;
+    duration_ms: number;
+    duration_seconds: number;
+  };
+  phase_nodes: Array<{
+    phase: number;
+    label: string;
+    role: string;
+    anchor_role: string;
+    conductor_order_index: number;
+    conductor_grid_row: number;
+    conductor_grid_col: number;
+    x: number;
+    y: number;
+    z: number;
+    base_frequency_hz: number;
+  }>;
+  anchors: {
+    center_1: HfieldFieldSynthesisReport["phase_nodes"][number];
+    lower_5: HfieldFieldSynthesisReport["phase_nodes"][number];
+    upper_9: HfieldFieldSynthesisReport["phase_nodes"][number];
+  };
+  harmonic_events: Array<{
+    event_kind: string;
+    source_track_id: string;
+    source_role: string;
+    event_index: number;
+    phase: number;
+    anchor_phase: number;
+    field_region: string;
+    note_name: string | null;
+    gesture_id: string | null;
+    operator: string | null;
+    frequency_hz: number;
+    amplitude: number;
+    start_ms: number;
+    duration_ms: number;
+    end_ms: number;
+    time_norm_start: number;
+    time_norm_end: number;
+    phase_angle_rad: number;
+    x: number;
+    y: number;
+    z: number;
+    cymatic_radius: number;
+    cymatic_displacement: number;
+  }>;
+  cymatic_wave_samples: Array<{
+    sample_index: number;
+    source_event_index: number;
+    event_kind: string;
+    time_ms: number;
+    time_norm: number;
+    phase: number;
+    frequency_hz: number;
+    amplitude: number;
+    x: number;
+    y: number;
+    z: number;
+    radial_displacement: number;
+    coherence_weight: number;
+  }>;
+  field_trace: Array<{
+    point_index: number;
+    time_ms: number;
+    time_norm: number;
+    phase: number;
+    x: number;
+    y: number;
+    z: number;
+    field_region: string;
+    intensity: number;
+  }>;
+  total_note_count: number;
+  total_conductor_event_count: number;
+  deterministic_field_hash: string;
+  ready_for_3d_viewport: boolean;
+  ready_for_cymatic_mesh: boolean;
+  warnings: string[];
+};
+
 export type ForgePacketBridgeStubReport = {
   status: string;
   bridge_contract_id: string;
@@ -589,6 +687,10 @@ export type ResonanceLevelBundle = {
 
 export async function getCurrentHfieldPacketContractReport(): Promise<HfieldPacketContractReport> {
   return await invoke<HfieldPacketContractReport>("get_current_hfield_packet_contract_report");
+}
+
+export async function getCurrentHfieldFieldSynthesisReport(): Promise<HfieldFieldSynthesisReport> {
+  return await invoke<HfieldFieldSynthesisReport>("get_current_hfield_field_synthesis_report");
 }
 
 export async function getCurrentForgePacketBridgeStubReport(): Promise<ForgePacketBridgeStubReport> {

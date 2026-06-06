@@ -8,6 +8,7 @@ use hfield_dsp::{
     compile_combined_music_and_conductor_preview, compile_music_preview, compile_pitch_preview,
     write_wav_i16, CompiledAudio,
 };
+use hfield_field::synthesize_hfield_field;
 use hfield_forge_bridge::create_forge_packet_bridge_stub_report;
 use hfield_loop::{create_loop_phrase_report, extract_loop_phrase_score};
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
@@ -257,6 +258,19 @@ fn stop_existing_playback(state: &AppState) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn get_current_hfield_field_synthesis_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    serde_json::to_value(synthesize_hfield_field(&guard))
+        .map_err(|err| format!(".hfield field synthesis serialization failed: {err}"))
 }
 
 #[tauri::command]
@@ -1333,6 +1347,7 @@ fn main() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             get_current_hfield_packet_contract_report,
+            get_current_hfield_field_synthesis_report,
             get_current_forge_packet_bridge_stub_report,
             get_current_playhead_cursor_report,
             get_current_loop_phrase_report,
