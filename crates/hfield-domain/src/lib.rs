@@ -15,6 +15,9 @@ pub const HFIELD_RENDER_VIEW_REGISTRY_ID: &str = "aiweb.hfield.render_view_regis
 pub const HFIELD_COUPLING_PROFILE_ENGINE_V1_CONTRACT_ID: &str =
     "aiweb.hfield.coupling_profile_engine.v1";
 pub const HFIELD_COUPLING_PROFILE_REGISTRY_ID: &str = "aiweb.hfield.coupling_profile_registry.v1";
+pub const HFIELD_MOTIF_LIBRARY_ANNOTATION_LAYER_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.motif_library_annotation_layer.v1";
+pub const HFIELD_MOTIF_LIBRARY_REGISTRY_ID: &str = "aiweb.hfield.motif_library_registry.v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FieldScore {
@@ -951,6 +954,448 @@ fn coupling_profile_readiness_gates(
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifLibraryAnnotationLayerV1Report {
+    pub status: &'static str,
+    pub contract_id: &'static str,
+    pub registry_id: &'static str,
+    pub layer_role: &'static str,
+    pub authority_boundaries: MotifLayerAuthorityBoundaries,
+    pub motif_definition_policy: MotifDefinitionPolicy,
+    pub annotation_lifecycle: MotifAnnotationLifecycle,
+    pub annotation_classes: Vec<MotifAnnotationClass>,
+    pub source_bindings: Vec<MotifSourceBinding>,
+    pub motif_candidates: Vec<MotifCandidateReport>,
+    pub current_score_scan: MotifCurrentScoreScan,
+    pub readiness_gates: MotifLayerReadinessGates,
+    pub open_source_dependency_policy: MotifOpenSourceDependencyPolicy,
+    pub next_work: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifLayerAuthorityBoundaries {
+    pub motifs_are_reusable_source_fragments: bool,
+    pub annotations_are_attached_metadata: bool,
+    pub annotations_are_forge_operational_meaning: bool,
+    pub renderers_may_display_motifs: bool,
+    pub motif_layer_can_authorize_forge_action: bool,
+    pub open_source_pattern_tools_are_source_authority: bool,
+    pub mutates_forge: bool,
+    pub performs_identity_vault_write: bool,
+    pub exports_private_identity: bool,
+    pub authorizes_health_or_sensor_claims: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifDefinitionPolicy {
+    pub motif_id_rule: &'static str,
+    pub source_span_rule: &'static str,
+    pub reuse_rule: &'static str,
+    pub hash_rule: &'static str,
+    pub annotation_rule: &'static str,
+    pub promotion_rule: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifAnnotationLifecycle {
+    pub default_state: &'static str,
+    pub allowed_states: Vec<&'static str>,
+    pub discovery_rule: &'static str,
+    pub approval_rule: &'static str,
+    pub rejection_rule: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifAnnotationClass {
+    pub class_id: &'static str,
+    pub purpose: &'static str,
+    pub source_authority: &'static str,
+    pub can_change_source_hash_without_save_gate: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifSourceBinding {
+    pub binding_id: &'static str,
+    pub source_layer: &'static str,
+    pub current_binding: String,
+    pub owned_by_harmonic_field_score: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifCandidateReport {
+    pub candidate_id: String,
+    pub motif_kind: &'static str,
+    pub annotation_state: &'static str,
+    pub source_fragment_scope: &'static str,
+    pub track_count: usize,
+    pub note_count: usize,
+    pub gesture_event_count: usize,
+    pub start_ms: u32,
+    pub end_ms: u32,
+    pub candidate_annotations: Vec<&'static str>,
+    pub source_owned_by_hfield: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifCurrentScoreScan {
+    pub title: String,
+    pub format: String,
+    pub version: String,
+    pub music_track_count: usize,
+    pub note_count: usize,
+    pub primary_gesture_event_count: usize,
+    pub expressive_gesture_event_count: usize,
+    pub total_gesture_event_count: usize,
+    pub total_duration_ms: u32,
+    pub coupling_profile: String,
+    pub candidate_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifLayerReadinessGates {
+    pub has_harmonic_field_score_format: bool,
+    pub has_music_or_gesture_source_material: bool,
+    pub has_supported_coupling_profile_reference: bool,
+    pub has_annotation_lifecycle: bool,
+    pub renderers_downstream_only: bool,
+    pub no_live_forge_or_identity_side_effects: bool,
+    pub current_score_can_drive_motif_layer: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotifOpenSourceDependencyPolicy {
+    pub principle: &'static str,
+    pub allowed_roles: Vec<&'static str>,
+    pub forbidden_roles: Vec<&'static str>,
+    pub dependency_gates: Vec<&'static str>,
+}
+
+pub fn create_motif_library_annotation_layer_v1_report(
+    score: &FieldScore,
+) -> MotifLibraryAnnotationLayerV1Report {
+    let motif_candidates = motif_candidate_reports(score);
+    let current_score_scan = motif_current_score_scan(score, motif_candidates.len());
+    let readiness_gates = motif_layer_readiness_gates(score);
+
+    MotifLibraryAnnotationLayerV1Report {
+        status: "ok",
+        contract_id: HFIELD_MOTIF_LIBRARY_ANNOTATION_LAYER_V1_CONTRACT_ID,
+        registry_id: HFIELD_MOTIF_LIBRARY_REGISTRY_ID,
+        layer_role: "governed reusable motif fragments and editable annotation metadata for Harmonic Field Score source material",
+        authority_boundaries: MotifLayerAuthorityBoundaries {
+            motifs_are_reusable_source_fragments: true,
+            annotations_are_attached_metadata: true,
+            annotations_are_forge_operational_meaning: false,
+            renderers_may_display_motifs: true,
+            motif_layer_can_authorize_forge_action: false,
+            open_source_pattern_tools_are_source_authority: false,
+            mutates_forge: false,
+            performs_identity_vault_write: false,
+            exports_private_identity: false,
+            authorizes_health_or_sensor_claims: false,
+        },
+        motif_definition_policy: MotifDefinitionPolicy {
+            motif_id_rule: "Motif ids must be stable local identifiers that can later be hashed against source spans without depending on a renderer view.",
+            source_span_rule: "A motif references a bounded source span from music events, G1-G9 gesture events, coupling profile state, or a coupled combination of those layers.",
+            reuse_rule: "Reusable motifs may be copied or referenced across projects only through explicit save/import/export gates.",
+            hash_rule: "Motif hashes are reserved until serialized motif fixtures exist; this report is a governance/readiness layer only.",
+            annotation_rule: "Annotations describe discovery, interpretation, rehearsal notes, accessibility hints, or candidate semantics without becoming Forge law.",
+            promotion_rule: "Discovery candidates may become approved motifs only through a future explicit operator approval gate.",
+        },
+        annotation_lifecycle: MotifAnnotationLifecycle {
+            default_state: "discovery_candidate",
+            allowed_states: vec![
+                "discovery_candidate",
+                "approved_local_motif",
+                "rejected_candidate",
+                "archived_motif",
+                "future_forge_link_reserved",
+            ],
+            discovery_rule: "Automatic scans may suggest motifs, but suggested motifs are not approved until a later explicit approval gate exists.",
+            approval_rule: "Approved local motifs remain HCS-local score knowledge unless later exported through a verified bundle.",
+            rejection_rule: "Rejected candidates must remain auditable as rejected metadata if preserved; rejection never deletes source score material.",
+        },
+        annotation_classes: motif_annotation_classes(),
+        source_bindings: motif_source_bindings(score),
+        motif_candidates,
+        current_score_scan,
+        readiness_gates,
+        open_source_dependency_policy: MotifOpenSourceDependencyPolicy {
+            principle: "Use mature open-source tools for pattern discovery, similarity search, MusicXML/MIDI import, and notation display when useful, but never let those tools own motif truth or .hfield source authority.",
+            allowed_roles: vec![
+                "pattern_similarity_helper",
+                "MIDI_phrase_import_adapter",
+                "MusicXML_motif_import_adapter",
+                "notation_selection_helper",
+                "timeline_region_helper",
+                "search_index_helper",
+            ],
+            forbidden_roles: vec![
+                ".hfield_source_authority",
+                "motif_truth_authority",
+                "Forge_authorization",
+                "Identity_Vault_live_write",
+                "private_identity_export",
+                "health_or_sensor_claim_authority",
+            ],
+            dependency_gates: vec![
+                "license_compatibility",
+                "maintenance_activity",
+                "local_first_no_cloud_required",
+                "deterministic_output_or_recorded_nondeterminism",
+                "no_hidden_data_collection",
+                "no_authority_over_hfield_source_object",
+            ],
+        },
+        next_work: vec![
+            "add serialized motif objects after fixture coverage exists",
+            "add operator approval gate for approved_local_motif state",
+            "bind motif registry hash into canonical bundle manifest v2",
+            "add motif import/export receipts with replay verifier coverage",
+            "later allow Forge trace references only as future_forge_link_reserved metadata",
+        ],
+    }
+}
+
+fn motif_annotation_classes() -> Vec<MotifAnnotationClass> {
+    vec![
+        MotifAnnotationClass {
+            class_id: "structural",
+            purpose: "labels phrase shape, repetition, sequence, cadence, gesture arc, or field path pattern",
+            source_authority: "operator_or_hcs_scan",
+            can_change_source_hash_without_save_gate: false,
+        },
+        MotifAnnotationClass {
+            class_id: "expressive",
+            purpose: "labels mood, intensity, articulation, dynamic intention, or rehearsal interpretation",
+            source_authority: "operator_annotation",
+            can_change_source_hash_without_save_gate: false,
+        },
+        MotifAnnotationClass {
+            class_id: "accessibility",
+            purpose: "labels helper views such as note-name overlay, large view, color reinforcement, Braille, or Jianpu hints",
+            source_authority: "user_view_preference_or_operator_annotation",
+            can_change_source_hash_without_save_gate: false,
+        },
+        MotifAnnotationClass {
+            class_id: "candidate_semantic",
+            purpose: "stores provisional meaning notes without becoming Forge operational meaning",
+            source_authority: "operator_annotation_only_until_future_forge_gate",
+            can_change_source_hash_without_save_gate: false,
+        },
+    ]
+}
+
+fn motif_source_bindings(score: &FieldScore) -> Vec<MotifSourceBinding> {
+    vec![
+        MotifSourceBinding {
+            binding_id: "music_phrase_source",
+            source_layer: "musical_event_layer",
+            current_binding: format!(
+                "tracks={} notes={} tempo={} meter={}",
+                score.music.tracks.len(),
+                harmonic_field_note_count(score),
+                score.music.tempo_bpm,
+                score.music.meter
+            ),
+            owned_by_harmonic_field_score: true,
+        },
+        MotifSourceBinding {
+            binding_id: "gesture_phrase_source",
+            source_layer: "gesture_motion_layer",
+            current_binding: format!(
+                "primary_events={} expressive_events={}",
+                score.conductor.primary_hand_track.events.len(),
+                motif_expressive_gesture_event_count(score)
+            ),
+            owned_by_harmonic_field_score: true,
+        },
+        MotifSourceBinding {
+            binding_id: "coupled_profile_source",
+            source_layer: "coupling_profile_layer",
+            current_binding: score.coupling_profile.clone(),
+            owned_by_harmonic_field_score: true,
+        },
+        MotifSourceBinding {
+            binding_id: "field_anchor_source",
+            source_layer: "frequency_anchor_model",
+            current_binding: format!(
+                "root={}Hz layout={} phase_order={:?}",
+                score.root_frequency_hz, score.conductor.field_layout, HFIELD_PHASE_ORDER
+            ),
+            owned_by_harmonic_field_score: true,
+        },
+    ]
+}
+
+fn motif_candidate_reports(score: &FieldScore) -> Vec<MotifCandidateReport> {
+    let note_count = harmonic_field_note_count(score);
+    let primary_gesture_event_count = score.conductor.primary_hand_track.events.len();
+    let expressive_gesture_event_count = motif_expressive_gesture_event_count(score);
+    let gesture_event_count = primary_gesture_event_count + expressive_gesture_event_count;
+    let total_duration_ms = motif_total_duration_ms(score);
+    let mut candidates = vec![MotifCandidateReport {
+        candidate_id: "score_motif_candidate_1".to_string(),
+        motif_kind: "whole_score_summary",
+        annotation_state: "discovery_candidate",
+        source_fragment_scope: "full_harmonic_field_score",
+        track_count: score.music.tracks.len(),
+        note_count,
+        gesture_event_count,
+        start_ms: 0,
+        end_ms: total_duration_ms,
+        candidate_annotations: vec![
+            "project-scale motif",
+            "source summary",
+            "not renderer authority",
+        ],
+        source_owned_by_hfield: true,
+    }];
+
+    if gesture_event_count > 0 {
+        candidates.push(MotifCandidateReport {
+            candidate_id: "gesture_phrase_candidate_1".to_string(),
+            motif_kind: "gesture_phrase",
+            annotation_state: "discovery_candidate",
+            source_fragment_scope: "primary_and_expressive_gesture_tracks",
+            track_count: 0,
+            note_count: 0,
+            gesture_event_count,
+            start_ms: 0,
+            end_ms: total_duration_ms,
+            candidate_annotations: vec![
+                "G1-G9 gesture arc",
+                "conductor motion",
+                "operator approval required",
+            ],
+            source_owned_by_hfield: true,
+        });
+    }
+
+    if note_count > 0 {
+        candidates.push(MotifCandidateReport {
+            candidate_id: "music_phrase_candidate_1".to_string(),
+            motif_kind: "music_phrase",
+            annotation_state: "discovery_candidate",
+            source_fragment_scope: "music_tracks",
+            track_count: score.music.tracks.len(),
+            note_count,
+            gesture_event_count: 0,
+            start_ms: 0,
+            end_ms: total_duration_ms,
+            candidate_annotations: vec![
+                "timed pitch motif",
+                "notation-visible phrase",
+                "view-independent source",
+            ],
+            source_owned_by_hfield: true,
+        });
+    }
+
+    if note_count > 0 && gesture_event_count > 0 {
+        candidates.push(MotifCandidateReport {
+            candidate_id: "coupled_music_gesture_candidate_1".to_string(),
+            motif_kind: "coupled_music_gesture_phrase",
+            annotation_state: "discovery_candidate",
+            source_fragment_scope: "music_tracks_plus_conductor_tracks",
+            track_count: score.music.tracks.len(),
+            note_count,
+            gesture_event_count,
+            start_ms: 0,
+            end_ms: total_duration_ms,
+            candidate_annotations: vec![
+                "coupled phrase",
+                "field-score motif",
+                "future approval gate",
+            ],
+            source_owned_by_hfield: true,
+        });
+    }
+
+    candidates
+}
+
+fn motif_current_score_scan(score: &FieldScore, candidate_count: usize) -> MotifCurrentScoreScan {
+    let primary_gesture_event_count = score.conductor.primary_hand_track.events.len();
+    let expressive_gesture_event_count = motif_expressive_gesture_event_count(score);
+    MotifCurrentScoreScan {
+        title: score.title.clone(),
+        format: score.format.clone(),
+        version: score.version.clone(),
+        music_track_count: score.music.tracks.len(),
+        note_count: harmonic_field_note_count(score),
+        primary_gesture_event_count,
+        expressive_gesture_event_count,
+        total_gesture_event_count: primary_gesture_event_count + expressive_gesture_event_count,
+        total_duration_ms: motif_total_duration_ms(score),
+        coupling_profile: score.coupling_profile.clone(),
+        candidate_count,
+    }
+}
+
+fn motif_layer_readiness_gates(score: &FieldScore) -> MotifLayerReadinessGates {
+    let has_music_or_gesture_source_material = !score.music.tracks.is_empty()
+        || !score
+            .conductor
+            .primary_hand_track
+            .track_id
+            .trim()
+            .is_empty();
+    let has_supported_coupling_profile_reference =
+        coupling_profile_supported(&score.coupling_profile);
+    let no_live_forge_or_identity_side_effects = score.packet.forge_bridge.status == "reserved"
+        && score.packet.forge_bridge.forge_runtime_ref.is_none()
+        && score.provenance.identity_vault.vault_record_ref.is_none()
+        && !score.provenance.raw_private_identity_exported;
+
+    MotifLayerReadinessGates {
+        has_harmonic_field_score_format: score.format == HFIELD_FORMAT_ID,
+        has_music_or_gesture_source_material,
+        has_supported_coupling_profile_reference,
+        has_annotation_lifecycle: true,
+        renderers_downstream_only: true,
+        no_live_forge_or_identity_side_effects,
+        current_score_can_drive_motif_layer: score.format == HFIELD_FORMAT_ID
+            && has_music_or_gesture_source_material
+            && has_supported_coupling_profile_reference
+            && no_live_forge_or_identity_side_effects,
+    }
+}
+
+fn motif_expressive_gesture_event_count(score: &FieldScore) -> usize {
+    score
+        .conductor
+        .expressive_hand_track
+        .as_ref()
+        .map(|track| track.events.len())
+        .unwrap_or(0)
+}
+
+fn motif_total_duration_ms(score: &FieldScore) -> u32 {
+    let primary_max = score
+        .conductor
+        .primary_hand_track
+        .events
+        .iter()
+        .map(|event| event.start_ms.saturating_add(event.duration_ms))
+        .max()
+        .unwrap_or(0);
+    let expressive_max = score
+        .conductor
+        .expressive_hand_track
+        .as_ref()
+        .and_then(|track| {
+            track
+                .events
+                .iter()
+                .map(|event| event.start_ms.saturating_add(event.duration_ms))
+                .max()
+        })
+        .unwrap_or(0);
+
+    primary_max.max(expressive_max)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HfieldPacketContract {
     pub contract_id: String,
     pub packet_kind: String,
@@ -1476,5 +1921,67 @@ mod tests {
             .coupling_laws
             .iter()
             .any(|law| law.law_id == "open_source_adapter_boundary"));
+    }
+
+    #[test]
+    fn motif_layer_v1_keeps_annotations_out_of_forge_authority() {
+        let report = create_motif_library_annotation_layer_v1_report(&FieldScore::default_hcs());
+
+        assert_eq!(
+            report.contract_id,
+            HFIELD_MOTIF_LIBRARY_ANNOTATION_LAYER_V1_CONTRACT_ID
+        );
+        assert!(
+            report
+                .authority_boundaries
+                .motifs_are_reusable_source_fragments
+        );
+        assert!(
+            report
+                .authority_boundaries
+                .annotations_are_attached_metadata
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .annotations_are_forge_operational_meaning
+        );
+        assert!(
+            !report
+                .authority_boundaries
+                .motif_layer_can_authorize_forge_action
+        );
+        assert!(!report.authority_boundaries.mutates_forge);
+        assert!(!report.authority_boundaries.performs_identity_vault_write);
+        assert!(!report.authority_boundaries.exports_private_identity);
+        assert!(
+            !report
+                .authority_boundaries
+                .open_source_pattern_tools_are_source_authority
+        );
+    }
+
+    #[test]
+    fn motif_layer_v1_scans_current_score_for_reusable_candidates() {
+        let report = create_motif_library_annotation_layer_v1_report(&FieldScore::default_hcs());
+
+        assert!(report.current_score_scan.candidate_count >= 1);
+        assert_eq!(
+            report.current_score_scan.candidate_count,
+            report.motif_candidates.len()
+        );
+        assert!(report
+            .motif_candidates
+            .iter()
+            .all(|candidate| candidate.source_owned_by_hfield));
+        assert!(report.readiness_gates.current_score_can_drive_motif_layer);
+        assert!(report
+            .annotation_lifecycle
+            .allowed_states
+            .contains(&"approved_local_motif"));
+        assert!(report
+            .open_source_dependency_policy
+            .forbidden_roles
+            .contains(&"motif_truth_authority"));
     }
 }

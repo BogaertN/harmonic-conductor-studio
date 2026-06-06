@@ -172,6 +172,35 @@ export type HfieldCouplingProfileEngineV1Report = {
   next_work: string[];
 };
 
+
+export type HfieldMotifLibraryAnnotationLayerV1Report = {
+  status: string;
+  contract_id: string;
+  registry_id: string;
+  layer_role: string;
+  authority_boundaries: {
+    motifs_are_reusable_source_fragments: boolean;
+    annotations_are_attached_metadata: boolean;
+    annotations_are_forge_operational_meaning: boolean;
+    renderers_may_display_motifs: boolean;
+    motif_layer_can_authorize_forge_action: boolean;
+    open_source_pattern_tools_are_source_authority: boolean;
+    mutates_forge: boolean;
+    performs_identity_vault_write: boolean;
+    exports_private_identity: boolean;
+    authorizes_health_or_sensor_claims: boolean;
+  };
+  motif_definition_policy: unknown;
+  annotation_lifecycle: unknown;
+  annotation_classes: unknown[];
+  source_bindings: unknown[];
+  motif_candidates: unknown[];
+  current_score_scan: unknown;
+  readiness_gates: unknown;
+  open_source_dependency_policy: unknown;
+  next_work: string[];
+};
+
 export type HfieldSchemaVersionMigrationRegistryReport = {
   status: string;
   contract_id: string;
@@ -1315,6 +1344,11 @@ export async function getCurrentHarmonicFieldScoreV1UpgradeReport(): Promise<Hfi
 
 export async function getCurrentCouplingProfileEngineV1Report(): Promise<HfieldCouplingProfileEngineV1Report> {
   return await invoke<HfieldCouplingProfileEngineV1Report>("get_current_coupling_profile_engine_v1_report");
+}
+
+
+export async function getCurrentMotifLibraryAnnotationLayerV1Report(): Promise<HfieldMotifLibraryAnnotationLayerV1Report> {
+  return await invoke<HfieldMotifLibraryAnnotationLayerV1Report>("get_current_motif_library_annotation_layer_v1_report");
 }
 
 export async function listSavedProjects(): Promise<ProjectListReport> {

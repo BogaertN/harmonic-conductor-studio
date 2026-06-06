@@ -18,6 +18,7 @@ import {
   getCurrentNineGestureConductorEngineReport,
   getCurrentHarmonicFieldScoreV1UpgradeReport,
   getCurrentCouplingProfileEngineV1Report,
+  getCurrentMotifLibraryAnnotationLayerV1Report,
   exportCurrentHfieldCymaticSurfaceJson,
   exportCurrentHfieldPacketContractJson,
   exportCurrentHfieldProjectJson,
@@ -98,6 +99,7 @@ import {
   type HfieldNineGestureConductorEngineReport,
   type HfieldHarmonicFieldScoreV1UpgradeReport,
   type HfieldCouplingProfileEngineV1Report,
+  type HfieldMotifLibraryAnnotationLayerV1Report,
 } from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
@@ -140,6 +142,7 @@ type DiagnosticKey =
   | "nineGestureConductorEngine"
   | "harmonicFieldScoreV1Upgrade"
   | "couplingProfileEngineV1"
+  | "motifLibraryAnnotationLayerV1"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -206,6 +209,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "nineGestureConductorEngine", label: "Nine-Gesture Conductor Engine" },
   { key: "harmonicFieldScoreV1Upgrade", label: "Harmonic Field Score v1 Upgrade" },
   { key: "couplingProfileEngineV1", label: "Coupling Profile Engine v1" },
+  { key: "motifLibraryAnnotationLayerV1", label: "Motif Library + Annotation Layer v1" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -617,6 +621,7 @@ export default function App() {
   const [nineGestureConductorEngineReport, setNineGestureConductorEngineReport] = useState<HfieldNineGestureConductorEngineReport | null>(null);
   const [harmonicFieldScoreV1UpgradeReport, setHarmonicFieldScoreV1UpgradeReport] = useState<HfieldHarmonicFieldScoreV1UpgradeReport | null>(null);
   const [couplingProfileEngineV1Report, setCouplingProfileEngineV1Report] = useState<HfieldCouplingProfileEngineV1Report | null>(null);
+  const [motifLibraryAnnotationLayerV1Report, setMotifLibraryAnnotationLayerV1Report] = useState<HfieldMotifLibraryAnnotationLayerV1Report | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1387,6 +1392,17 @@ export default function App() {
     }
   }
 
+
+  async function inspectMotifLibraryAnnotationLayerV1() {
+    setError(null);
+    try {
+      setMotifLibraryAnnotationLayerV1Report(await getCurrentMotifLibraryAnnotationLayerV1Report());
+      setSelectedDiagnostic("motifLibraryAnnotationLayerV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function renderCurrentProjectWav() {
     setError(null);
     try {
@@ -1613,6 +1629,8 @@ export default function App() {
         return harmonicFieldScoreV1UpgradeReport;
       case "couplingProfileEngineV1":
         return couplingProfileEngineV1Report;
+      case "motifLibraryAnnotationLayerV1":
+        return motifLibraryAnnotationLayerV1Report;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -2099,8 +2117,9 @@ export default function App() {
                   <button onClick={inspectNineGestureConductorEngine} type="button">Inspect Nine-Gesture Engine</button>
                   <button onClick={inspectHarmonicFieldScoreV1Upgrade} type="button">Inspect Field Score v1</button>
                   <button onClick={inspectCouplingProfileEngineV1} type="button">Inspect Coupling Profile</button>
+                  <button onClick={inspectMotifLibraryAnnotationLayerV1} type="button">Inspect Motif Layer</button>
                 </div>
-                <pre>{JSON.stringify(couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                <pre>{JSON.stringify(motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
               </section>
 
               <div className="project-grid">
