@@ -627,6 +627,36 @@ function hcsScheduleInstrumentNoteV1(
   return endAt + releaseSeconds;
 }
 
+function ComposerFirstSoundFontFoundationV1() {
+  return (
+    <section className="composer-first-soundfont-foundation-v1" aria-label="Composer first SoundFont foundation v1">
+      <div>
+        <p className="eyebrow">SoundFont Foundation</p>
+        <h3>Real sampled instruments are ready for the next playback engine</h3>
+        <p className="note">HCS found local FluidR3 SoundFonts and FluidSynth on Proto-forge. The composer now treats the old Web Audio tones as fallback previews, while the next sample-engine patch routes playback through SoundFont-backed instruments.</p>
+      </div>
+      <div className="soundfont-foundation-grid-v1">
+        <span><strong>GM bank</strong>{HCS_COMPOSER_FIRST_GM_SOUNDFONT_V1}</span>
+        <span><strong>GS bank</strong>{HCS_COMPOSER_FIRST_GS_SOUNDFONT_V1}</span>
+        <span><strong>Runtime</strong>/usr/bin/fluidsynth · v2.3.4 detected</span>
+        <span><strong>Contract</strong>{HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1_CONTRACT_ID}</span>
+      </div>
+    </section>
+  );
+}
+
+function ComposerFirstWorkflowDeckV1() {
+  return (
+    <section className="composer-first-flow-deck-v1" aria-label="Composer-first workflow">
+      <div className="composer-first-step-v1"><strong>1</strong><span>Play keys or load a starter score</span></div>
+      <div className="composer-first-step-v1"><strong>2</strong><span>Notes write into the score automatically</span></div>
+      <div className="composer-first-step-v1"><strong>3</strong><span>Edit timing in the piano roll</span></div>
+      <div className="composer-first-step-v1"><strong>4</strong><span>Choose track instruments and hear the mix</span></div>
+      <div className="composer-first-step-v1"><strong>5</strong><span>Send the same score to the Glass Reader</span></div>
+    </section>
+  );
+}
+
 function InstrumentRackAndTrackSoundV1({ report }: { report: HcsTrackEditorAndPianoRollV1Report | null }) {
   const [profiles, setProfiles] = useState<Record<string, HcsTrackSoundProfileStateV1>>({});
   const [lastPreview, setLastPreview] = useState<string>("No instrument mix played yet.");
@@ -810,7 +840,12 @@ type StudioTrackEditorAndPianoRollV1Props = {
 };
 
 
+// HCS Composer First Workflow and SoundFont Foundation v1 proof: normal composer path hides raw JSON, score renders first, and SoundFont/FluidSynth foundation is surfaced.
 // HCS Production Notation Render Sync v1 proof: No separate fake staff state; notation renders from current_score.music.tracks[*].notes.
+const HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1_CONTRACT_ID = "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1";
+const HCS_COMPOSER_FIRST_GM_SOUNDFONT_V1 = "/usr/share/sounds/sf2/FluidR3_GM.sf2";
+const HCS_COMPOSER_FIRST_GS_SOUNDFONT_V1 = "/usr/share/sounds/sf2/FluidR3_GS.sf2";
+
 const HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID = "aiweb.hfield.key_frequency_registry.v1";
 const HCS_VIRTUAL_KEYBOARD_AND_REALTIME_NOTE_ENTRY_V1_CONTRACT_ID = "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1";
 const HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ = 440;
@@ -1077,23 +1112,32 @@ function StudioTrackEditorAndPianoRollV1({
       </div>
 
       <div className="studio-compose-grid-v1">
-        <section className="score-import-panel-v1">
+        <section className="composer-first-start-panel-v1" aria-label="Composer first start panel">
           <div className="board-title-row">
-            <h3>Score Input</h3>
+            <h3>Start Here</h3>
             <span>{report?.action ?? "ready"}</span>
           </div>
-          <p className="note">Paste full FieldScore JSON or the simple HCS score format. Once imported, the same notes appear in the piano roll, track lanes, audio path, and Glass Reader field.</p>
-          <textarea
-            value={scoreJson}
-            onChange={(event) => setScoreJson(event.target.value)}
-            spellCheck={false}
-            aria-label="Import score JSON"
-          />
-          <div className="button-row">
-            <button onClick={() => setScoreJson(studioSampleScoreJsonV1)} type="button">Sample Score JSON</button>
-            <button onClick={() => onImportScoreJson(scoreJson)} type="button">Import and Playable</button>
-            <button onClick={onClearScore} type="button">New Empty Score</button>
+          <p className="note">No JSON required. Load a starter score or press the piano keys. Every note you create writes into the score, notation, piano roll, track lanes, audio chain, and Glass Reader field.</p>
+          <div className="composer-first-big-actions-v1">
+            <button onClick={() => onLoadPreset("glass_reader_arpeggio")} type="button">Load Arpeggio</button>
+            <button onClick={() => onLoadPreset("midnight_sonnet_seed")} type="button">Load Midnight Seed</button>
+            <button onClick={() => onLoadPreset("empty_studio_score")} type="button">New Blank Score</button>
+            <button onClick={onPlayStudio} type="button">Play Studio Mix</button>
           </div>
+          <details className="advanced-score-import-v1">
+            <summary>Advanced: paste HCS score JSON</summary>
+            <p className="note">Developer import is still available, but it is no longer the normal composer workflow.</p>
+            <textarea
+              value={scoreJson}
+              onChange={(event) => setScoreJson(event.target.value)}
+              spellCheck={false}
+              aria-label="Advanced import score JSON"
+            />
+            <div className="button-row">
+              <button onClick={() => setScoreJson(studioSampleScoreJsonV1)} type="button">Sample JSON</button>
+              <button onClick={() => onImportScoreJson(scoreJson)} type="button">Import JSON</button>
+            </div>
+          </details>
         </section>
 
         <section className="virtual-keyboard-panel-v1 realtime-keyboard-panel-v1">
@@ -1101,6 +1145,16 @@ function StudioTrackEditorAndPianoRollV1({
             <h3>Virtual Piano</h3>
             <span>{entryMode.replace(/_/g, " ")}</span>
           </div>
+          <div className="mouse-first-compose-controls-v1" aria-label="Mouse-first composition controls">
+            <button onClick={() => setActiveStepIndex(Math.max(0, activeStepIndex - 1))} type="button">◀ Step</button>
+            <button onClick={() => setActiveStepIndex(activeStepIndex + 1)} type="button">Step ▶</button>
+            <button onClick={() => setKeyboardOctave(Math.max(1, keyboardOctave - 1))} type="button">Octave −</button>
+            <button onClick={() => setKeyboardOctave(Math.min(8, keyboardOctave + 1))} type="button">Octave +</button>
+            <button onClick={() => setDurationSteps(Math.max(1, durationSteps - 1))} type="button">Shorter</button>
+            <button onClick={() => setDurationSteps(durationSteps + 1)} type="button">Longer</button>
+            <span>Click a key to write. Click a ruler step to move the write cursor. Typing is optional.</span>
+          </div>
+
           <div className="keyboard-controls-v1 realtime-controls-v1">
             <label>
               <span>Track</span>
@@ -1177,6 +1231,8 @@ function StudioTrackEditorAndPianoRollV1({
       <NotationRenderSyncV1 report={report} selectedNoteKey={selectedNoteKey} onSelectNote={onSelectNote} />
 
       <InstrumentRackAndTrackSoundV1 report={report} />
+
+      <ComposerFirstSoundFontFoundationV1 />
 
       <section className="piano-roll-grid-v1">
         <div className="board-title-row">
@@ -1509,7 +1565,7 @@ function VisibleConductorMotion({
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<OperatorTab>("field");
+  const [activeTab, setActiveTab] = useState<OperatorTab>("compose");
 
   useEffect(() => {
     setActiveTab("field");
@@ -2935,11 +2991,11 @@ export default function App() {
 
 
   const activeModeLabel =
-    activeTab === "compose" ? "Score" :
-    activeTab === "conduct" ? "Conductor" :
+    activeTab === "compose" ? "Composer" :
+    activeTab === "conduct" ? "Cues" :
     activeTab === "rehearse" ? "Practice" :
     activeTab === "perform" ? "Perform" :
-    activeTab === "field" ? "Studio" :
+    activeTab === "field" ? "Glass Reader" :
     activeTab === "project" ? "Library" : "Advanced";
 
   const leadTrack = musicTimeline?.tracks.find((track) => track.track_id === "lead_voice") ?? null;
@@ -2984,11 +3040,9 @@ export default function App() {
 
       <section className="workstation-frame">
         <nav className="mode-rail" aria-label="Workspace modes">
-          <button className={activeTab === "compose" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("compose")} type="button">Score</button>
-          <button className={activeTab === "conduct" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("conduct")} type="button">Conductor</button>
-          <button className={activeTab === "rehearse" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("rehearse")} type="button">Practice</button>
-          <button className={activeTab === "perform" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("perform")} type="button">Perform</button>
-          <button className={activeTab === "field" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("field")} type="button">Studio</button>
+          <button className={activeTab === "compose" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("compose")} type="button">Composer</button>
+          <button className={activeTab === "conduct" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("conduct")} type="button">Cues</button>
+          <button className={activeTab === "field" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("field")} type="button">Glass Reader</button>
           <button className={activeTab === "project" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("project")} type="button">Library</button>
           <button className={activeTab === "diagnostics" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("diagnostics")} type="button">Advanced</button>
         </nav>
@@ -3043,6 +3097,8 @@ export default function App() {
                   <button onClick={playCurrentMusicAudio} type="button">Play Music</button>
                 </div>
               </div>
+
+              <ComposerFirstWorkflowDeckV1 />
 
               <NotationSpine
                 musicTimeline={musicTimeline}

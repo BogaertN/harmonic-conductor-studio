@@ -474,6 +474,23 @@ export type HcsInstrumentRackAndTrackSoundV1Report = {
   authority_boundaries: Record<string, boolean>;
 };
 
+export type HcsComposerFirstWorkflowAndSoundFontFoundationV1Report = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  purpose: string;
+  title: string;
+  score_hash: string;
+  tempo_bpm: number;
+  meter: string;
+  track_count: number;
+  note_count: number;
+  composer_workflow_policy: Record<string, unknown>;
+  soundfont_foundation: Record<string, unknown>;
+  single_source_law: Record<string, unknown>;
+  authority_boundaries: Record<string, boolean>;
+};
+
 export type HcsProductionNotationRenderSyncV1Report = {
   status: string;
   contract_id: string;
@@ -1873,6 +1890,10 @@ export async function lookupHcsKeyFrequencyV1(midiNote: number): Promise<HcsKeyF
 
 export async function getHcsInstrumentRackAndTrackSoundV1Report(): Promise<HcsInstrumentRackAndTrackSoundV1Report> {
   return await invoke<HcsInstrumentRackAndTrackSoundV1Report>("get_hcs_instrument_rack_and_track_sound_v1_report");
+}
+
+export async function getHcsComposerFirstWorkflowAndSoundFontFoundationV1Report(): Promise<HcsComposerFirstWorkflowAndSoundFontFoundationV1Report> {
+  return await invoke<HcsComposerFirstWorkflowAndSoundFontFoundationV1Report>("get_hcs_composer_first_workflow_and_soundfont_foundation_v1_report");
 }
 
 export async function getHcsProductionNotationRenderSyncV1Report(): Promise<HcsProductionNotationRenderSyncV1Report> {

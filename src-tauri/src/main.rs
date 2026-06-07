@@ -40,6 +40,8 @@ use hfield_resonance::create_resonance_level_bundle;
 use hfield_storage::{score_hash_hex, score_to_pretty_json};
 use hfield_visual::create_conductor_motion_report;
 use serde_json::json;
+use std::path::Path;
+use std::process::Command;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     mpsc, Arc, Mutex,
@@ -1101,6 +1103,102 @@ fn get_hcs_instrument_rack_and_track_sound_v1_report(
             "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
             "formula_id": "frequency_hz = 440 * 2^((midi_note - 69) / 12)",
             "simulated": false
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score": false,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false,
+            "uses_llm": false
+        }
+    }))
+}
+
+const HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1";
+
+fn hcs_soundfont_file_status_v1(path: &str) -> serde_json::Value {
+    let file_path = Path::new(path);
+    let size_bytes = std::fs::metadata(file_path)
+        .map(|metadata| metadata.len())
+        .ok();
+    json!({
+        "path": path,
+        "exists": file_path.is_file(),
+        "size_bytes": size_bytes,
+        "format": path.rsplit('.').next().unwrap_or("unknown")
+    })
+}
+
+fn hcs_command_status_v1(binary: &str, args: &[&str]) -> serde_json::Value {
+    match Command::new(binary).args(args).output() {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            json!({
+                "binary": binary,
+                "available": output.status.success(),
+                "stdout": stdout,
+                "stderr": stderr
+            })
+        }
+        Err(err) => json!({
+            "binary": binary,
+            "available": false,
+            "error": err.to_string()
+        }),
+    }
+}
+
+#[tauri::command]
+fn get_hcs_composer_first_workflow_and_soundfont_foundation_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+    let timeline = create_music_timeline_report(&guard);
+    let score_hash = score_hash_hex(&guard).map_err(|err| format!("score hash failed: {err}"))?;
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "purpose": "unify HCS into a composer-first score workflow while surfacing the local FluidSynth/SoundFont foundation for sample-backed instruments",
+        "title": guard.title,
+        "score_hash": score_hash,
+        "tempo_bpm": guard.music.tempo_bpm,
+        "meter": guard.music.meter,
+        "track_count": timeline.track_count,
+        "note_count": timeline.total_note_count,
+        "composer_workflow_policy": {
+            "default_workspace": "composer",
+            "raw_json_hidden_from_normal_path": true,
+            "score_visible_first": true,
+            "keyboard_directly_playable": true,
+            "piano_roll_directly_editable_surface": true,
+            "instrument_rack_inline_with_tracks": true,
+            "advanced_import_available_but_collapsed": true,
+            "reduced_primary_mode_rail": true
+        },
+        "soundfont_foundation": {
+            "fluidsynth": hcs_command_status_v1("fluidsynth", &["--version"]),
+            "soundfont_candidates": [
+                hcs_soundfont_file_status_v1("/usr/share/sounds/sf2/FluidR3_GM.sf2"),
+                hcs_soundfont_file_status_v1("/usr/share/sounds/sf2/FluidR3_GS.sf2")
+            ],
+            "sample_engine_status": "foundation_detected_next_patch_routes_playback",
+            "current_web_audio_tones_are_fallback_only": true
+        },
+        "single_source_law": {
+            "score_source": "current_score.music.tracks[*].notes",
+            "notation_uses_same_source": true,
+            "piano_roll_uses_same_source": true,
+            "keyboard_writes_same_source": true,
+            "instrument_choice_does_not_change_pitch_authority": true,
+            "glass_reader_receives_same_score_chain": true
         },
         "authority_boundaries": {
             "mutates_current_hcs_score": false,
@@ -2565,6 +2663,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "virtual_keyboard_and_realtime_note_entry_v1_contract_id": "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1",
         "production_notation_render_sync_v1_contract_id": "aiweb.hfield.production_notation_render_sync.v1",
         "instrument_rack_and_track_sound_v1_contract_id": "aiweb.hfield.instrument_rack_and_track_sound.v1",
+        "composer_first_workflow_and_soundfont_foundation_v1_contract_id": "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -4886,6 +4985,7 @@ fn main() {
             get_hcs_virtual_keyboard_and_realtime_note_entry_v1_report,
             get_hcs_production_notation_render_sync_v1_report,
             get_hcs_instrument_rack_and_track_sound_v1_report,
+            get_hcs_composer_first_workflow_and_soundfont_foundation_v1_report,
             get_hcs_key_frequency_registry_v1_report,
             lookup_hcs_key_frequency_v1,
             import_hcs_studio_score_json_v1,

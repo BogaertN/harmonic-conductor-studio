@@ -1,0 +1,25 @@
+{
+  "patch_id": "HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1",
+  "contract_id": "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1",
+  "schema_version": "1.0.0",
+  "purpose": "Unify HCS into a composer-first score workflow and surface the local SoundFont/FluidSynth foundation for sample-backed instruments.",
+  "normal_user_path": {
+    "raw_json_hidden": true,
+    "score_visible_first": true,
+    "keyboard_directly_playable": true,
+    "piano_roll_kept_in_same_workflow": true,
+    "instrument_rack_kept_in_same_workflow": true,
+    "glass_reader_chain_preserved": true
+  },
+  "soundfont_foundation": {
+    "fluidr3_gm": "/usr/share/sounds/sf2/FluidR3_GM.sf2",
+    "fluidr3_gs": "/usr/share/sounds/sf2/FluidR3_GS.sf2",
+    "fluidsynth": "/usr/bin/fluidsynth"
+  },
+  "authority_boundaries": {
+    "mutates_forge": false,
+    "performs_identity_vault_write": false,
+    "exports_private_identity": false,
+    "uses_llm": false
+  }
+}
