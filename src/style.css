@@ -3212,3 +3212,13 @@ body {
   content: " · note/frequency labels only at glass crossing · HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1";
 }
 /* END HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1 */
+
+/* HCS_GLASS_READER_CUMULATIVE_REVEAL_HISTORY_V1 */
+.field-reader-stage-hint::before {
+  content: "Cumulative glass reveal chamber: future waveform remains hidden · active glass slice reads live note/frequency · ";
+}
+
+.field-reader-stage-hint::after {
+  content: " · already-played waveform stays visible as muted translucent history · HCS_GLASS_READER_CUMULATIVE_REVEAL_HISTORY_V1";
+}
+/* END HCS_GLASS_READER_CUMULATIVE_REVEAL_HISTORY_V1 */
