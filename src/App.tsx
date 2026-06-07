@@ -366,6 +366,7 @@ type StudioTrackEditorAndPianoRollV1Props = {
 
 
 const HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID = "aiweb.hfield.key_frequency_registry.v1";
+const HCS_VIRTUAL_KEYBOARD_AND_REALTIME_NOTE_ENTRY_V1_CONTRACT_ID = "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1";
 const HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ = 440;
 const HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI = 69;
 const hcsKeyFrequencyNamesV1 = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -430,6 +431,7 @@ const studioSampleScoreJsonV1 = `{
   ]
 }`;
 
+
 function StudioTrackEditorAndPianoRollV1({
   musicTimeline,
   selectedNoteKey,
@@ -454,6 +456,17 @@ function StudioTrackEditorAndPianoRollV1({
   const [stepMs, setStepMs] = useState(500);
   const [keyboardOctave, setKeyboardOctave] = useState(4);
   const [scoreJson, setScoreJson] = useState(studioSampleScoreJsonV1);
+  const [entryMode, setEntryMode] = useState<"play_and_insert" | "play_only" | "insert_only">("play_and_insert");
+  const [computerKeyboardEnabled, setComputerKeyboardEnabled] = useState(true);
+  const [autoAdvanceStep, setAutoAdvanceStep] = useState(true);
+  const [lastRealtimeEntry, setLastRealtimeEntry] = useState("No realtime note entered yet.");
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    if (tracks.length > 0 && !tracks.some((track) => track.track_id === activeTrackId)) {
+      setActiveTrackId(tracks[0].track_id);
+    }
+  }, [activeTrackId, tracks]);
 
   const totalDurationMs = Math.max(1, musicTimeline?.total_duration_ms ?? 1);
   const gridSteps = Array.from({ length: 32 }, (_, index) => index);
@@ -467,18 +480,142 @@ function StudioTrackEditorAndPianoRollV1({
     }))
   );
 
-  async function writeKeyboardNote(midiNote: number) {
-    setActiveMidiNote(midiNote);
-    await onSetPianoRollNote(activeTrackId, activeStepIndex, midiNote, durationSteps, velocity, stepMs);
+  const qwertyMap: Record<string, number> = {
+    a: 0,
+    w: 1,
+    s: 2,
+    e: 3,
+    d: 4,
+    f: 5,
+    t: 6,
+    g: 7,
+    y: 8,
+    h: 9,
+    u: 10,
+    j: 11,
+    k: 12,
+    o: 13,
+    l: 14,
+    p: 15,
+    ";": 16,
+    "'": 17
+  };
+
+  function getPreviewAudioContext(): AudioContext | null {
+    if (typeof window === "undefined") return null;
+    const audioWindow = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
+    const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextCtor();
+    }
+    return audioContextRef.current;
   }
 
+  function playRealtimeKeyPreview(midiNote: number) {
+    const context = getPreviewAudioContext();
+    if (!context) {
+      setLastRealtimeEntry("Audio preview unavailable in this window, but score entry remains backed.");
+      return;
+    }
+    if (context.state === "suspended") {
+      void context.resume();
+    }
+
+    const frequencyHz = hcsCanonicalMidiFrequencyHzV1(midiNote);
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const now = context.currentTime;
+    const previewSeconds = Math.max(0.08, Math.min(1.2, (Number(stepMs) || 500) / 1000 * Math.max(1, Number(durationSteps) || 1) * 0.45));
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequencyHz, now);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.02, Math.min(0.18, Number(velocity) || 0.84) * 0.2), now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + previewSeconds);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + previewSeconds + 0.02);
+  }
+
+  async function writeRealtimeKeyboardNote(midiNote: number, source: "mouse" | "computer_keyboard") {
+    const safeMidi = Math.max(0, Math.min(127, Math.round(midiNote)));
+    const safeStep = Math.max(0, Math.min(255, Math.round(Number(activeStepIndex) || 0)));
+    const safeDurationSteps = Math.max(1, Math.min(64, Math.round(Number(durationSteps) || 1)));
+    const safeVelocity = Math.max(0, Math.min(1, Number(velocity) || 0.84));
+    const safeStepMs = Math.max(40, Math.min(8000, Math.round(Number(stepMs) || 500)));
+    const frequencyHz = hcsCanonicalMidiFrequencyHzV1(safeMidi);
+    const pitchLabel = hcsMidiNoteLabelV1(safeMidi);
+
+    setActiveMidiNote(safeMidi);
+
+    if (entryMode === "play_and_insert" || entryMode === "play_only") {
+      playRealtimeKeyPreview(safeMidi);
+    }
+
+    if (entryMode === "play_and_insert" || entryMode === "insert_only") {
+      await onSetPianoRollNote(activeTrackId, safeStep, safeMidi, safeDurationSteps, safeVelocity, safeStepMs);
+      if (autoAdvanceStep) {
+        setActiveStepIndex(Math.min(255, safeStep + safeDurationSteps));
+      }
+      setLastRealtimeEntry(`${source === "mouse" ? "Clicked" : "Typed"} ${pitchLabel} · MIDI ${safeMidi} · ${frequencyHz.toFixed(2)} Hz into ${activeTrackId} step ${safeStep}.`);
+    } else {
+      setLastRealtimeEntry(`${source === "mouse" ? "Clicked" : "Typed"} ${pitchLabel} · MIDI ${safeMidi} · ${frequencyHz.toFixed(2)} Hz preview only.`);
+    }
+  }
+
+  useEffect(() => {
+    if (!computerKeyboardEnabled) return undefined;
+
+    function handleComputerKeyboard(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      if (tagName === "input" || tagName === "textarea" || tagName === "select" || target?.isContentEditable) return;
+      const key = event.key.toLowerCase();
+      if (key === "z") {
+        setKeyboardOctave((octave) => Math.max(0, octave - 1));
+        event.preventDefault();
+        return;
+      }
+      if (key === "x") {
+        setKeyboardOctave((octave) => Math.min(8, octave + 1));
+        event.preventDefault();
+        return;
+      }
+      if (key === "[" || key === "arrowleft") {
+        setActiveStepIndex((step) => Math.max(0, step - 1));
+        event.preventDefault();
+        return;
+      }
+      if (key === "]" || key === "arrowright") {
+        setActiveStepIndex((step) => Math.min(255, step + 1));
+        event.preventDefault();
+        return;
+      }
+      if (key === " ") {
+        void onPlayStudio();
+        event.preventDefault();
+        return;
+      }
+      const offset = qwertyMap[key];
+      if (offset === undefined) return;
+      const midi = (keyboardOctave + 1) * 12 + offset;
+      event.preventDefault();
+      void writeRealtimeKeyboardNote(midi, "computer_keyboard");
+    }
+
+    window.addEventListener("keydown", handleComputerKeyboard);
+    return () => window.removeEventListener("keydown", handleComputerKeyboard);
+  }, [activeStepIndex, activeTrackId, autoAdvanceStep, computerKeyboardEnabled, durationSteps, entryMode, keyboardOctave, onPlayStudio, stepMs, velocity]);
+
   return (
-    <section className="studio-track-editor-v1" aria-label="HCS Track Editor and Piano Roll v1">
+    <section className="studio-track-editor-v1 realtime-keyboard-v1-surface" aria-label="HCS Virtual Keyboard and Realtime Note Entry v1">
       <div className="studio-track-editor-header">
         <div>
-          <p className="eyebrow">Track Editor and Piano Roll v1</p>
-          <h2>Compose real music, then hear it and see it in the Glass Reader</h2>
-          <p className="note">This is the backed creation surface: import a score, click piano keys into timed steps, edit lanes, play the deterministic mix, then export audio or seal the bundle. Every key is tied to the canonical MIDI frequency registry, not guessed or simulated.</p>
+          <p className="eyebrow">Virtual Keyboard and Realtime Note Entry v1</p>
+          <h2>Press keys, compose into the score, and hear each frequency as you write</h2>
+          <p className="note">Mouse clicks and optional computer-keyboard input now resolve through the canonical MIDI frequency registry, preview the real frequency, and write notes directly into music.tracks[*].notes through the backed piano-roll command.</p>
         </div>
         <div className="button-row compact-row">
           <button onClick={() => onLoadPreset("glass_reader_arpeggio")} type="button">Load Arpeggio</button>
@@ -488,13 +625,18 @@ function StudioTrackEditorAndPianoRollV1({
         </div>
       </div>
 
+      <div className="realtime-entry-authority-v1">
+        <strong>{hcsMidiNoteLabelV1(activeMidiNote)} · MIDI {activeMidiNote} · {hcsCanonicalMidiFrequencyHzV1(activeMidiNote).toFixed(2)} Hz</strong>
+        <span>Authority: {HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID} · {HCS_VIRTUAL_KEYBOARD_AND_REALTIME_NOTE_ENTRY_V1_CONTRACT_ID} · A4 = {HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ} Hz · 12-TET · not simulated</span>
+      </div>
+
       <div className="studio-compose-grid-v1">
         <section className="score-import-panel-v1">
           <div className="board-title-row">
             <h3>Score Input</h3>
             <span>{report?.action ?? "ready"}</span>
           </div>
-          <p className="note">Paste full FieldScore JSON or the simple HCS score format. This lets you bring in new music instead of living inside the Ode seed forever.</p>
+          <p className="note">Paste full FieldScore JSON or the simple HCS score format. Once imported, the same notes appear in the piano roll, track lanes, audio path, and Glass Reader field.</p>
           <textarea
             value={scoreJson}
             onChange={(event) => setScoreJson(event.target.value)}
@@ -508,16 +650,12 @@ function StudioTrackEditorAndPianoRollV1({
           </div>
         </section>
 
-        <section className="virtual-keyboard-panel-v1">
+        <section className="virtual-keyboard-panel-v1 realtime-keyboard-panel-v1">
           <div className="board-title-row">
-            <h3>Virtual Keyboard</h3>
-            <span>selected MIDI {activeMidiNote}</span>
+            <h3>Virtual Piano</h3>
+            <span>{entryMode.replace(/_/g, " ")}</span>
           </div>
-          <div className="frequency-authority-strip-v1">
-            <strong>{hcsMidiNoteLabelV1(activeMidiNote)} · MIDI {activeMidiNote} · {hcsCanonicalMidiFrequencyHzV1(activeMidiNote).toFixed(2)} Hz</strong>
-            <span>{HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID} · A4 = {HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ} Hz · 12-TET · not simulated</span>
-          </div>
-          <div className="keyboard-controls-v1">
+          <div className="keyboard-controls-v1 realtime-controls-v1">
             <label>
               <span>Track</span>
               <select value={activeTrackId} onChange={(event) => setActiveTrackId(event.target.value)}>
@@ -546,20 +684,47 @@ function StudioTrackEditorAndPianoRollV1({
               <input value={keyboardOctave} onChange={(event) => setKeyboardOctave(Number(event.target.value))} inputMode="numeric" />
             </label>
           </div>
+
+          <div className="realtime-entry-options-v1">
+            <label>
+              <span>Entry mode</span>
+              <select value={entryMode} onChange={(event) => setEntryMode(event.target.value as "play_and_insert" | "play_only" | "insert_only")}>
+                <option value="play_and_insert">Play + insert</option>
+                <option value="play_only">Play only</option>
+                <option value="insert_only">Insert only</option>
+              </select>
+            </label>
+            <label className="checkbox-line-v1">
+              <input checked={computerKeyboardEnabled} onChange={(event) => setComputerKeyboardEnabled(event.target.checked)} type="checkbox" />
+              <span>Computer keyboard input</span>
+            </label>
+            <label className="checkbox-line-v1">
+              <input checked={autoAdvanceStep} onChange={(event) => setAutoAdvanceStep(event.target.checked)} type="checkbox" />
+              <span>Auto-advance step</span>
+            </label>
+          </div>
+
+          <div className="computer-keyboard-map-v1">
+            <strong>Computer keys:</strong>
+            <span>A W S E D F T G Y H U J K O L P ; '</span>
+            <span>Z/X octave · [/] or arrows step · Space play</span>
+          </div>
+
           <div className="virtual-keyboard-v1" aria-label="Playable score keyboard">
             {keyboardNotes.map((note) => (
               <button
                 key={`${note.fullLabel}-${note.midi}`}
                 className={note.black ? "piano-key black-key" : "piano-key white-key"}
-                onClick={() => writeKeyboardNote(note.midi)}
+                onClick={() => void writeRealtimeKeyboardNote(note.midi, "mouse")}
                 type="button"
-                title={`Write ${note.fullLabel} · ${note.frequencyHz.toFixed(2)} Hz · MIDI ${note.midi} to ${activeTrackId} step ${activeStepIndex}`}
+                title={`Play/write ${note.fullLabel} · ${note.frequencyHz.toFixed(2)} Hz · MIDI ${note.midi} to ${activeTrackId} step ${activeStepIndex}`}
               >
                 <span>{note.fullLabel}</span>
                 <small>{note.frequencyHz.toFixed(2)} Hz</small>
               </button>
             ))}
           </div>
+          <div className="realtime-entry-status-v1">{lastRealtimeEntry}</div>
         </section>
       </div>
 

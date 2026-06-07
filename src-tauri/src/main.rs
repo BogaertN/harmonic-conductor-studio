@@ -929,6 +929,71 @@ fn lookup_hcs_key_frequency_v1(midi_note: u8) -> Result<serde_json::Value, Strin
     Ok(hcs_key_frequency_registry_record_v1(midi_note.min(127)))
 }
 
+const HCS_VIRTUAL_KEYBOARD_AND_REALTIME_NOTE_ENTRY_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1";
+
+#[tauri::command]
+fn get_hcs_virtual_keyboard_and_realtime_note_entry_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+    let timeline = create_music_timeline_report(&guard);
+    let notation = create_notation_layout_report(&guard);
+    let score_hash = score_hash_hex(&guard).map_err(|err| format!("score hash failed: {err}"))?;
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_VIRTUAL_KEYBOARD_AND_REALTIME_NOTE_ENTRY_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "purpose": "real-time virtual keyboard note entry backed by HCS score mutation and deterministic frequency authority",
+        "score_hash": score_hash,
+        "title": guard.title,
+        "tempo_bpm": guard.music.tempo_bpm,
+        "meter": guard.music.meter,
+        "track_count": timeline.track_count,
+        "note_count": timeline.total_note_count,
+        "music_timeline": timeline,
+        "notation_layout": notation,
+        "input_surfaces": {
+            "on_screen_piano_keyboard": true,
+            "click_to_play_frequency_preview": true,
+            "click_to_insert_score_note": true,
+            "optional_computer_keyboard_mapping": true,
+            "auto_advance_step_entry": true,
+            "immediate_piano_roll_refresh": true,
+            "immediate_track_lane_refresh": true,
+            "immediate_field_refresh": true
+        },
+        "frequency_authority": {
+            "contract_id": HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID,
+            "tuning_mode": "twelve_tone_equal_temperament",
+            "a4_hz": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ,
+            "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
+            "formula_id": "frequency_hz = 440 * 2^((midi_note - 69) / 12)",
+            "simulated": false
+        },
+        "write_path": {
+            "score_mutation_command": "set_hcs_piano_roll_note_v1",
+            "target_payload": "current_score.music.tracks[*].notes",
+            "reflects_in_piano_roll": true,
+            "reflects_in_track_lanes": true,
+            "reflects_in_notation_layout": true,
+            "reflects_in_glass_reader_field": true
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score_only_when_insert_mode_enabled": true,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false,
+            "uses_llm": false
+        }
+    }))
+}
+
 const HCS_TRACK_EDITOR_AND_PIANO_ROLL_V1_CONTRACT_ID: &str =
     "aiweb.hfield.track_editor_and_piano_roll.v1";
 
@@ -2241,6 +2306,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "studio_creation_backend_and_placeholder_purge_v1_contract_id": "aiweb.hfield.studio_creation_backend_and_placeholder_purge.v1",
         "track_editor_and_piano_roll_v1_contract_id": "aiweb.hfield.track_editor_and_piano_roll.v1",
         "key_frequency_registry_v1_contract_id": "aiweb.hfield.key_frequency_registry.v1",
+        "virtual_keyboard_and_realtime_note_entry_v1_contract_id": "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -4559,6 +4625,7 @@ fn main() {
             play_current_project_music_audio,
             render_current_project_music_wav,
             get_hcs_track_editor_and_piano_roll_v1_report,
+            get_hcs_virtual_keyboard_and_realtime_note_entry_v1_report,
             get_hcs_key_frequency_registry_v1_report,
             lookup_hcs_key_frequency_v1,
             import_hcs_studio_score_json_v1,

@@ -2418,3 +2418,77 @@ body {
 .white-key small {
   color: rgba(23, 19, 11, 0.74);
 }
+
+
+/* HCS Virtual Keyboard and Realtime Note Entry v1 */
+.realtime-keyboard-v1-surface {
+  border-color: rgba(84, 214, 255, 0.24);
+}
+.realtime-entry-authority-v1,
+.realtime-entry-status-v1,
+.computer-keyboard-map-v1 {
+  margin: 0.75rem 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(84, 214, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(84, 214, 255, 0.055);
+  display: grid;
+  gap: 0.25rem;
+  color: rgba(248, 241, 212, 0.9);
+}
+.realtime-entry-authority-v1 span,
+.realtime-entry-status-v1,
+.computer-keyboard-map-v1 span {
+  color: rgba(248, 241, 212, 0.64);
+  font-size: 0.76rem;
+}
+.realtime-entry-options-v1 {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(160px, 1fr) minmax(150px, 1fr);
+  gap: 0.65rem;
+  align-items: end;
+  margin: 0.75rem 0;
+}
+.realtime-entry-options-v1 label {
+  display: grid;
+  gap: 0.25rem;
+  color: rgba(248, 241, 212, 0.82);
+  font-size: 0.72rem;
+}
+.realtime-entry-options-v1 select {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(3, 5, 9, 0.82);
+  color: #f8f1d4;
+  padding: 0.55rem 0.65rem;
+}
+.checkbox-line-v1 {
+  grid-template-columns: auto 1fr !important;
+  align-items: center;
+  min-height: 42px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.checkbox-line-v1 input {
+  width: 16px;
+  height: 16px;
+}
+.realtime-keyboard-panel-v1 .piano-key small {
+  display: block;
+  font-size: 0.52rem;
+  font-weight: 700;
+  opacity: 0.72;
+  margin-top: 0.1rem;
+}
+.realtime-keyboard-panel-v1 .piano-key:active {
+  transform: translateY(2px);
+  filter: brightness(1.18);
+}
+@media (max-width: 900px) {
+  .realtime-entry-options-v1 {
+    grid-template-columns: 1fr;
+  }
+}
+/* END HCS Virtual Keyboard and Realtime Note Entry v1 */
