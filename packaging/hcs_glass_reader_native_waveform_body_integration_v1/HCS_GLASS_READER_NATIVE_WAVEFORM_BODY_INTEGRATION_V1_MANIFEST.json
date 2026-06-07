@@ -1,0 +1,13 @@
+{
+  "patch_id": "HCS_GLASS_READER_NATIVE_WAVEFORM_BODY_INTEGRATION_V1",
+  "contract_reused": "aiweb.hfield.waveform_to_3d_field_body.v1",
+  "native_renderer": "src/components/HfieldVolumetricPacketField.tsx",
+  "viewport": "src/components/HfieldPhaseFieldViewport.tsx",
+  "normal_workflow": "Glass Reader scene consumes waveform body report",
+  "composer_preview_status": "demoted_to_advanced_audit",
+  "authority_boundaries": {
+    "mutates_forge": false,
+    "performs_identity_vault_write": false,
+    "uses_llm": false
+  }
+}

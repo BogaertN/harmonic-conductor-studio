@@ -8,6 +8,8 @@ import {
   getCurrentHfieldCymaticReaderSurfaceReport,
   getCurrentHfieldRuntimeCarrierPacketReport,
   getCurrentHfieldRustRenderManifestReport,
+  getHcsWaveformTo3DFieldBodyV1Report,
+  type HcsWaveformTo3DFieldBodyV1Report,
   type HfieldCymaticReaderSurfaceReport,
   type HfieldFieldSynthesisReport,
   type HfieldRuntimeCarrierPacketReport,
@@ -253,6 +255,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
   const [cymaticReport, setCymaticReport] = useState<HfieldCymaticReaderSurfaceReport | null>(null);
   const [carrierReport, setCarrierReport] = useState<HfieldRuntimeCarrierPacketReport | null>(null);
   const [renderManifest, setRenderManifest] = useState<HfieldRustRenderManifestReport | null>(null);
+  const [waveformBodyReport, setWaveformBodyReport] = useState<HcsWaveformTo3DFieldBodyV1Report | null>(null);
   const [readerError, setReaderError] = useState<string | null>(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [cameraRevision, setCameraRevision] = useState(0);
@@ -261,14 +264,20 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
     let mounted = true;
     setReaderError(null);
 
-    Promise.all([getCurrentHfieldCymaticReaderSurfaceReport(), getCurrentHfieldRuntimeCarrierPacketReport(), getCurrentHfieldRustRenderManifestReport()])
-      .then(([nextCymaticReport, nextCarrierReport, nextRenderManifest]) => {
+    Promise.all([
+      getCurrentHfieldCymaticReaderSurfaceReport(),
+      getCurrentHfieldRuntimeCarrierPacketReport(),
+      getCurrentHfieldRustRenderManifestReport(),
+      getHcsWaveformTo3DFieldBodyV1Report()
+    ])
+      .then(([nextCymaticReport, nextCarrierReport, nextRenderManifest, nextWaveformBodyReport]) => {
         if (!mounted) {
           return;
         }
         setCymaticReport(nextCymaticReport);
         setCarrierReport(nextCarrierReport);
         setRenderManifest(nextRenderManifest);
+        setWaveformBodyReport(nextWaveformBodyReport);
       })
       .catch((error: unknown) => {
         if (!mounted) {
@@ -325,7 +334,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
 
       <div className="field-canvas-shell carrier-reader-canvas-shell">
         <Canvas key={`carrier-reader-${isFocusMode ? "focus" : "inline"}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
-          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} playheadReport={playheadReport} isPlaying={isPlaying} />
+          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} playheadReport={playheadReport} isPlaying={isPlaying} />
         </Canvas>
         <div className="field-reader-stage-hint">Orbit: drag · Zoom: wheel · Pan: right-drag · Reset Camera returns the packet to inspection view</div>
       </div>
@@ -338,6 +347,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
         <div className="mini-stat"><span>operating field</span><strong>{carrierReport?.operating_field.key_signature_proxy ?? "—"}</strong></div>
         <div className="mini-stat"><span>runtime paths</span><strong>{carrierReport?.runtime_paths.length ?? 0}</strong></div>
         <div className="mini-stat"><span>render bodies</span><strong>{renderManifest?.field_bodies.length ?? 0}</strong></div>
+        <div className="mini-stat"><span>waveform bodies</span><strong>{waveformBodyReport?.waveform_bodies.length ?? 0}</strong></div>
         <div className="mini-stat"><span>reference pts</span><strong>{renderManifest?.reference_points.length ?? 0}</strong></div>
         <div className="mini-stat"><span>ripples</span><strong>{carrierReport?.information_ripples.length ?? 0}</strong></div>
         <div className="mini-stat"><span>surface</span><strong>{cymaticReport ? `${cymaticReport.reader_surface.vertex_count} vertices` : "—"}</strong></div>

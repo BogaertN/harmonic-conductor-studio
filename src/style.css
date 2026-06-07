@@ -2856,3 +2856,19 @@ body {
 .wave-body-empty-v1{position:absolute;inset:0;display:grid;place-items:center;color:#e7d8a4;font-size:.86rem}
 .studio-track-editor-v1{grid-template-areas:"hero hero" "fieldbody fieldbody" "score mixer" "roll mixer" "keys mixer"}
 @media(max-width:1350px){.studio-track-editor-v1{grid-template-areas:"hero" "fieldbody" "score" "roll" "keys" "mixer"}.wave-body-chain-v1{grid-template-columns:1fr}}
+
+
+/* HCS_GLASS_READER_NATIVE_WAVEFORM_BODY_INTEGRATION_V1: demote old Composer-side waveform preview after native Glass Reader integration. */
+.advanced-waveform-body-preview-v1 {
+  margin: 1rem 0;
+  border: 1px solid rgba(120, 231, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(3, 12, 18, 0.55);
+  padding: 0.85rem 1rem;
+}
+
+.advanced-waveform-body-preview-v1 > summary {
+  cursor: pointer;
+  color: #c9f9ff;
+  font-weight: 700;
+}

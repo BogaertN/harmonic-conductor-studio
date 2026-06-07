@@ -1667,7 +1667,11 @@ function StudioTrackEditorAndPianoRollV1({
         onLonger={() => setDurationSteps(durationSteps + 1)}
       />
 
-      <WaveformTo3DFieldBodyV1 report={report} />
+      <details className="advanced-waveform-body-preview-v1">
+        <summary>Advanced: waveform body audit for native Glass Reader renderer</summary>
+        <p className="note">Normal workflow now drives these waveform bodies through the actual Glass Reader scene. This panel remains only as a contract/audit view.</p>
+        <WaveformTo3DFieldBodyV1 report={report} />
+      </details>
 
       <NotationRenderSyncV1 report={report} selectedNoteKey={selectedNoteKey} onSelectNote={onSelectNote} />
 

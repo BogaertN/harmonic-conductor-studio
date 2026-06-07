@@ -474,6 +474,48 @@ export type HcsInstrumentRackAndTrackSoundV1Report = {
   authority_boundaries: Record<string, boolean>;
 };
 
+export type HcsWaveformEnvelopePointV1 = {
+  sample_index: number;
+  t_norm: number;
+  time_ms: number;
+  amplitude: number;
+  radius: number;
+  surface_x: number;
+  surface_y: number;
+  surface_z: number;
+};
+
+export type HcsWaveformBodyV1 = {
+  track_id: string;
+  role: string;
+  phase_index: number;
+  note_count: number;
+  duration_ms: number;
+  min_midi: number;
+  max_midi: number;
+  pitch_center_midi: number;
+  peak_velocity: number;
+  rms_energy: number;
+  body: {
+    shape: string;
+    length: number;
+    radius: number;
+    undulation_depth: number;
+    not_random_bubble: boolean;
+    generated_from_waveform_envelope: boolean;
+  };
+  glass_reader_placement: {
+    x: number;
+    y: number;
+    z: number;
+    lane_index: number;
+    plane: string;
+    depth_rule: string;
+    vertical_rule: string;
+  };
+  envelope_points: HcsWaveformEnvelopePointV1[];
+};
+
 export type HcsWaveformTo3DFieldBodyV1Report = {
   status: string;
   contract_id: string;
@@ -484,7 +526,7 @@ export type HcsWaveformTo3DFieldBodyV1Report = {
   track_count: number;
   note_count: number;
   total_duration_ms: number;
-  waveform_bodies: unknown[];
+  waveform_bodies: HcsWaveformBodyV1[];
   conversion_rule: Record<string, unknown>;
   glass_reader_placement_rule: Record<string, unknown>;
   authority_boundaries: Record<string, boolean>;

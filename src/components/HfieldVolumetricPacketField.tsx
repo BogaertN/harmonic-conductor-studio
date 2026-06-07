@@ -2,13 +2,14 @@ import { Line, OrbitControls } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import type { HfieldRustRenderManifestReport } from "../bridge/tauriCommands";
+import type { HcsWaveformTo3DFieldBodyV1Report, HfieldRustRenderManifestReport } from "../bridge/tauriCommands";
 
 export type HfieldVolumetricPacketFieldProps = {
   fieldReport?: unknown;
   cymaticReport?: unknown;
   carrierReport?: unknown;
   renderManifest?: HfieldRustRenderManifestReport | null;
+  waveformBodyReport?: HcsWaveformTo3DFieldBodyV1Report | null;
   playheadReport?: unknown;
   isPlaying?: boolean;
 };
@@ -17,6 +18,11 @@ type ManifestBody = HfieldRustRenderManifestReport["field_bodies"][number];
 type ManifestBridge = HfieldRustRenderManifestReport["bridge_bodies"][number];
 type ManifestReferenceLine = HfieldRustRenderManifestReport["reference_lines"][number];
 type ManifestReferencePoint = HfieldRustRenderManifestReport["reference_points"][number];
+type NativeWaveformTrackBody = HcsWaveformTo3DFieldBodyV1Report["waveform_bodies"][number];
+type NativeWaveformEnvelopePoint = NativeWaveformTrackBody["envelope_points"][number];
+
+const HCS_GLASS_READER_NATIVE_WAVEFORM_BODY_INTEGRATION_V1 = "HCS_GLASS_READER_NATIVE_WAVEFORM_BODY_INTEGRATION_V1";
+const HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID = "aiweb.hfield.waveform_to_3d_field_body.v1";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -269,7 +275,171 @@ function ReferencePointMesh({ point }: { point: ManifestReferencePoint }) {
 }
 
 
-function ToneBodyMesh({ body }: { body: ManifestBody }) {
+function waveformTrackBodyMap(report?: HcsWaveformTo3DFieldBodyV1Report | null): Map<string, NativeWaveformTrackBody> {
+  const map = new Map<string, NativeWaveformTrackBody>();
+
+  if (!report || report.contract_id !== HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID) {
+    return map;
+  }
+
+  for (const waveformBody of report.waveform_bodies) {
+    if (waveformBody.track_id) {
+      map.set(waveformBody.track_id, waveformBody);
+    }
+  }
+
+  return map;
+}
+
+function clampUnit(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function nativeEnvelopePoints(waveformBody: NativeWaveformTrackBody | null): NativeWaveformEnvelopePoint[] {
+  const points = waveformBody?.envelope_points ?? [];
+
+  if (points.length >= 2) {
+    return [...points].sort((a, b) => a.t_norm - b.t_norm);
+  }
+
+  return [
+    { sample_index: 0, t_norm: 0, time_ms: 0, amplitude: 0.38, radius: 0.1, surface_x: 0, surface_y: 0, surface_z: 0 },
+    { sample_index: 1, t_norm: 1, time_ms: waveformBody?.duration_ms ?? 1, amplitude: 0.38, radius: 0.1, surface_x: 1, surface_y: 0, surface_z: 0 }
+  ];
+}
+
+function envelopeAmplitudeAt(points: NativeWaveformEnvelopePoint[], tNorm: number): number {
+  const t = clampUnit(tNorm);
+
+  if (points.length === 0) {
+    return 0.35;
+  }
+
+  if (t <= points[0].t_norm) {
+    return clampUnit(points[0].amplitude);
+  }
+
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+
+    if (t <= current.t_norm) {
+      const span = Math.max(0.0001, current.t_norm - previous.t_norm);
+      const local = clampUnit((t - previous.t_norm) / span);
+      return clampUnit(THREE.MathUtils.lerp(previous.amplitude, current.amplitude, local));
+    }
+  }
+
+  return clampUnit(points[points.length - 1].amplitude);
+}
+
+function nativeWaveformRoleLift(waveformBody: NativeWaveformTrackBody | null): number {
+  const role = waveformBody?.role.toLowerCase() ?? "";
+
+  if (role.includes("bass") || role.includes("root")) {
+    return 1.16;
+  }
+
+  if (role.includes("lead") || role.includes("melody")) {
+    return 1.08;
+  }
+
+  if (role.includes("pad") || role.includes("field")) {
+    return 0.94;
+  }
+
+  return 1;
+}
+
+function createNativeWaveformBodyGeometry(body: ManifestBody, waveformBody: NativeWaveformTrackBody | null): THREE.BufferGeometry {
+  const points = nativeEnvelopePoints(waveformBody);
+  const longitudinalSegments = Math.max(14, Math.min(48, points.length * 2));
+  const radialSegments = 20;
+  const length = Math.max(0.08, Math.abs(body.z_body_length));
+  const phase = waveformBody?.phase_index ?? 1;
+  const roleLift = nativeWaveformRoleLift(waveformBody);
+  const undulation = Math.max(0.012, Math.min(0.18, waveformBody?.body.undulation_depth ?? body.amplitude * 0.08));
+  const peak = Math.max(body.amplitude, waveformBody?.peak_velocity ?? 0.0, waveformBody?.rms_energy ?? 0.0);
+  const radiusBaseX = Math.max(0.035, body.radius_x * roleLift);
+  const radiusBaseY = Math.max(0.035, body.radius_y * roleLift);
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let row = 0; row <= longitudinalSegments; row += 1) {
+    const t = row / longitudinalSegments;
+    const z = -length / 2 + t * length;
+    const envelope = envelopeAmplitudeAt(points, t);
+    const attackDecay = Math.sin(Math.PI * t);
+    const ripple = Math.sin(t * Math.PI * (4 + phase) + phase * 0.53) * undulation * attackDecay;
+    const radiusScale = Math.max(0.32, 0.42 + envelope * 0.72 + peak * 0.18 + ripple);
+    const radiusX = radiusBaseX * radiusScale;
+    const radiusY = radiusBaseY * Math.max(0.34, radiusScale * (0.82 + envelope * 0.22));
+
+    for (let column = 0; column < radialSegments; column += 1) {
+      const angle = (column / radialSegments) * Math.PI * 2;
+      const ringRipple = 1 + Math.sin(angle * 3 + t * Math.PI * 2 + phase) * undulation * 0.22;
+      positions.push(Math.cos(angle) * radiusX * ringRipple, Math.sin(angle) * radiusY * ringRipple, z);
+    }
+  }
+
+  for (let row = 0; row < longitudinalSegments; row += 1) {
+    for (let column = 0; column < radialSegments; column += 1) {
+      const current = row * radialSegments + column;
+      const next = row * radialSegments + ((column + 1) % radialSegments);
+      const above = (row + 1) * radialSegments + column;
+      const aboveNext = (row + 1) * radialSegments + ((column + 1) % radialSegments);
+      indices.push(current, above, next, next, above, aboveNext);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  geometry.userData = {
+    contract_id: HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID,
+    patch_id: HCS_GLASS_READER_NATIVE_WAVEFORM_BODY_INTEGRATION_V1,
+    source_track_id: body.track_id,
+    generated_from_waveform_envelope: true,
+    not_random_bubble: true
+  };
+  return geometry;
+}
+
+function NativeWaveformBodyMesh({ body, waveformBody }: { body: ManifestBody; waveformBody: NativeWaveformTrackBody | null }) {
+  const geometry = useMemo(() => createNativeWaveformBodyGeometry(body, waveformBody), [body, waveformBody]);
+  const peak = Math.max(body.amplitude, waveformBody?.peak_velocity ?? 0, waveformBody?.rms_energy ?? 0);
+  const opacity = Math.max(bodyOpacity(body), Math.min(0.62, 0.22 + peak * 0.42));
+
+  return (
+    <group position={[body.x, body.y, body.z_center]}>
+      <mesh geometry={geometry}>
+        <meshStandardMaterial
+          color={body.color_hex}
+          transparent
+          opacity={opacity}
+          roughness={0.2}
+          metalness={0.1}
+          emissive={body.color_hex}
+          emissiveIntensity={0.18 + peak * 0.18}
+          depthWrite={false}
+        />
+      </mesh>
+
+      <mesh geometry={geometry} scale={[1.035, 1.035, 1.008]}>
+        <meshBasicMaterial color={body.color_hex} transparent opacity={Math.max(0.24, bodyWireOpacity(body))} wireframe depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function ToneBodyMesh({ body, waveformBody }: { body: ManifestBody; waveformBody?: NativeWaveformTrackBody | null }) {
+  if (body.layer_key === "payload_tone" && waveformBody) {
+    return <NativeWaveformBodyMesh body={body} waveformBody={waveformBody} />;
+  }
+
+
   return (
     <group position={[body.x, body.y, body.z_center]}>
       <mesh scale={[body.radius_x, body.radius_y, Math.max(0.04, body.z_body_length / 2)]}>
@@ -336,6 +506,7 @@ function SliceIntersection({ body }: { body: ManifestBody }) {
 
 export default function HfieldVolumetricPacketField({
   renderManifest,
+  waveformBodyReport,
   playheadReport,
   isPlaying = false,
 }: HfieldVolumetricPacketFieldProps) {
@@ -351,6 +522,7 @@ export default function HfieldVolumetricPacketField({
   const bridges = useMemo(() => renderManifest?.bridge_bodies ?? [], [renderManifest]);
   const referenceLines = useMemo(() => renderManifest?.reference_lines ?? [], [renderManifest]);
   const referencePoints = useMemo(() => renderManifest?.reference_points ?? [], [renderManifest]);
+  const waveformBodiesByTrack = useMemo(() => waveformTrackBodyMap(waveformBodyReport), [waveformBodyReport]);
   const baseProgress = currentPlayheadProgress(playheadReport);
 
   useFrame(() => {
@@ -407,7 +579,7 @@ export default function HfieldVolumetricPacketField({
       ))}
 
       {bodies.map((body) => (
-        <ToneBodyMesh key={body.body_id} body={body} />
+        <ToneBodyMesh key={body.body_id} body={body} waveformBody={waveformBodiesByTrack.get(body.track_id) ?? null} />
       ))}
 
       {referencePoints.map((point) => (
