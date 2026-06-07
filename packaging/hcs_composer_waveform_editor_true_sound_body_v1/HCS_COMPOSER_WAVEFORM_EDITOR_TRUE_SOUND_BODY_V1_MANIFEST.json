@@ -1,0 +1,24 @@
+{
+  "patch_id": "HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1",
+  "contract_id": "aiweb.hcs.composer_waveform_editor_true_sound_body.v1",
+  "supersedes_visual_failures": [
+    "HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1",
+    "HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1"
+  ],
+  "purpose": "Build a real Composer waveform editor source layer so score notes become deterministic 2D waveform segments before Glass Reader 3D sound-body extrusion.",
+  "source_authority": "current_score.music.tracks[*].notes",
+  "rendering_law": {
+    "notes_generate_waveform_segments": true,
+    "waveform_editor_precedes_3d_extrusion": true,
+    "glass_reader_uses_true_sound_body_extrusions": true,
+    "raw_carrier_ripples_are_inspection_only": true,
+    "file_identity_carrier_not_visible_as_production_payload_body": true
+  },
+  "authority_boundaries": {
+    "mutates_current_hcs_score": false,
+    "mutates_forge": false,
+    "performs_identity_vault_write": false,
+    "exports_private_identity": false,
+    "uses_llm": false
+  }
+}

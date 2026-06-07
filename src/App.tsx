@@ -1105,6 +1105,7 @@ function ComposerStudioCanvasRebuildV1({
       </div>
 
       <div className="composer-canvas-actionbar-v1">
+        <button onClick={() => onLoadPreset("full_system_exerciser_v1")} type="button">Load Full Demo</button>
         <button onClick={() => onLoadPreset("glass_reader_arpeggio")} type="button">Load Arpeggio</button>
         <button onClick={() => onLoadPreset("midnight_sonnet_seed")} type="button">Load Song Seed</button>
         <button onClick={() => onLoadPreset("empty_studio_score")} type="button">New Score</button>
@@ -1656,6 +1657,7 @@ function StudioTrackEditorAndPianoRollV1({
           <p className="note">Mouse clicks and optional computer-keyboard input now resolve through the canonical MIDI frequency registry, preview the real frequency, and write notes directly into music.tracks[*].notes through the backed piano-roll command.</p>
         </div>
         <div className="button-row compact-row">
+          <button onClick={() => onLoadPreset("full_system_exerciser_v1")} type="button">Load Full Demo</button>
           <button onClick={() => onLoadPreset("glass_reader_arpeggio")} type="button">Load Arpeggio</button>
           <button onClick={() => onLoadPreset("midnight_sonnet_seed")} type="button">Load Midnight Seed</button>
           <button onClick={onPlayStudio} type="button">Play Studio Mix</button>
@@ -1676,6 +1678,7 @@ function StudioTrackEditorAndPianoRollV1({
           </div>
           <p className="note">No JSON required. Load a starter score or press the piano keys. Every note you create writes into the score, notation, piano roll, track lanes, audio chain, and Glass Reader field.</p>
           <div className="composer-first-big-actions-v1">
+            <button onClick={() => onLoadPreset("full_system_exerciser_v1")} type="button">Load Full Demo Song</button>
             <button onClick={() => onLoadPreset("glass_reader_arpeggio")} type="button">Load Arpeggio</button>
             <button onClick={() => onLoadPreset("midnight_sonnet_seed")} type="button">Load Midnight Seed</button>
             <button onClick={() => onLoadPreset("empty_studio_score")} type="button">New Blank Score</button>
@@ -1868,6 +1871,7 @@ function StudioTrackEditorAndPianoRollV1({
       <div className="studio-action-strip-v1">
         <button onClick={onRefresh} type="button">Refresh Editor</button>
         <button onClick={onExportAudio} type="button">Export Audio</button>
+        <button onClick={() => onLoadPreset("full_system_exerciser_v1")} type="button">Full Demo Preset</button>
         <button onClick={() => onLoadPreset("empty_studio_score")} type="button">Blank Preset</button>
         <span>{report ? `${report.title} · ${report.note_count} notes · hash ${report.score_hash.slice(0, 12)}` : "No editor report yet"}</span>
       </div>
@@ -2535,6 +2539,12 @@ export default function App() {
       setMotionTimeMs(0);
       setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
       setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
+      setGestureTimeline(await getCurrentGestureTimeline());
+      setMotionReport(await getCurrentConductorMotionReport());
+      setMappingReport(await getCurrentConductorMappingReport());
+      setResonanceBundle(await getCurrentResonanceLevelBundle());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setLoopPhraseReport(await getCurrentLoopPhraseReport(loopStartMeasure, loopEndMeasure));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -2551,9 +2561,23 @@ export default function App() {
       setMotionTimeMs(0);
       setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
       setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
+      setGestureTimeline(await getCurrentGestureTimeline());
+      setMotionReport(await getCurrentConductorMotionReport());
+      setMappingReport(await getCurrentConductorMappingReport());
+      setResonanceBundle(await getCurrentResonanceLevelBundle());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setLoopPhraseReport(await getCurrentLoopPhraseReport(loopStartMeasure, loopEndMeasure));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  async function loadFullSystemExerciserDemoV1() {
+    await loadStudioScorePresetV1("full_system_exerciser_v1");
+    setLoopStartMeasure(1);
+    setLoopEndMeasure(8);
+    setActiveTab("field");
+    setSelectedDiagnostic("musicTimeline");
   }
 
   async function setPianoRollNoteV1(trackId: string, stepIndex: number, midiNote: number, durationSteps: number, velocity: number, stepMs: number) {
@@ -2582,6 +2606,12 @@ export default function App() {
       setMotionTimeMs(0);
       setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
       setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
+      setGestureTimeline(await getCurrentGestureTimeline());
+      setMotionReport(await getCurrentConductorMotionReport());
+      setMappingReport(await getCurrentConductorMappingReport());
+      setResonanceBundle(await getCurrentResonanceLevelBundle());
+      setSeedMusicScore(await getCurrentProjectScore());
+      setLoopPhraseReport(await getCurrentLoopPhraseReport(loopStartMeasure, loopEndMeasure));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -3628,7 +3658,7 @@ export default function App() {
         </div>
 
         <div className="global-transport">
-          <button onClick={loadSeedMusic} type="button">Load Demo</button>
+          <button onClick={loadFullSystemExerciserDemoV1} type="button">Load Full Demo</button>
           <button onClick={applyGeneratedMapping} type="button">Map Cues</button>
           <button onClick={playCurrentCombinedAudio} type="button">Play Studio</button>
           <button onClick={playLoopPhraseCombined} type="button">Loop Phrase</button>
@@ -3690,7 +3720,8 @@ export default function App() {
                   <p className="note">Production-ready score editing starts here: choose notes, move timing, adjust lanes, then hear the same score through the Studio field.</p>
                 </div>
                 <div className="button-row compact-row">
-                  <button onClick={loadSeedMusic} type="button">Load Demo Score</button>
+                  <button onClick={loadFullSystemExerciserDemoV1} type="button">Load Full Demo Song</button>
+                  <button onClick={loadSeedMusic} type="button">Load Short Demo</button>
                   <button onClick={refreshMusicTimeline} type="button">Refresh Score</button>
                   <button onClick={playCurrentMusicAudio} type="button">Play Music</button>
                 </div>
@@ -3980,7 +4011,8 @@ export default function App() {
                   <h3>1. Create or load music</h3>
                   <p className="note">Use the demo score, open a saved project, or move to Score when you want to edit notes and timing.</p>
                   <div className="button-row studio-action-row">
-                    <button onClick={loadSeedMusic} type="button">Load Demo Score</button>
+                    <button onClick={loadFullSystemExerciserDemoV1} type="button">Load Full Demo Song</button>
+                    <button onClick={loadSeedMusic} type="button">Load Short Demo</button>
                     <button onClick={() => setActiveTab("compose")} type="button">Edit Score</button>
                     <button onClick={listHcsSqliteProjectsV1} type="button">Recent Projects</button>
                   </div>
@@ -4001,7 +4033,6 @@ export default function App() {
                   <p className="note">Save actual multi-track music locally, then seal Bundle Manifest v2 when the project needs custody/replay proof.</p>
                   <div className="button-row studio-action-row">
                     <button onClick={saveCurrentProjectToHcsSqliteLibraryV1} type="button">Save Project</button>
-                    <button onClick={renderCurrentProjectWav} type="button">Export Audio</button>
                     <button onClick={renderCurrentProjectWav} type="button">Export Audio</button>
                     <button onClick={exportHfieldCanonicalBundleManifestV2} type="button">Seal Bundle v2</button>
                     <button onClick={() => setActiveTab("diagnostics")} type="button">Advanced</button>

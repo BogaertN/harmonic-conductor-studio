@@ -1,0 +1,33 @@
+{
+  "patch_id": "HCS_DEMO_SONG_FULL_SYSTEM_EXERCISER_V1",
+  "contract_role": "long_deterministic_demo_score_for_full_stack_visual_and_audio_exercising",
+  "base_commit": "3442f41 Add Composer waveform editor true sound body v1",
+  "adds": [
+    "full_system_exerciser_v1 studio score preset",
+    "32-bar deterministic multi-track composition",
+    "lead melody with short, long, high, low, and velocity-varied notes",
+    "bass/depth support with long carriers and pulses",
+    "harmonic field support with sustained chord beds and high shimmer notes",
+    "primary and expressive conductor gesture timelines using all nine gesture IDs",
+    "UI buttons to load the full demo from global transport, Composer, and Glass Reader workflow"
+  ],
+  "fixes": [
+    "commits previously untracked waveform editor packaging folder left by R2 proof",
+    "refreshes gesture, field, mapping, playhead, and waveform-dependent reports after preset load"
+  ],
+  "authority_boundaries": {
+    "rust_owned_demo_score": true,
+    "no_forge_mutation": true,
+    "no_identity_vault_write": true,
+    "no_llm_runtime_authority": true,
+    "debug_visuals_not_promoted": true
+  },
+  "required_gates": [
+    "cargo fmt --all -- --check",
+    "cargo test --workspace",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "npm run typecheck",
+    "npm run build",
+    "npm run tauri info"
+  ]
+}

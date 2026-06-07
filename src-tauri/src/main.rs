@@ -274,6 +274,203 @@ fn seed_music_score() -> FieldScore {
     score
 }
 
+fn hcs_full_system_exerciser_score_v1() -> FieldScore {
+    let mut score = FieldScore::default_hcs();
+
+    score.title = "Full System Exerciser Demo v1".to_string();
+    score.music.tempo_bpm = 96.0;
+    score.music.meter = "4/4".to_string();
+    score.music.tuning_mode = "twelve_tone_equal_temperament".to_string();
+
+    let quarter_ms = (60_000.0 / score.music.tempo_bpm).round() as u32;
+    let half_ms = (quarter_ms / 2).max(1);
+    let bar_ms = quarter_ms * 4;
+    let bar_count = 32_u32;
+    let roots = [48_i32, 53, 55, 50, 45, 52, 47, 43];
+
+    let mut lead_notes = Vec::new();
+    for bar_index in 0..bar_count {
+        let bar_start = bar_index * bar_ms;
+        let root = roots[(bar_index as usize) % roots.len()];
+        let phrase_energy = (0.58_f32 + ((bar_index % 8) as f32 * 0.035)).min(0.94);
+
+        match bar_index % 4 {
+            0 => {
+                let intervals = [0_i32, 4, 7, 12];
+                for (slot, interval) in intervals.iter().enumerate() {
+                    lead_notes.push(NoteEvent {
+                        midi_note: (root + 12 + interval).clamp(48, 88) as u8,
+                        start_ms: bar_start + slot as u32 * quarter_ms,
+                        duration_ms: quarter_ms,
+                        velocity: (phrase_energy + slot as f32 * 0.025).min(0.98),
+                    });
+                }
+            }
+            1 => {
+                let intervals = [12_i32, 11, 9, 7, 4, 7, 9, 11];
+                for (slot, interval) in intervals.iter().enumerate() {
+                    lead_notes.push(NoteEvent {
+                        midi_note: (root + interval).clamp(48, 91) as u8,
+                        start_ms: bar_start + slot as u32 * half_ms,
+                        duration_ms: half_ms,
+                        velocity: (phrase_energy + ((slot % 3) as f32 * 0.035)).min(0.98),
+                    });
+                }
+            }
+            2 => {
+                let cells = [
+                    (0_i32, half_ms),
+                    (4_i32, half_ms),
+                    (7_i32, quarter_ms),
+                    (14_i32, half_ms),
+                    (12_i32, half_ms),
+                    (9_i32, quarter_ms),
+                ];
+                let mut cursor = 0_u32;
+                for (slot, (interval, duration_ms)) in cells.iter().enumerate() {
+                    lead_notes.push(NoteEvent {
+                        midi_note: (root + 12 + interval).clamp(48, 93) as u8,
+                        start_ms: bar_start + cursor,
+                        duration_ms: *duration_ms,
+                        velocity: (phrase_energy + slot as f32 * 0.018).min(0.96),
+                    });
+                    cursor = cursor.saturating_add(*duration_ms);
+                }
+            }
+            _ => {
+                lead_notes.push(NoteEvent {
+                    midi_note: (root + 24).clamp(55, 96) as u8,
+                    start_ms: bar_start,
+                    duration_ms: quarter_ms * 2,
+                    velocity: (phrase_energy + 0.10).min(0.99),
+                });
+                let intervals = [7_i32, 9, 11, 12];
+                for (slot, interval) in intervals.iter().enumerate() {
+                    lead_notes.push(NoteEvent {
+                        midi_note: (root + 12 + interval).clamp(48, 94) as u8,
+                        start_ms: bar_start + quarter_ms * 2 + slot as u32 * half_ms,
+                        duration_ms: half_ms,
+                        velocity: (0.70_f32 + slot as f32 * 0.055).min(0.98),
+                    });
+                }
+            }
+        }
+    }
+
+    let mut depth_notes = Vec::new();
+    for bar_index in 0..bar_count {
+        let bar_start = bar_index * bar_ms;
+        let root = roots[(bar_index as usize) % roots.len()] - 12;
+        depth_notes.push(NoteEvent {
+            midi_note: root.clamp(28, 48) as u8,
+            start_ms: bar_start,
+            duration_ms: bar_ms,
+            velocity: (0.46_f32 + (bar_index % 4) as f32 * 0.035).min(0.62),
+        });
+
+        if bar_index % 2 == 0 {
+            depth_notes.push(NoteEvent {
+                midi_note: (root + 12).clamp(36, 60) as u8,
+                start_ms: bar_start + quarter_ms * 2,
+                duration_ms: quarter_ms * 2,
+                velocity: 0.32,
+            });
+        }
+    }
+
+    let mut field_notes = Vec::new();
+    for phrase_index in 0..8_u32 {
+        let start_ms = phrase_index * bar_ms * 4;
+        let root = roots[(phrase_index as usize) % roots.len()];
+        let chord = [0_i32, 7, 12, 16, 19];
+        for (voice_index, interval) in chord.iter().enumerate() {
+            field_notes.push(NoteEvent {
+                midi_note: (root + interval).clamp(48, 84) as u8,
+                start_ms,
+                duration_ms: bar_ms * 4,
+                velocity: (0.12_f32 + voice_index as f32 * 0.025 + phrase_index as f32 * 0.006)
+                    .min(0.30),
+            });
+        }
+
+        field_notes.push(NoteEvent {
+            midi_note: (root + 31).clamp(67, 98) as u8,
+            start_ms: start_ms + bar_ms * 2,
+            duration_ms: bar_ms,
+            velocity: 0.18,
+        });
+    }
+
+    for track in &mut score.music.tracks {
+        match track.track_id.as_str() {
+            "lead_voice" => {
+                track.role = "melody".to_string();
+                track.notes = lead_notes.clone();
+            }
+            "depth_voice" => {
+                track.role = "bass_depth".to_string();
+                track.notes = depth_notes.clone();
+            }
+            "field_voice" => {
+                track.role = "harmonic_field_support".to_string();
+                track.notes = field_notes.clone();
+            }
+            _ => {}
+        }
+    }
+
+    let gesture_cycle = [
+        ("g2", "inward_opening"),
+        ("g1", "root_settle"),
+        ("g3", "emergence_extension"),
+        ("g4", "constraint_entry"),
+        ("g5", "transformation_hold"),
+        ("g6", "release"),
+        ("g7", "expression_binding"),
+        ("g9", "formed_signal"),
+        ("g8", "projection_emit"),
+    ];
+
+    let mut primary_events = Vec::new();
+    let mut expressive_events = Vec::new();
+    for bar_index in 0..bar_count {
+        let (gesture_id, operator) = gesture_cycle[(bar_index as usize) % gesture_cycle.len()];
+        primary_events.push(GestureEvent {
+            gesture_id: gesture_id.to_string(),
+            start_ms: bar_index * bar_ms,
+            duration_ms: bar_ms,
+            intensity: (0.42_f32 + ((bar_index % 8) as f32 * 0.055)).min(0.92),
+            operator: Some(operator.to_string()),
+        });
+
+        if bar_index % 2 == 1 {
+            let (expressive_id, expressive_operator) =
+                gesture_cycle[((bar_index + 3) as usize) % gesture_cycle.len()];
+            expressive_events.push(GestureEvent {
+                gesture_id: expressive_id.to_string(),
+                start_ms: bar_index * bar_ms + half_ms,
+                duration_ms: bar_ms - half_ms,
+                intensity: (0.34_f32 + ((bar_index % 6) as f32 * 0.055)).min(0.76),
+                operator: Some(format!("expressive_{expressive_operator}")),
+            });
+        }
+    }
+
+    score.conductor = ConductedPerformance {
+        field_layout: "center_1_lower_5_upper_9_full_demo_exerciser".to_string(),
+        primary_hand_track: GestureTrack {
+            track_id: "primary_hand".to_string(),
+            events: primary_events,
+        },
+        expressive_hand_track: Some(GestureTrack {
+            track_id: "expressive_hand".to_string(),
+            events: expressive_events,
+        }),
+    };
+
+    score
+}
+
 fn stop_existing_playback(state: &AppState) -> Result<(), String> {
     let maybe_active = {
         let mut guard = state
@@ -2530,6 +2727,9 @@ fn hcs_preset_score_v1(preset_id: &str) -> Result<FieldScore, String> {
     let bar = q * 4;
 
     match preset_id {
+        "full_system_exerciser_v1" => {
+            score = hcs_full_system_exerciser_score_v1();
+        }
         "empty_studio_score" => {
             score.title = "Empty Studio Score".to_string();
             for track in &mut score.music.tracks {
