@@ -1918,3 +1918,183 @@ body {
   max-height: 240px;
 }
 /* END HFIELD Identity Vault Reference Binding v1 */
+
+
+/* HCS UI Studio Workflow Triage and Rebuild v1 */
+.shell-v2.mode-field {
+  --mode-accent: #f4df9b;
+}
+
+.shell-v2.mode-field .top-status-bar {
+  grid-template-columns: minmax(360px, 1.15fr) minmax(520px, 1.85fr) minmax(360px, auto);
+  background:
+    radial-gradient(circle at 48% 0%, rgba(244, 223, 155, 0.14), transparent 32%),
+    radial-gradient(circle at 82% 80%, rgba(84, 214, 255, 0.10), transparent 34%),
+    linear-gradient(135deg, rgba(22, 24, 34, 0.98), rgba(8, 10, 16, 0.94));
+}
+
+.shell-v2.mode-field .workstation-frame {
+  grid-template-columns: 104px minmax(900px, 1fr) 340px;
+}
+
+.shell-v2.mode-field .main-workspace {
+  padding: 0.7rem;
+  background:
+    radial-gradient(circle at 50% 4%, rgba(84, 214, 255, 0.07), transparent 34%),
+    rgba(12, 14, 22, 0.84);
+}
+
+.mode-rail .mode-button {
+  text-align: left;
+  padding-inline: 0.72rem;
+  border-radius: 14px;
+}
+
+.mode-rail .mode-button.active {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 14px 40px rgba(244, 223, 155, 0.16);
+}
+
+.studio-start-deck {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  gap: 0.75rem;
+  margin: 0.85rem 0;
+}
+
+.studio-step-card,
+.library-quick-actions article {
+  border: 1px solid rgba(244, 223, 155, 0.16);
+  border-radius: 18px;
+  padding: 1rem;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(244, 223, 155, 0.08), transparent 34%),
+    rgba(5, 9, 15, 0.72);
+  box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.025), 0 18px 48px rgba(0, 0, 0, 0.22);
+}
+
+.studio-step-card h3,
+.library-quick-actions h3 {
+  margin-bottom: 0.4rem;
+}
+
+.studio-step-primary {
+  border-color: rgba(84, 214, 255, 0.22);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(84, 214, 255, 0.12), transparent 36%),
+    radial-gradient(circle at 86% 12%, rgba(244, 223, 155, 0.10), transparent 32%),
+    rgba(4, 9, 16, 0.80);
+}
+
+.studio-action-row {
+  margin-top: 0.85rem;
+}
+
+.studio-action-row button,
+.global-transport button {
+  min-height: 40px;
+}
+
+.shell-v2.mode-field .phrase-loop-section {
+  border-color: rgba(84, 214, 255, 0.16);
+  background: rgba(5, 9, 14, 0.58);
+}
+
+.shell-v2.mode-field .field-workspace {
+  grid-template-rows: auto auto auto minmax(720px, auto);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(244, 223, 155, 0.07), transparent 28%),
+    radial-gradient(circle at 70% 80%, rgba(84, 214, 255, 0.06), transparent 38%),
+    linear-gradient(150deg, rgba(13, 17, 26, 0.96), rgba(4, 6, 12, 0.96));
+}
+
+.shell-v2.mode-field .field-viewport-panel.carrier-reader-panel {
+  border-color: rgba(84, 214, 255, 0.24);
+  min-height: clamp(860px, 80vh, 1120px);
+}
+
+.shell-v2.mode-field .field-canvas-shell.carrier-reader-canvas-shell {
+  min-height: clamp(720px, 62vh, 980px) !important;
+}
+
+.library-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 0.85rem;
+}
+
+.legacy-file-card {
+  border-color: rgba(255, 255, 255, 0.065);
+  background: rgba(5, 7, 12, 0.34);
+}
+
+.advanced-export-drawer {
+  grid-column: 1 / -1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.advanced-export-drawer > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.95rem 1rem;
+  color: #f4df9b;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid rgba(244, 223, 155, 0.10);
+}
+
+.advanced-export-drawer > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-export-drawer > summary::after {
+  content: "Open developer tools";
+  float: right;
+  color: rgba(244, 223, 155, 0.68);
+  font-size: 0.74rem;
+}
+
+.advanced-export-drawer[open] > summary::after {
+  content: "Hide developer tools";
+}
+
+.advanced-export-content {
+  padding: 1rem;
+}
+
+.composer-bench-section,
+.composer-tool-dock .tool-card:not(.primary-tool-card) {
+  display: none;
+}
+
+.composer-tool-dock {
+  grid-template-columns: 1fr;
+}
+
+.composer-tool-dock .primary-tool-card {
+  border-color: rgba(84, 214, 255, 0.18);
+}
+
+.notation-board .staff-system::after {
+  content: "Preview, not full engraving editor yet";
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.65rem;
+  color: rgba(244, 223, 155, 0.65);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+@media (max-width: 1500px) {
+  .studio-start-deck,
+  .library-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .shell-v2.mode-field .workstation-frame {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+}
+/* END HCS UI Studio Workflow Triage and Rebuild v1 */
+

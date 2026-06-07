@@ -605,7 +605,7 @@ function VisibleConductorMotion({
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<OperatorTab>("compose");
+  const [activeTab, setActiveTab] = useState<OperatorTab>("field");
   const [selectedDiagnostic, setSelectedDiagnostic] = useState<DiagnosticKey>("motionReport");
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
@@ -1904,12 +1904,12 @@ export default function App() {
 
 
   const activeModeLabel =
-    activeTab === "compose" ? "Compose" :
-    activeTab === "conduct" ? "Conduct" :
-    activeTab === "rehearse" ? "Rehearse" :
+    activeTab === "compose" ? "Score" :
+    activeTab === "conduct" ? "Conductor" :
+    activeTab === "rehearse" ? "Practice" :
     activeTab === "perform" ? "Perform" :
-    activeTab === "field" ? "Field" :
-    activeTab === "project" ? "Project" : "Diagnostics";
+    activeTab === "field" ? "Studio" :
+    activeTab === "project" ? "Library" : "Advanced";
 
   const leadTrack = musicTimeline?.tracks.find((track) => track.track_id === "lead_voice") ?? null;
   const depthTrack = musicTimeline?.tracks.find((track) => track.track_id === "depth_voice") ?? null;
@@ -1927,7 +1927,7 @@ export default function App() {
         <div className="brand-block">
           <p className="eyebrow">AI.Web Native Desktop Application</p>
           <h1>Harmonic Conductor Studio</h1>
-          <p>Professional workstation for composition, notation, conducting, rehearsal, performance, and .hfield custody.</p>
+          <p>Studio-first harmonic music workspace for score, conductor cues, deterministic audio, Glass Reader cymatics, and sealed .hfield custody.</p>
         </div>
 
         <div className="global-status-strip" aria-label="Project status">
@@ -1943,23 +1943,23 @@ export default function App() {
         </div>
 
         <div className="global-transport">
-          <button onClick={loadSeedMusic} type="button">Load</button>
-          <button onClick={applyGeneratedMapping} type="button">Map</button>
-          <button onClick={playCurrentCombinedAudio} type="button">Play</button>
-          <button onClick={playLoopPhraseCombined} type="button">Phrase</button>
+          <button onClick={loadSeedMusic} type="button">Load Demo</button>
+          <button onClick={applyGeneratedMapping} type="button">Map Cues</button>
+          <button onClick={playCurrentCombinedAudio} type="button">Play Studio</button>
+          <button onClick={playLoopPhraseCombined} type="button">Loop Phrase</button>
           <button className="danger" onClick={stopAudio} type="button">Stop</button>
         </div>
       </header>
 
       <section className="workstation-frame">
         <nav className="mode-rail" aria-label="Workspace modes">
-          <button className={activeTab === "compose" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("compose")} type="button">Compose</button>
-          <button className={activeTab === "conduct" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("conduct")} type="button">Conduct</button>
-          <button className={activeTab === "rehearse" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("rehearse")} type="button">Rehearse</button>
+          <button className={activeTab === "compose" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("compose")} type="button">Score</button>
+          <button className={activeTab === "conduct" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("conduct")} type="button">Conductor</button>
+          <button className={activeTab === "rehearse" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("rehearse")} type="button">Practice</button>
           <button className={activeTab === "perform" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("perform")} type="button">Perform</button>
-          <button className={activeTab === "field" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("field")} type="button">Field</button>
-          <button className={activeTab === "project" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("project")} type="button">Project</button>
-          <button className={activeTab === "diagnostics" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("diagnostics")} type="button">Diagnostics</button>
+          <button className={activeTab === "field" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("field")} type="button">Studio</button>
+          <button className={activeTab === "project" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("project")} type="button">Library</button>
+          <button className={activeTab === "diagnostics" ? "mode-button active" : "mode-button"} onClick={() => setActiveTab("diagnostics")} type="button">Advanced</button>
         </nav>
 
         <section className="main-workspace" aria-label={`${activeModeLabel} workspace`}>
@@ -2002,13 +2002,13 @@ export default function App() {
             <div className="workspace-panel compose-workspace">
               <div className="workspace-header-row">
                 <div>
-                  <p className="eyebrow">Composition Workspace</p>
-                  <h2>Notation and Timeline</h2>
-                  <p className="note">This is the primary creation surface. The notation, piano roll, track lanes, and conductor cue strip now own the biggest area.</p>
+                  <p className="eyebrow">Score Workspace</p>
+                  <h2>Music Timeline and Track Lanes</h2>
+                  <p className="note">Production-ready score editing starts here: choose notes, move timing, adjust lanes, then hear the same score through the Studio field.</p>
                 </div>
                 <div className="button-row compact-row">
-                  <button onClick={loadSeedMusic} type="button">Load Seed</button>
-                  <button onClick={refreshMusicTimeline} type="button">Refresh Notes</button>
+                  <button onClick={loadSeedMusic} type="button">Load Demo Score</button>
+                  <button onClick={refreshMusicTimeline} type="button">Refresh Score</button>
                   <button onClick={playCurrentMusicAudio} type="button">Play Music</button>
                 </div>
               </div>
@@ -2031,7 +2031,7 @@ export default function App() {
                 <div className="tool-card primary-tool-card">
                   <p className="eyebrow">Composer Tool Dock</p>
                   <h3>Professional Score Tools</h3>
-                  <p className="note">Reserved workstation zones for the tools a composer expects: notation, piano roll, tracks, mixer, palettes, import/export, shortcuts, and measure tools.</p>
+                  <p className="note">Roadmap-only tools are hidden from the main studio path until they are backed by real editing behavior. Use the note editor, track lanes, and Score Timeline Preview below for current production editing.</p>
                 </div>
                 <div className="tool-card"><strong>Notation</strong><span>staff, clef, rests, ties, slurs, dynamics</span></div>
                 <div className="tool-card"><strong>Piano Roll</strong><span>pitch grid, duration, velocity, lanes</span></div>
@@ -2044,10 +2044,10 @@ export default function App() {
               <div className="composition-grid">
                 <section className="notation-board">
                   <div className="board-title-row">
-                    <h3>Notation Staff</h3>
+                    <h3>Score Timeline Preview</h3>
                     <span>{musicTimeline?.meter ?? "4/4"} · {musicTimeline?.tempo_bpm ?? 84} BPM · {musicTimeline?.tuning_mode ?? "12-TET"}</span>
                   </div>
-                  <div className="staff-system" aria-label="Notation staff placeholder">
+                  <div className="staff-system" aria-label="Score timeline preview">
                     {[0, 1, 2, 3, 4].map((line) => <span key={line} className="staff-line" />)}
                     {(leadTrack?.notes ?? []).slice(0, 15).map((note, index) => (
                       <span
@@ -2262,16 +2262,49 @@ export default function App() {
             <div className="workspace-panel field-workspace">
               <div className="workspace-header-row">
                 <div>
-                  <p className="eyebrow">Harmonic Packet Field</p>
-                  <h2>3D Glass Reader and Runtime Carrier Cymatics</h2>
-                  <p className="note">This viewport reads the .hfield packet through a glass plane. Rust derives the file identity carrier from the packet identity, then separates runtime path carriers and note payload frequencies before the renderer draws the cymatic ripples through time.</p>
+                  <p className="eyebrow">Studio Workbench</p>
+                  <h2>Glass Reader Plane and Runtime Carrier Cymatics</h2>
+                  <p className="note">Start here. Load or save music, play the deterministic studio mix, watch conductor cues move through the score, and see the same .hfield packet expressed as the 3D Glass Reader field.</p>
                 </div>
                 <div className="button-row compact-row">
-                  <button onClick={refreshFieldSynthesis} type="button">Refresh Field</button>
+                  <button onClick={refreshFieldSynthesis} type="button">Refresh Studio Field</button>
                   <button onClick={playCurrentCombinedAudio} type="button">Play</button>
                   <button className="danger" onClick={stopAudio} type="button">Stop</button>
                 </div>
               </div>
+
+              <section className="studio-start-deck" aria-label="Start here studio workflow">
+                <article className="studio-step-card studio-step-primary">
+                  <p className="eyebrow">Start Here</p>
+                  <h3>1. Create or load music</h3>
+                  <p className="note">Use the demo score, open a saved project, or move to Score when you want to edit notes and timing.</p>
+                  <div className="button-row studio-action-row">
+                    <button onClick={loadSeedMusic} type="button">Load Demo Score</button>
+                    <button onClick={() => setActiveTab("compose")} type="button">Edit Score</button>
+                    <button onClick={listHcsSqliteProjectsV1} type="button">Recent Projects</button>
+                  </div>
+                </article>
+                <article className="studio-step-card">
+                  <p className="eyebrow">Hear It</p>
+                  <h3>2. Play the studio mix</h3>
+                  <p className="note">Deterministic audio plays from the current score and conductor layer, while the Glass Reader field gives the visual carrier path.</p>
+                  <div className="button-row studio-action-row">
+                    <button onClick={playCurrentCombinedAudio} type="button">Play Studio Mix</button>
+                    <button onClick={playLoopPhraseCombined} type="button">Loop Phrase</button>
+                    <button className="danger" onClick={stopAudio} type="button">Stop</button>
+                  </div>
+                </article>
+                <article className="studio-step-card">
+                  <p className="eyebrow">Keep It</p>
+                  <h3>3. Save and seal</h3>
+                  <p className="note">Save actual multi-track music locally, then seal Bundle Manifest v2 when the project needs custody/replay proof.</p>
+                  <div className="button-row studio-action-row">
+                    <button onClick={saveCurrentProjectToHcsSqliteLibraryV1} type="button">Save Project</button>
+                    <button onClick={exportHfieldCanonicalBundleManifestV2} type="button">Seal Bundle v2</button>
+                    <button onClick={() => setActiveTab("diagnostics")} type="button">Advanced</button>
+                  </div>
+                </article>
+              </section>
 
               <NotationSpine
                 musicTimeline={musicTimeline}
@@ -2282,7 +2315,7 @@ export default function App() {
                 notationLayout={notationLayout}
                 selectedNoteKey={selectedNoteKey}
                 onSelectNote={selectNotationNote}
-                modeLabel="Field"
+                modeLabel="Studio"
                 variant="compact"
               />
 
@@ -2301,9 +2334,9 @@ export default function App() {
             <div className="workspace-panel project-workspace">
               <div className="workspace-header-row">
                 <div>
-                  <p className="eyebrow">Project Custody</p>
-                  <h2>Save, Open, Validate, Hash</h2>
-                  <p className="note">The .hfield project is the durable source of music, conductor mapping, and motion state.</p>
+                  <p className="eyebrow">Studio Library</p>
+                  <h2>Projects, Local Library, and Sealed Bundles</h2>
+                  <p className="note">Normal workflow stays simple: save the current project, reopen recent work, and seal Bundle Manifest v2 when the piece is ready.</p>
                 </div>
               </div>
 
@@ -2321,8 +2354,29 @@ export default function App() {
                 variant="compact"
               />
 
-              <div className="project-custody-card">
-                <label htmlFor="project-file-name">Project file</label>
+              <section className="library-quick-actions" aria-label="Studio library quick actions">
+                <article>
+                  <p className="eyebrow">Local Library</p>
+                  <h3>Save actual music</h3>
+                  <p className="note">Stores the full FieldScore JSON, including music.tracks[*].notes, in the local SQLite library.</p>
+                  <div className="button-row">
+                    <button onClick={saveCurrentProjectToHcsSqliteLibraryV1} type="button">Save Project</button>
+                    <button onClick={listHcsSqliteProjectsV1} type="button">Recent Projects</button>
+                  </div>
+                </article>
+                <article>
+                  <p className="eyebrow">Seal</p>
+                  <h3>Bundle Manifest v2</h3>
+                  <p className="note">Creates the current replay/custody bundle after the score, audio, renderer, cymatic, and syllable reports are locked.</p>
+                  <div className="button-row">
+                    <button onClick={exportHfieldCanonicalBundleManifestV2} type="button">Seal Bundle v2</button>
+                    <button onClick={verifyHfieldExportReplayManifest} type="button">Verify Latest</button>
+                  </div>
+                </article>
+              </section>
+
+              <div className="project-custody-card legacy-file-card">
+                <label htmlFor="project-file-name">Advanced file name</label>
                 <div className="project-row console-project-row">
                   <input
                     id="project-file-name"
@@ -2331,9 +2385,9 @@ export default function App() {
                     aria-label="Project file name"
                     placeholder="project_name.hfield"
                   />
-                  <button onClick={saveProject} type="button">Save Current</button>
-                  <button onClick={() => openProject()} type="button">Open Named</button>
-                  <button onClick={refreshProjectList} type="button">List Projects</button>
+                  <button onClick={saveProject} type="button">Save File</button>
+                  <button onClick={() => openProject()} type="button">Open File</button>
+                  <button onClick={refreshProjectList} type="button">Recent Files</button>
                 </div>
               </div>
 
@@ -2355,9 +2409,11 @@ export default function App() {
                 <pre>{JSON.stringify(identityVaultReferenceReport ?? "No Identity Vault reference report yet.", null, 2)}</pre>
               </section>
 
-              <section className="report-card hfield-export-panel">
-                <h3>Reader Packet Exports</h3>
-                <p className="note">Writes local files under exports/hfield or exports/audio. These exports do not mutate Forge.</p>
+              <details className="advanced-export-drawer report-card hfield-export-panel">
+                <summary>Advanced Export and Verification Tools</summary>
+                <section className="advanced-export-content">
+                  <h3>Advanced Export and Verification Tools</h3>
+                  <p className="note">Developer and custody tools. These remain available, but they are no longer the main studio workflow. These exports do not mutate Forge.</p>
                 <div className="project-row export-button-row">
                   <button onClick={exportHfieldProjectJson} type="button">Export Project JSON</button>
                   <button onClick={exportHfieldReaderBundle} type="button">Export Reader Bundle</button>
@@ -2392,8 +2448,9 @@ export default function App() {
                   <button onClick={inspectSyllableShapedExpressionV1} type="button">Inspect Syllable Expression</button>
                   <button onClick={exportSyllableShapedExpressionV1Json} type="button">Export Syllable Expression JSON</button>
                 </div>
-                <pre>{JSON.stringify(hcsProductionPackagingV1Report ?? hcsSqliteLibraryV1Report ?? syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report ?? cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report ?? gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
-              </section>
+                  <pre>{JSON.stringify(hcsProductionPackagingV1Report ?? hcsSqliteLibraryV1Report ?? syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report ?? cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report ?? gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                </section>
+              </details>
 
               <div className="project-grid">
                 <section className="report-card">
@@ -2420,9 +2477,9 @@ export default function App() {
             <div className="workspace-panel diagnostics-workspace">
               <div className="workspace-header-row">
                 <div>
-                  <p className="eyebrow">Diagnostics</p>
-                  <h2>Single Report Viewer</h2>
-                  <p className="note">Technical reports are available, but no longer pollute the performance workspace.</p>
+                  <p className="eyebrow">Advanced</p>
+                  <h2>Developer Reports and Verification</h2>
+                  <p className="note">Engineering reports, custody receipts, legacy exports, and verification tools live here so the main Studio view stays usable.</p>
                 </div>
                 <div className="diagnostics-selector-row">
                   <label htmlFor="diagnostic-select">Report</label>

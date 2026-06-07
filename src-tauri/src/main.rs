@@ -1613,6 +1613,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "syllable_shaped_expression_v1_contract_id": "aiweb.hfield.syllable_shaped_expression.v1",
         "sqlite_motif_project_library_v1_contract_id": "aiweb.hfield.sqlite_motif_project_library.v1",
         "production_packaging_v1_contract_id": "aiweb.hfield.production_packaging.v1",
+        "ui_studio_workflow_triage_and_rebuild_v1_contract_id": "aiweb.hfield.ui_studio_workflow_triage_and_rebuild.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
