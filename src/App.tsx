@@ -25,6 +25,11 @@ import {
   listHcsSqliteMotifsV1,
   saveCurrentHcsSqliteReceiptV1,
   getHcsProductionPackagingV1Report,
+  getHcsTrackEditorAndPianoRollV1Report,
+  importHcsStudioScoreJsonV1,
+  loadHcsStudioScorePresetV1,
+  setHcsPianoRollNoteV1,
+  clearCurrentStudioScoreV1,
   getHcsStudioCreationBackendAndPlaceholderPurgeV1Report,
   verifyLatestHfieldExportReplayManifestJson,
   getHfieldSchemaVersionMigrationRegistryJson,
@@ -106,6 +111,7 @@ import {
   type HfieldSchemaVersionMigrationRegistryReport,
   type HcsSqliteMotifProjectLibraryV1Report,
   type HcsProductionPackagingV1Report,
+  type HcsTrackEditorAndPianoRollV1Report,
   type HcsStudioCreationBackendAndPlaceholderPurgeV1Report,
   type HfieldExportReplayVerifierReport,
   type PlaybackReport,
@@ -339,6 +345,260 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+
+type StudioTrackEditorAndPianoRollV1Props = {
+  musicTimeline: MusicTimelineReport | null;
+  selectedNoteKey: string | null;
+  onSelectNote: (trackId: string, eventIndex: number) => void;
+  onSetPianoRollNote: (trackId: string, stepIndex: number, midiNote: number, durationSteps: number, velocity: number, stepMs: number) => Promise<void>;
+  onImportScoreJson: (scoreJson: string) => Promise<void>;
+  onLoadPreset: (presetId: string) => Promise<void>;
+  onClearScore: () => Promise<void>;
+  onPlayStudio: () => Promise<void>;
+  onStop: () => Promise<void>;
+  onExportAudio: () => Promise<void>;
+  onRefresh: () => Promise<void>;
+  report: HcsTrackEditorAndPianoRollV1Report | null;
+};
+
+const studioKeyboardSemitones = [
+  { label: "C", offset: 0, black: false },
+  { label: "C#", offset: 1, black: true },
+  { label: "D", offset: 2, black: false },
+  { label: "D#", offset: 3, black: true },
+  { label: "E", offset: 4, black: false },
+  { label: "F", offset: 5, black: false },
+  { label: "F#", offset: 6, black: true },
+  { label: "G", offset: 7, black: false },
+  { label: "G#", offset: 8, black: true },
+  { label: "A", offset: 9, black: false },
+  { label: "A#", offset: 10, black: true },
+  { label: "B", offset: 11, black: false }
+];
+
+const studioSampleScoreJsonV1 = `{
+  "title": "My First HCS Score",
+  "tempo_bpm": 96,
+  "meter": "4/4",
+  "tracks": [
+    {
+      "track_id": "lead_voice",
+      "role": "melody",
+      "notes": [
+        { "pitch": "C4", "start_beat": 0, "duration_beats": 1, "velocity": 0.86 },
+        { "pitch": "E4", "start_beat": 1, "duration_beats": 1, "velocity": 0.86 },
+        { "pitch": "G4", "start_beat": 2, "duration_beats": 1, "velocity": 0.86 },
+        { "pitch": "C5", "start_beat": 3, "duration_beats": 2, "velocity": 0.82 }
+      ]
+    },
+    {
+      "track_id": "depth_voice",
+      "role": "bass_depth",
+      "notes": [
+        { "pitch": "C3", "start_beat": 0, "duration_beats": 4, "velocity": 0.5 },
+        { "pitch": "G2", "start_beat": 4, "duration_beats": 4, "velocity": 0.46 }
+      ]
+    },
+    {
+      "track_id": "field_voice",
+      "role": "harmonic_field_support",
+      "notes": [
+        { "pitch": "C4", "start_beat": 0, "duration_beats": 8, "velocity": 0.22 },
+        { "pitch": "G4", "start_beat": 0, "duration_beats": 8, "velocity": 0.16 }
+      ]
+    }
+  ]
+}`;
+
+function StudioTrackEditorAndPianoRollV1({
+  musicTimeline,
+  selectedNoteKey,
+  onSelectNote,
+  onSetPianoRollNote,
+  onImportScoreJson,
+  onLoadPreset,
+  onClearScore,
+  onPlayStudio,
+  onStop,
+  onExportAudio,
+  onRefresh,
+  report
+}: StudioTrackEditorAndPianoRollV1Props) {
+  const tracks = musicTimeline?.tracks ?? [];
+  const firstTrackId = tracks[0]?.track_id ?? "lead_voice";
+  const [activeTrackId, setActiveTrackId] = useState(firstTrackId);
+  const [activeMidiNote, setActiveMidiNote] = useState(60);
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [durationSteps, setDurationSteps] = useState(1);
+  const [velocity, setVelocity] = useState(0.84);
+  const [stepMs, setStepMs] = useState(500);
+  const [keyboardOctave, setKeyboardOctave] = useState(4);
+  const [scoreJson, setScoreJson] = useState(studioSampleScoreJsonV1);
+
+  const totalDurationMs = Math.max(1, musicTimeline?.total_duration_ms ?? 1);
+  const gridSteps = Array.from({ length: 32 }, (_, index) => index);
+  const keyboardNotes = [keyboardOctave, keyboardOctave + 1].flatMap((octave) =>
+    studioKeyboardSemitones.map((note) => ({
+      ...note,
+      octave,
+      midi: (octave + 1) * 12 + note.offset,
+      fullLabel: `${note.label}${octave}`
+    }))
+  );
+
+  async function writeKeyboardNote(midiNote: number) {
+    setActiveMidiNote(midiNote);
+    await onSetPianoRollNote(activeTrackId, activeStepIndex, midiNote, durationSteps, velocity, stepMs);
+  }
+
+  return (
+    <section className="studio-track-editor-v1" aria-label="HCS Track Editor and Piano Roll v1">
+      <div className="studio-track-editor-header">
+        <div>
+          <p className="eyebrow">Track Editor and Piano Roll v1</p>
+          <h2>Compose real music, then hear it and see it in the Glass Reader</h2>
+          <p className="note">This is the backed creation surface: import a score, click piano keys into timed steps, edit lanes, play the deterministic mix, then export audio or seal the bundle.</p>
+        </div>
+        <div className="button-row compact-row">
+          <button onClick={() => onLoadPreset("glass_reader_arpeggio")} type="button">Load Arpeggio</button>
+          <button onClick={() => onLoadPreset("midnight_sonnet_seed")} type="button">Load Midnight Seed</button>
+          <button onClick={onPlayStudio} type="button">Play Studio Mix</button>
+          <button className="danger" onClick={onStop} type="button">Stop</button>
+        </div>
+      </div>
+
+      <div className="studio-compose-grid-v1">
+        <section className="score-import-panel-v1">
+          <div className="board-title-row">
+            <h3>Score Input</h3>
+            <span>{report?.action ?? "ready"}</span>
+          </div>
+          <p className="note">Paste full FieldScore JSON or the simple HCS score format. This lets you bring in new music instead of living inside the Ode seed forever.</p>
+          <textarea
+            value={scoreJson}
+            onChange={(event) => setScoreJson(event.target.value)}
+            spellCheck={false}
+            aria-label="Import score JSON"
+          />
+          <div className="button-row">
+            <button onClick={() => setScoreJson(studioSampleScoreJsonV1)} type="button">Sample Score JSON</button>
+            <button onClick={() => onImportScoreJson(scoreJson)} type="button">Import and Playable</button>
+            <button onClick={onClearScore} type="button">New Empty Score</button>
+          </div>
+        </section>
+
+        <section className="virtual-keyboard-panel-v1">
+          <div className="board-title-row">
+            <h3>Virtual Keyboard</h3>
+            <span>selected MIDI {activeMidiNote}</span>
+          </div>
+          <div className="keyboard-controls-v1">
+            <label>
+              <span>Track</span>
+              <select value={activeTrackId} onChange={(event) => setActiveTrackId(event.target.value)}>
+                {tracks.map((track) => <option key={track.track_id} value={track.track_id}>{track.track_id}</option>)}
+                {tracks.length === 0 && <option value="lead_voice">lead_voice</option>}
+              </select>
+            </label>
+            <label>
+              <span>Step</span>
+              <input value={activeStepIndex} onChange={(event) => setActiveStepIndex(Number(event.target.value))} inputMode="numeric" />
+            </label>
+            <label>
+              <span>Duration steps</span>
+              <input value={durationSteps} onChange={(event) => setDurationSteps(Number(event.target.value))} inputMode="numeric" />
+            </label>
+            <label>
+              <span>Velocity</span>
+              <input value={velocity} onChange={(event) => setVelocity(Number(event.target.value))} inputMode="decimal" />
+            </label>
+            <label>
+              <span>Step ms</span>
+              <input value={stepMs} onChange={(event) => setStepMs(Number(event.target.value))} inputMode="numeric" />
+            </label>
+            <label>
+              <span>Octave</span>
+              <input value={keyboardOctave} onChange={(event) => setKeyboardOctave(Number(event.target.value))} inputMode="numeric" />
+            </label>
+          </div>
+          <div className="virtual-keyboard-v1" aria-label="Playable score keyboard">
+            {keyboardNotes.map((note) => (
+              <button
+                key={`${note.fullLabel}-${note.midi}`}
+                className={note.black ? "piano-key black-key" : "piano-key white-key"}
+                onClick={() => writeKeyboardNote(note.midi)}
+                type="button"
+                title={`Write ${note.fullLabel} to ${activeTrackId} step ${activeStepIndex}`}
+              >
+                <span>{note.fullLabel}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="piano-roll-grid-v1">
+        <div className="board-title-row">
+          <h3>Piano Roll Grid and Track Lanes</h3>
+          <span>{musicTimeline?.track_count ?? 0} tracks · {musicTimeline?.total_note_count ?? 0} notes</span>
+        </div>
+        <div className="piano-roll-ruler-v1">
+          {gridSteps.map((step) => (
+            <button
+              key={step}
+              className={step === activeStepIndex ? "active" : ""}
+              onClick={() => setActiveStepIndex(step)}
+              type="button"
+            >
+              {step + 1}
+            </button>
+          ))}
+        </div>
+        <div className="piano-roll-lanes-v1">
+          {tracks.map((track) => (
+            <div key={track.track_id} className="piano-roll-track-v1">
+              <div className="track-label-v1">
+                <strong>{track.track_id}</strong>
+                <span>{track.role}</span>
+              </div>
+              <div className="track-lane-grid-v1">
+                {track.notes.map((note) => {
+                  const noteKey = `${note.track_id}:${note.event_index}`;
+                  const left = Math.min(96, Math.max(0, (note.start_ms / totalDurationMs) * 100));
+                  const width = Math.max(2.5, Math.min(35, (note.duration_ms / totalDurationMs) * 100));
+                  const top = Math.max(6, Math.min(78, 82 - ((note.midi_note - 36) / 48) * 72));
+                  const classes = ["piano-roll-note-v1", note.resonance_lane];
+                  if (selectedNoteKey === noteKey) classes.push("selected");
+                  return (
+                    <button
+                      key={`${track.track_id}-${note.event_index}-${note.start_ms}-${note.midi_note}`}
+                      className={classes.join(" ")}
+                      style={{ left: `${left}%`, width: `${width}%`, top: `${top}%` }}
+                      onClick={() => onSelectNote(note.track_id, note.event_index)}
+                      type="button"
+                      title={`${note.note_name} · ${note.start_ms}ms · ${note.frequency_hz.toFixed(2)}Hz`}
+                    >
+                      {note.note_name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {tracks.length === 0 && <p className="note">Import a score or load a preset to create track lanes.</p>}
+        </div>
+      </section>
+
+      <div className="studio-action-strip-v1">
+        <button onClick={onRefresh} type="button">Refresh Editor</button>
+        <button onClick={onExportAudio} type="button">Export Audio</button>
+        <button onClick={() => onLoadPreset("empty_studio_score")} type="button">Blank Preset</button>
+        <span>{report ? `${report.title} · ${report.note_count} notes · hash ${report.score_hash.slice(0, 12)}` : "No editor report yet"}</span>
+      </div>
+    </section>
   );
 }
 
@@ -689,6 +949,7 @@ export default function App() {
   const [syllableShapedExpressionV1ExportReport, setSyllableShapedExpressionV1ExportReport] = useState<ExportFileReport | null>(null);
   const [hcsSqliteLibraryV1Report, setHcsSqliteLibraryV1Report] = useState<HcsSqliteMotifProjectLibraryV1Report | null>(null);
   const [hcsProductionPackagingV1Report, setHcsProductionPackagingV1Report] = useState<HcsProductionPackagingV1Report | null>(null);
+  const [trackEditorAndPianoRollV1Report, setTrackEditorAndPianoRollV1Report] = useState<HcsTrackEditorAndPianoRollV1Report | null>(null);
   const [hcsStudioCreationBackendAndPlaceholderPurgeV1Report, setHcsStudioCreationBackendAndPlaceholderPurgeV1Report] = useState<HcsStudioCreationBackendAndPlaceholderPurgeV1Report | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
@@ -856,6 +1117,7 @@ export default function App() {
     setSeedMusicScore(currentScore);
     setResonanceBundle(await getCurrentResonanceLevelBundle());
     setMusicTimeline(await getCurrentMusicTimeline());
+    setTrackEditorAndPianoRollV1Report(await getHcsTrackEditorAndPianoRollV1Report());
     const nextNotationLayout = await getCurrentNotationLayout();
     setNotationLayout(nextNotationLayout);
     setSelectedNoteForEditing(nextNotationLayout.selected_note);
@@ -954,6 +1216,84 @@ export default function App() {
     }
   }
 
+
+
+  async function refreshTrackEditorAndPianoRollV1() {
+    setError(null);
+    try {
+      setTrackEditorAndPianoRollV1Report(await getHcsTrackEditorAndPianoRollV1Report());
+      setMusicTimeline(await getCurrentMusicTimeline());
+      const nextNotationLayout = await getCurrentNotationLayout();
+      setNotationLayout(nextNotationLayout);
+      setSelectedNoteForEditing(nextNotationLayout.selected_note);
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(Math.round(motionTimeMs)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function importStudioScoreJsonV1(scoreJson: string) {
+    setError(null);
+    try {
+      const imported = await importHcsStudioScoreJsonV1(scoreJson);
+      setTrackEditorAndPianoRollV1Report(imported);
+      setMusicTimeline(imported.music_timeline);
+      setNotationLayout(imported.notation_layout);
+      setSelectedNoteForEditing(imported.notation_layout.selected_note);
+      setMotionTimeMs(0);
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
+      setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function loadStudioScorePresetV1(presetId: string) {
+    setError(null);
+    try {
+      const loaded = await loadHcsStudioScorePresetV1(presetId);
+      setTrackEditorAndPianoRollV1Report(loaded);
+      setMusicTimeline(loaded.music_timeline);
+      setNotationLayout(loaded.notation_layout);
+      setSelectedNoteForEditing(loaded.notation_layout.selected_note);
+      setMotionTimeMs(0);
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
+      setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function setPianoRollNoteV1(trackId: string, stepIndex: number, midiNote: number, durationSteps: number, velocity: number, stepMs: number) {
+    setError(null);
+    try {
+      const updated = await setHcsPianoRollNoteV1(trackId, stepIndex, midiNote, durationSteps, velocity, stepMs);
+      setTrackEditorAndPianoRollV1Report(updated);
+      setMusicTimeline(updated.music_timeline);
+      setNotationLayout(updated.notation_layout);
+      setSelectedNoteForEditing(updated.notation_layout.selected_note);
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(Math.round(motionTimeMs)));
+      setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function clearStudioScoreV1() {
+    setError(null);
+    try {
+      const cleared = await clearCurrentStudioScoreV1();
+      setTrackEditorAndPianoRollV1Report(cleared);
+      setMusicTimeline(cleared.music_timeline);
+      setNotationLayout(cleared.notation_layout);
+      setSelectedNoteForEditing(cleared.notation_layout.selected_note);
+      setMotionTimeMs(0);
+      setPlayheadCursorReport(await getCurrentPlayheadCursorReport(0));
+      setFieldSynthesisReport(await getCurrentHfieldFieldSynthesisReport());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   async function selectNotationNote(trackId: string, eventIndex: number) {
     setError(null);
@@ -2080,7 +2420,23 @@ export default function App() {
                 variant="compose"
               />
 
-              <section className="composer-tool-dock" aria-label="Composer workstation tool dock">
+              
+
+              <StudioTrackEditorAndPianoRollV1
+                musicTimeline={musicTimeline}
+                selectedNoteKey={selectedNoteKey}
+                onSelectNote={selectNotationNote}
+                onSetPianoRollNote={setPianoRollNoteV1}
+                onImportScoreJson={importStudioScoreJsonV1}
+                onLoadPreset={loadStudioScorePresetV1}
+                onClearScore={clearStudioScoreV1}
+                onPlayStudio={playCurrentCombinedAudio}
+                onStop={stopAudio}
+                onExportAudio={renderCurrentProjectWav}
+                onRefresh={refreshTrackEditorAndPianoRollV1}
+                report={trackEditorAndPianoRollV1Report}
+              />
+<section className="composer-tool-dock" aria-label="Composer workstation tool dock">
                 <div className="tool-card primary-tool-card">
                   <p className="eyebrow">Backed Score Tools</p>
                   <h3>Live Score Editor</h3>
@@ -2661,8 +3017,8 @@ export default function App() {
               </section>
 
               <section className="control-section composer-bench-section">
-                <h3>Composer Workbench</h3>
-                <div className="composer-bench-grid" aria-label="Professional composer tool placeholders">
+                <h3>Legacy Composer Placeholders</h3>
+                <div className="composer-bench-grid" aria-label="Legacy composer placeholders hidden from normal workflow">
                   <span>Score</span>
                   <span>Palette</span>
                   <span>Mixer</span>

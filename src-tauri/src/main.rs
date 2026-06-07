@@ -12,7 +12,7 @@ use hfield_cymatics::{
 };
 use hfield_domain::{
     create_syllable_shaped_expression_v1_report, ConductedPerformance, FieldScore, GestureEvent,
-    GestureTrack, NoteEvent,
+    GestureTrack, MusicTrack, NoteEvent,
 };
 use hfield_dsp::{
     compile_combined_music_and_conductor_preview, compile_deterministic_audio_engine_v2,
@@ -839,6 +839,531 @@ fn render_current_project_music_wav(
     ))
 }
 
+const HCS_TRACK_EDITOR_AND_PIANO_ROLL_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.track_editor_and_piano_roll.v1";
+
+#[derive(Debug, serde::Deserialize)]
+struct HcsStudioScoreImportV1 {
+    title: Option<String>,
+    tempo_bpm: Option<f64>,
+    meter: Option<String>,
+    tuning_mode: Option<String>,
+    tracks: Vec<HcsStudioTrackImportV1>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct HcsStudioTrackImportV1 {
+    track_id: String,
+    role: Option<String>,
+    notes: Vec<HcsStudioNoteImportV1>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct HcsStudioNoteImportV1 {
+    midi_note: Option<u8>,
+    pitch: Option<String>,
+    start_ms: Option<u32>,
+    duration_ms: Option<u32>,
+    start_beat: Option<f64>,
+    duration_beats: Option<f64>,
+    velocity: Option<f32>,
+}
+
+fn hcs_track_editor_report_v1(
+    score: &FieldScore,
+    action: &str,
+) -> Result<serde_json::Value, String> {
+    let timeline = create_music_timeline_report(score);
+    let notation = create_notation_layout_report(score);
+    let score_hash = score_hash_hex(score).map_err(|err| format!("score hash failed: {err}"))?;
+    let track_summaries = timeline
+        .tracks
+        .iter()
+        .map(|track| {
+            json!({
+                "track_id": track.track_id,
+                "role": track.role,
+                "note_count": track.note_count,
+                "duration_ms": track.track_duration_ms,
+                "duration_seconds": track.track_duration_seconds
+            })
+        })
+        .collect::<Vec<_>>();
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_TRACK_EDITOR_AND_PIANO_ROLL_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "action": action,
+        "title": score.title,
+        "score_hash": score_hash,
+        "tempo_bpm": score.music.tempo_bpm,
+        "meter": score.music.meter,
+        "tuning_mode": score.music.tuning_mode,
+        "track_count": timeline.track_count,
+        "note_count": timeline.total_note_count,
+        "total_duration_ms": timeline.total_duration_ms,
+        "total_duration_seconds": timeline.total_duration_seconds,
+        "track_summaries": track_summaries,
+        "music_timeline": timeline,
+        "notation_layout": notation,
+        "normal_user_surfaces": [
+            "Score Import Inbox",
+            "Virtual Keyboard",
+            "Piano Roll Grid",
+            "Track Lane Editor",
+            "Measure/Beat Entry",
+            "Play Studio Mix",
+            "Export Audio",
+            "Save Project",
+            "Seal Bundle v2"
+        ],
+        "placeholder_policy": {
+            "composer_tool_dock_visible_in_normal_path": false,
+            "notation_staff_placeholder_visible_in_normal_path": false,
+            "raw_quick_note_buttons_visible_in_normal_path": false,
+            "raw_gesture_button_pad_visible_in_normal_path": false,
+            "score_import_is_backed": true,
+            "piano_roll_grid_is_backed": true,
+            "virtual_keyboard_is_backed": true,
+            "track_lane_editor_is_backed": true
+        },
+        "score_import_contract": {
+            "full_field_score_json_supported": true,
+            "simple_studio_score_json_supported": true,
+            "simple_format": {
+                "title": "string optional",
+                "tempo_bpm": "number optional",
+                "meter": "string optional",
+                "tracks": [
+                    {
+                        "track_id": "lead_voice | depth_voice | field_voice | custom_safe_id",
+                        "role": "string optional",
+                        "notes": [
+                            {
+                                "midi_note": "number 0-127 optional",
+                                "pitch": "C4 style optional",
+                                "start_beat": "number optional",
+                                "duration_beats": "number optional",
+                                "start_ms": "number optional",
+                                "duration_ms": "number optional",
+                                "velocity": "0.0-1.0 optional"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score_only": true,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false,
+            "uses_llm": false
+        }
+    }))
+}
+
+fn hcs_pitch_label_to_midi_v1(label: &str) -> Option<u8> {
+    let clean = label.trim();
+    if clean.len() < 2 {
+        return None;
+    }
+
+    let mut chars = clean.chars().peekable();
+    let letter = chars.next()?.to_ascii_uppercase();
+    let base = match letter {
+        'C' => 0_i16,
+        'D' => 2_i16,
+        'E' => 4_i16,
+        'F' => 5_i16,
+        'G' => 7_i16,
+        'A' => 9_i16,
+        'B' => 11_i16,
+        _ => return None,
+    };
+
+    let accidental = match chars.peek().copied() {
+        Some('#') => {
+            chars.next();
+            1_i16
+        }
+        Some('b') | Some('B') => {
+            chars.next();
+            -1_i16
+        }
+        _ => 0_i16,
+    };
+
+    let octave_text = chars.collect::<String>();
+    let octave = octave_text.parse::<i16>().ok()?;
+    let midi = (octave + 1) * 12 + base + accidental;
+    if (0..=127).contains(&midi) {
+        Some(midi as u8)
+    } else {
+        None
+    }
+}
+
+fn hcs_safe_track_id_v1(track_id: &str) -> Result<String, String> {
+    let trimmed = track_id.trim();
+    if trimmed.is_empty() {
+        return Err("track_id cannot be empty".to_string());
+    }
+    let is_safe = trimmed
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-');
+    if !is_safe {
+        return Err(format!("track_id contains unsafe characters: {trimmed}"));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn hcs_decode_studio_score_json_v1(score_json: &str) -> Result<(FieldScore, String), String> {
+    if let Ok(score) = serde_json::from_str::<FieldScore>(score_json) {
+        return Ok((score, "full_field_score_json".to_string()));
+    }
+
+    let parsed = serde_json::from_str::<HcsStudioScoreImportV1>(score_json)
+        .map_err(|err| format!("score import failed. Expected full FieldScore JSON or HCS simple studio score JSON: {err}"))?;
+
+    if parsed.tracks.is_empty() {
+        return Err("score import requires at least one track".to_string());
+    }
+
+    let mut score = FieldScore::default_hcs();
+    if let Some(title) = parsed.title {
+        let trimmed = title.trim();
+        if !trimmed.is_empty() {
+            score.title = trimmed.to_string();
+        }
+    }
+
+    if let Some(tempo_bpm) = parsed.tempo_bpm {
+        if tempo_bpm.is_finite() {
+            score.music.tempo_bpm = tempo_bpm.clamp(20.0, 240.0);
+        }
+    }
+    if let Some(meter) = parsed.meter {
+        let trimmed = meter.trim();
+        if !trimmed.is_empty() {
+            score.music.meter = trimmed.to_string();
+        }
+    }
+    if let Some(tuning_mode) = parsed.tuning_mode {
+        let trimmed = tuning_mode.trim();
+        if !trimmed.is_empty() {
+            score.music.tuning_mode = trimmed.to_string();
+        }
+    }
+
+    let quarter_ms = if score.music.tempo_bpm <= 0.0 {
+        714.0
+    } else {
+        60_000.0 / score.music.tempo_bpm
+    };
+
+    let mut tracks = Vec::new();
+    for track in parsed.tracks {
+        let track_id = hcs_safe_track_id_v1(&track.track_id)?;
+        let role = track
+            .role
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("imported_voice")
+            .to_string();
+
+        let mut next_start_ms = 0_u32;
+        let mut notes = Vec::new();
+        for note in track.notes {
+            let midi_note = match (note.midi_note, note.pitch.as_deref()) {
+                (Some(value), _) => value.min(127),
+                (None, Some(label)) => hcs_pitch_label_to_midi_v1(label)
+                    .ok_or_else(|| format!("invalid pitch label in {track_id}: {label}"))?,
+                (None, None) => {
+                    return Err(format!("note in {track_id} requires midi_note or pitch"))
+                }
+            };
+
+            let start_ms = match (note.start_ms, note.start_beat) {
+                (Some(value), _) => value,
+                (None, Some(start_beat)) if start_beat.is_finite() => {
+                    (start_beat.max(0.0) * quarter_ms).round() as u32
+                }
+                _ => next_start_ms,
+            };
+
+            let duration_ms = match (note.duration_ms, note.duration_beats) {
+                (Some(value), _) => value.clamp(40, 60_000),
+                (None, Some(duration_beats)) if duration_beats.is_finite() => {
+                    ((duration_beats.max(0.125) * quarter_ms).round() as u32).clamp(40, 60_000)
+                }
+                _ => quarter_ms.round() as u32,
+            };
+
+            let velocity = note.velocity.unwrap_or(0.82).clamp(0.0, 1.0);
+            next_start_ms = start_ms.saturating_add(duration_ms);
+            notes.push(NoteEvent {
+                midi_note,
+                start_ms,
+                duration_ms,
+                velocity,
+            });
+        }
+        notes.sort_by_key(|note| (note.start_ms, note.midi_note));
+        tracks.push(MusicTrack {
+            track_id,
+            role,
+            notes,
+        });
+    }
+
+    score.music.tracks = tracks;
+    Ok((score, "simple_studio_score_json".to_string()))
+}
+
+fn hcs_preset_score_v1(preset_id: &str) -> Result<FieldScore, String> {
+    let mut score = FieldScore::default_hcs();
+    score.music.tempo_bpm = 96.0;
+    score.music.meter = "4/4".to_string();
+    score.music.tuning_mode = "twelve_tone_equal_temperament".to_string();
+    let q = (60_000.0 / score.music.tempo_bpm).round() as u32;
+    let bar = q * 4;
+
+    match preset_id {
+        "empty_studio_score" => {
+            score.title = "Empty Studio Score".to_string();
+            for track in &mut score.music.tracks {
+                track.notes.clear();
+            }
+        }
+        "glass_reader_arpeggio" => {
+            score.title = "Glass Reader Arpeggio".to_string();
+            for track in &mut score.music.tracks {
+                match track.track_id.as_str() {
+                    "lead_voice" => {
+                        track.notes = [60_u8, 64, 67, 72, 76, 72, 67, 64]
+                            .iter()
+                            .enumerate()
+                            .map(|(index, midi_note)| NoteEvent {
+                                midi_note: *midi_note,
+                                start_ms: (index as u32) * q,
+                                duration_ms: q,
+                                velocity: 0.82,
+                            })
+                            .collect();
+                    }
+                    "depth_voice" => {
+                        track.notes = vec![
+                            NoteEvent {
+                                midi_note: 36,
+                                start_ms: 0,
+                                duration_ms: bar * 2,
+                                velocity: 0.52,
+                            },
+                            NoteEvent {
+                                midi_note: 43,
+                                start_ms: bar * 2,
+                                duration_ms: bar * 2,
+                                velocity: 0.48,
+                            },
+                        ];
+                    }
+                    "field_voice" => {
+                        track.notes = vec![
+                            NoteEvent {
+                                midi_note: 55,
+                                start_ms: 0,
+                                duration_ms: bar * 4,
+                                velocity: 0.22,
+                            },
+                            NoteEvent {
+                                midi_note: 67,
+                                start_ms: 0,
+                                duration_ms: bar * 4,
+                                velocity: 0.18,
+                            },
+                        ];
+                    }
+                    _ => {}
+                }
+            }
+        }
+        "midnight_sonnet_seed" => {
+            score.title = "Midnight Sonnet Seed".to_string();
+            score.music.tempo_bpm = 72.0;
+            let q = (60_000.0 / score.music.tempo_bpm).round() as u32;
+            let lead = [57_u8, 60, 64, 62, 60, 55, 57, 64, 67, 64, 62, 60];
+            for track in &mut score.music.tracks {
+                match track.track_id.as_str() {
+                    "lead_voice" => {
+                        track.notes = lead
+                            .iter()
+                            .enumerate()
+                            .map(|(index, midi_note)| NoteEvent {
+                                midi_note: *midi_note,
+                                start_ms: (index as u32) * q,
+                                duration_ms: q,
+                                velocity: 0.76,
+                            })
+                            .collect();
+                    }
+                    "depth_voice" => {
+                        track.notes = vec![
+                            NoteEvent {
+                                midi_note: 45,
+                                start_ms: 0,
+                                duration_ms: q * 4,
+                                velocity: 0.44,
+                            },
+                            NoteEvent {
+                                midi_note: 48,
+                                start_ms: q * 4,
+                                duration_ms: q * 4,
+                                velocity: 0.42,
+                            },
+                            NoteEvent {
+                                midi_note: 43,
+                                start_ms: q * 8,
+                                duration_ms: q * 4,
+                                velocity: 0.40,
+                            },
+                        ];
+                    }
+                    "field_voice" => {
+                        track.notes = vec![
+                            NoteEvent {
+                                midi_note: 52,
+                                start_ms: 0,
+                                duration_ms: q * 12,
+                                velocity: 0.20,
+                            },
+                            NoteEvent {
+                                midi_note: 64,
+                                start_ms: 0,
+                                duration_ms: q * 12,
+                                velocity: 0.14,
+                            },
+                        ];
+                    }
+                    _ => {}
+                }
+            }
+        }
+        other => return Err(format!("unknown studio score preset: {other}")),
+    }
+
+    Ok(score)
+}
+
+#[tauri::command]
+fn get_hcs_track_editor_and_piano_roll_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    hcs_track_editor_report_v1(&guard, "inspect")
+}
+
+#[tauri::command]
+fn import_hcs_studio_score_json_v1(
+    state: tauri::State<'_, AppState>,
+    score_json: String,
+) -> Result<serde_json::Value, String> {
+    let (score, import_kind) = hcs_decode_studio_score_json_v1(&score_json)?;
+
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+    *guard = score;
+
+    hcs_track_editor_report_v1(&guard, &format!("import_{import_kind}"))
+}
+
+#[tauri::command]
+fn load_hcs_studio_score_preset_v1(
+    state: tauri::State<'_, AppState>,
+    preset_id: String,
+) -> Result<serde_json::Value, String> {
+    let score = hcs_preset_score_v1(&preset_id)?;
+
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+    *guard = score;
+
+    hcs_track_editor_report_v1(&guard, &format!("load_preset_{preset_id}"))
+}
+
+#[tauri::command]
+fn set_hcs_piano_roll_note_v1(
+    state: tauri::State<'_, AppState>,
+    track_id: String,
+    step_index: u32,
+    midi_note: u8,
+    duration_steps: u32,
+    velocity: f32,
+    step_ms: u32,
+) -> Result<serde_json::Value, String> {
+    let safe_track_id = hcs_safe_track_id_v1(&track_id)?;
+    let step_ms = step_ms.clamp(40, 8_000);
+    let duration_steps = duration_steps.clamp(1, 64);
+    let start_ms = step_index.saturating_mul(step_ms);
+    let duration_ms = duration_steps.saturating_mul(step_ms).clamp(40, 60_000);
+    let velocity = velocity.clamp(0.0, 1.0);
+
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    let Some(track) = guard
+        .music
+        .tracks
+        .iter_mut()
+        .find(|track| track.track_id == safe_track_id)
+    else {
+        return Err(format!("music track not found: {safe_track_id}"));
+    };
+
+    track.notes.retain(|note| note.start_ms != start_ms);
+    track.notes.push(NoteEvent {
+        midi_note: midi_note.min(127),
+        start_ms,
+        duration_ms,
+        velocity,
+    });
+    track
+        .notes
+        .sort_by_key(|note| (note.start_ms, note.midi_note));
+
+    hcs_track_editor_report_v1(&guard, "set_piano_roll_note")
+}
+
+#[tauri::command]
+fn clear_current_studio_score_v1(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    guard.title = "Untitled HCS Studio Score".to_string();
+    for track in &mut guard.music.tracks {
+        track.notes.clear();
+    }
+
+    hcs_track_editor_report_v1(&guard, "clear_score")
+}
+
 #[tauri::command]
 fn load_seed_music_project(state: tauri::State<'_, AppState>) -> Result<FieldScore, String> {
     let score = seed_music_score();
@@ -1616,6 +2141,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "ui_studio_workflow_triage_and_rebuild_v1_contract_id": "aiweb.hfield.ui_studio_workflow_triage_and_rebuild.v1",
         "desktop_launcher_studio_startup_fix_v1_contract_id": "aiweb.hfield.desktop_launcher_studio_startup_fix.v1",
         "studio_creation_backend_and_placeholder_purge_v1_contract_id": "aiweb.hfield.studio_creation_backend_and_placeholder_purge.v1",
+        "track_editor_and_piano_roll_v1_contract_id": "aiweb.hfield.track_editor_and_piano_roll.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -2833,8 +3359,8 @@ fn save_current_hcs_sqlite_receipt_v1(
     )
 }
 
-
-const HCS_STUDIO_CREATION_BACKEND_AND_PLACEHOLDER_PURGE_V1_CONTRACT_ID: &str = "aiweb.hfield.studio_creation_backend_and_placeholder_purge.v1";
+const HCS_STUDIO_CREATION_BACKEND_AND_PLACEHOLDER_PURGE_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.studio_creation_backend_and_placeholder_purge.v1";
 
 #[tauri::command]
 fn get_hcs_studio_creation_backend_and_placeholder_purge_v1_report() -> serde_json::Value {
@@ -3933,6 +4459,11 @@ fn main() {
             reset_current_music_to_seed,
             play_current_project_music_audio,
             render_current_project_music_wav,
+            get_hcs_track_editor_and_piano_roll_v1_report,
+            import_hcs_studio_score_json_v1,
+            load_hcs_studio_score_preset_v1,
+            set_hcs_piano_roll_note_v1,
+            clear_current_studio_score_v1,
             load_seed_music_project,
             get_current_project_score,
             get_current_gesture_timeline,

@@ -404,6 +404,36 @@ export type HcsStudioCreationBackendAndPlaceholderPurgeV1Report = {
   [key: string]: unknown;
 };
 
+
+export type HcsTrackEditorAndPianoRollV1Report = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  action: string;
+  title: string;
+  score_hash: string;
+  tempo_bpm: number;
+  meter: string;
+  tuning_mode: string;
+  track_count: number;
+  note_count: number;
+  total_duration_ms: number;
+  total_duration_seconds: number;
+  track_summaries: Array<{
+    track_id: string;
+    role: string;
+    note_count: number;
+    duration_ms: number;
+    duration_seconds: number;
+  }>;
+  music_timeline: MusicTimelineReport;
+  notation_layout: NotationLayoutReport;
+  normal_user_surfaces: string[];
+  placeholder_policy: Record<string, boolean>;
+  score_import_contract: unknown;
+  authority_boundaries: Record<string, boolean>;
+};
+
 export type HcsProductionPackagingV1Report = {
   status: string;
   contract_id: string;
@@ -1716,6 +1746,41 @@ export async function playGeneratedMappedCombinedAudio(): Promise<PlaybackReport
 
 export async function renderGeneratedMappedCombinedWav(): Promise<WavRenderReport> {
   return await invoke<WavRenderReport>("render_generated_mapped_combined_wav");
+}
+
+
+export async function getHcsTrackEditorAndPianoRollV1Report(): Promise<HcsTrackEditorAndPianoRollV1Report> {
+  return await invoke<HcsTrackEditorAndPianoRollV1Report>("get_hcs_track_editor_and_piano_roll_v1_report");
+}
+
+export async function importHcsStudioScoreJsonV1(scoreJson: string): Promise<HcsTrackEditorAndPianoRollV1Report> {
+  return await invoke<HcsTrackEditorAndPianoRollV1Report>("import_hcs_studio_score_json_v1", { scoreJson });
+}
+
+export async function loadHcsStudioScorePresetV1(presetId: string): Promise<HcsTrackEditorAndPianoRollV1Report> {
+  return await invoke<HcsTrackEditorAndPianoRollV1Report>("load_hcs_studio_score_preset_v1", { presetId });
+}
+
+export async function setHcsPianoRollNoteV1(
+  trackId: string,
+  stepIndex: number,
+  midiNote: number,
+  durationSteps: number,
+  velocity: number,
+  stepMs: number
+): Promise<HcsTrackEditorAndPianoRollV1Report> {
+  return await invoke<HcsTrackEditorAndPianoRollV1Report>("set_hcs_piano_roll_note_v1", {
+    trackId,
+    stepIndex,
+    midiNote,
+    durationSteps,
+    velocity,
+    stepMs
+  });
+}
+
+export async function clearCurrentStudioScoreV1(): Promise<HcsTrackEditorAndPianoRollV1Report> {
+  return await invoke<HcsTrackEditorAndPianoRollV1Report>("clear_current_studio_score_v1");
 }
 
 export async function loadSeedMusicProject(): Promise<unknown> {
