@@ -440,6 +440,29 @@ export type HcsKeyFrequencyRegistryV1Report = {
 };
 
 
+
+export type HcsProductionNotationRenderSyncV1Report = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  purpose: string;
+  title: string;
+  score_hash: string;
+  tempo_bpm: number;
+  meter: string;
+  tuning_mode: string;
+  track_count: number;
+  note_count: number;
+  total_duration_ms: number;
+  music_timeline: MusicTimelineReport;
+  notation_layout: NotationLayoutReport;
+  playhead_zero_sync: unknown;
+  sync_law: Record<string, unknown>;
+  notation_surface: Record<string, unknown>;
+  frequency_authority: Record<string, unknown>;
+  authority_boundaries: Record<string, boolean>;
+};
+
 export type HcsVirtualKeyboardAndRealtimeNoteEntryV1Report = {
   status: string;
   contract_id: string;
@@ -1812,6 +1835,11 @@ export async function lookupHcsKeyFrequencyV1(midiNote: number): Promise<HcsKeyF
   return await invoke<HcsKeyFrequencyRegistryV1Record>("lookup_hcs_key_frequency_v1", { midiNote });
 }
 
+
+
+export async function getHcsProductionNotationRenderSyncV1Report(): Promise<HcsProductionNotationRenderSyncV1Report> {
+  return await invoke<HcsProductionNotationRenderSyncV1Report>("get_hcs_production_notation_render_sync_v1_report");
+}
 
 export async function getHcsVirtualKeyboardAndRealtimeNoteEntryV1Report(): Promise<HcsVirtualKeyboardAndRealtimeNoteEntryV1Report> {
   return await invoke<HcsVirtualKeyboardAndRealtimeNoteEntryV1Report>("get_hcs_virtual_keyboard_and_realtime_note_entry_v1_report");

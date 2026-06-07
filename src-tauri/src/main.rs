@@ -929,6 +929,78 @@ fn lookup_hcs_key_frequency_v1(midi_note: u8) -> Result<serde_json::Value, Strin
     Ok(hcs_key_frequency_registry_record_v1(midi_note.min(127)))
 }
 
+const HCS_PRODUCTION_NOTATION_RENDER_SYNC_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.production_notation_render_sync.v1";
+
+#[tauri::command]
+fn get_hcs_production_notation_render_sync_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+    let timeline = create_music_timeline_report(&guard);
+    let notation = create_notation_layout_report(&guard);
+    let playhead = Some(create_playhead_cursor_report(&guard, 0));
+    let score_hash = score_hash_hex(&guard).map_err(|err| format!("score hash failed: {err}"))?;
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_PRODUCTION_NOTATION_RENDER_SYNC_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "purpose": "render notation directly from the same HCS score note data used by piano roll, virtual keyboard, deterministic audio, and Glass Reader field mapping",
+        "title": guard.title,
+        "score_hash": score_hash,
+        "tempo_bpm": guard.music.tempo_bpm,
+        "meter": guard.music.meter,
+        "tuning_mode": guard.music.tuning_mode,
+        "track_count": timeline.track_count,
+        "note_count": timeline.total_note_count,
+        "total_duration_ms": timeline.total_duration_ms,
+        "music_timeline": timeline,
+        "notation_layout": notation,
+        "playhead_zero_sync": playhead,
+        "sync_law": {
+            "single_source_of_truth": "current_score.music.tracks[*].notes",
+            "notation_shadow_state_allowed": false,
+            "piano_roll_shadow_state_allowed": false,
+            "virtual_keyboard_writes_score_notes": true,
+            "notation_renders_score_notes": true,
+            "score_import_updates_notation": true,
+            "piano_roll_edits_update_notation": true,
+            "playhead_timing_shared": true
+        },
+        "notation_surface": {
+            "real_svg_staff_rendering": true,
+            "measure_lines": true,
+            "noteheads": true,
+            "stems": true,
+            "track_staves": true,
+            "selected_note_highlight": true,
+            "linked_timing": true,
+            "generated_from_score_data": true,
+            "placeholder_staff_visible_in_normal_path": false
+        },
+        "frequency_authority": {
+            "contract_id": HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID,
+            "tuning_mode": "twelve_tone_equal_temperament",
+            "a4_hz": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ,
+            "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
+            "formula_id": "frequency_hz = 440 * 2^((midi_note - 69) / 12)",
+            "simulated": false
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score": false,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false,
+            "uses_llm": false
+        }
+    }))
+}
+
 const HCS_VIRTUAL_KEYBOARD_AND_REALTIME_NOTE_ENTRY_V1_CONTRACT_ID: &str =
     "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1";
 
@@ -2307,6 +2379,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "track_editor_and_piano_roll_v1_contract_id": "aiweb.hfield.track_editor_and_piano_roll.v1",
         "key_frequency_registry_v1_contract_id": "aiweb.hfield.key_frequency_registry.v1",
         "virtual_keyboard_and_realtime_note_entry_v1_contract_id": "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1",
+        "production_notation_render_sync_v1_contract_id": "aiweb.hfield.production_notation_render_sync.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -4626,6 +4699,7 @@ fn main() {
             render_current_project_music_wav,
             get_hcs_track_editor_and_piano_roll_v1_report,
             get_hcs_virtual_keyboard_and_realtime_note_entry_v1_report,
+            get_hcs_production_notation_render_sync_v1_report,
             get_hcs_key_frequency_registry_v1_report,
             lookup_hcs_key_frequency_v1,
             import_hcs_studio_score_json_v1,

@@ -2492,3 +2492,120 @@ body {
   }
 }
 /* END HCS Virtual Keyboard and Realtime Note Entry v1 */
+
+/* HCS Production Notation Render Sync v1 */
+.notation-render-sync-v1 {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid rgba(84, 214, 255, 0.22);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(7, 14, 24, 0.96), rgba(12, 22, 34, 0.9));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+}
+
+.notation-sync-law-v1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0 0.9rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(146, 255, 214, 0.22);
+  border-radius: 14px;
+  background: rgba(14, 26, 36, 0.78);
+  color: rgba(232, 249, 255, 0.88);
+  font-size: 0.82rem;
+}
+
+.notation-scroll-v1 {
+  overflow-x: auto;
+  padding: 0.4rem;
+  border-radius: 18px;
+  background: rgba(2, 6, 12, 0.76);
+}
+
+.notation-svg-v1 {
+  min-width: 980px;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.notation-page-bg-v1 {
+  fill: rgba(248, 252, 255, 0.965);
+  stroke: rgba(30, 54, 72, 0.28);
+  stroke-width: 1.2;
+}
+
+.notation-title-v1 {
+  fill: rgba(19, 35, 48, 0.92);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.notation-meta-v1,
+.notation-measure-label-v1,
+.notation-track-role-v1,
+.notation-note-label-v1,
+.notation-frequency-label-v1,
+.notation-empty-v1 {
+  fill: rgba(38, 61, 78, 0.72);
+  font-size: 11px;
+}
+
+.notation-track-label-v1 {
+  fill: rgba(11, 28, 42, 0.95);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.notation-clef-v1 {
+  fill: rgba(19, 35, 48, 0.9);
+  font-size: 40px;
+  font-family: serif;
+}
+
+.notation-staff-line-v1 {
+  stroke: rgba(20, 34, 48, 0.78);
+  stroke-width: 1.25;
+}
+
+.notation-measure-line-v1 {
+  stroke: rgba(43, 79, 103, 0.26);
+  stroke-width: 1;
+}
+
+.notation-note-group-v1 {
+  cursor: pointer;
+  outline: none;
+}
+
+.notation-notehead-v1 {
+  fill: rgba(3, 22, 34, 0.92);
+  stroke: rgba(0, 191, 255, 0.42);
+  stroke-width: 1.1;
+}
+
+.notation-stem-v1 {
+  stroke: rgba(3, 22, 34, 0.88);
+  stroke-width: 2;
+}
+
+.notation-duration-tie-v1 {
+  stroke: rgba(0, 140, 210, 0.32);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.notation-note-group-v1.selected .notation-notehead-v1 {
+  fill: rgba(0, 158, 255, 0.86);
+  stroke: rgba(4, 31, 48, 0.94);
+  stroke-width: 2;
+}
+
+.notation-note-group-v1.selected .notation-duration-tie-v1 {
+  stroke: rgba(0, 158, 255, 0.72);
+}
+
+/* END HCS Production Notation Render Sync v1 */
+

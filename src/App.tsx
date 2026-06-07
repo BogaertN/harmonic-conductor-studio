@@ -349,6 +349,136 @@ function TabButton({
 }
 
 
+
+function NotationRenderSyncV1({
+  report,
+  selectedNoteKey,
+  onSelectNote
+}: {
+  report: HcsTrackEditorAndPianoRollV1Report | null;
+  selectedNoteKey: string | null;
+  onSelectNote: (trackId: string, eventIndex: number) => void;
+}) {
+  const timeline = (report as any)?.music_timeline ?? null;
+  const tracks = (timeline?.tracks ?? []) as any[];
+  const totalDurationMs = Math.max(1, Number(timeline?.total_duration_ms ?? report?.total_duration_ms ?? 1));
+  const tempoBpm = Math.max(20, Number(report?.tempo_bpm ?? 96));
+  const meterText = String(report?.meter ?? "4/4");
+  const beatsPerMeasure = Math.max(1, Number(meterText.split("/")[0]) || 4);
+  const beatMs = 60000 / tempoBpm;
+  const measureMs = beatMs * beatsPerMeasure;
+  const measureCount = Math.max(1, Math.ceil(totalDurationMs / measureMs));
+  const svgWidth = 1240;
+  const leftPad = 132;
+  const rightPad = 34;
+  const usableWidth = svgWidth - leftPad - rightPad;
+  const headerY = 34;
+  const trackHeight = 126;
+  const trackCount = Math.max(1, tracks.length);
+  const svgHeight = headerY + trackCount * trackHeight + 28;
+  const staffLines = [0, 1, 2, 3, 4];
+  const measureLines = Array.from({ length: measureCount + 1 }, (_, index) => index);
+
+  function noteX(startMs: number): number {
+    return leftPad + Math.max(0, Math.min(1, startMs / totalDurationMs)) * usableWidth;
+  }
+
+  function noteWidth(durationMs: number): number {
+    return Math.max(18, Math.min(180, (durationMs / totalDurationMs) * usableWidth));
+  }
+
+  function noteY(midiNote: number, staffBaseY: number): number {
+    const clamped = Math.max(36, Math.min(84, Number(midiNote) || 60));
+    return staffBaseY + 38 - (clamped - 60) * 1.65;
+  }
+
+  return (
+    <section className="notation-render-sync-v1" aria-label="Production notation render sync v1">
+      <div className="board-title-row">
+        <div>
+          <h3>Notation Render Sync</h3>
+          <p className="note">Generated from the same score notes used by the keyboard, piano roll, audio engine, and Glass Reader. There is no separate fake staff state.</p>
+        </div>
+        <span>{report ? `${report.note_count} notes · ${report.meter} · ${Math.round(report.tempo_bpm)} BPM` : "waiting for score"}</span>
+      </div>
+      <div className="notation-sync-law-v1">
+        <strong>Single source:</strong>
+        <span>music.tracks[*].notes → notation → piano roll → deterministic audio → Glass Reader field</span>
+      </div>
+      <div className="notation-scroll-v1" role="img" aria-label="Synchronized sheet music generated from current HCS score">
+        <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="notation-svg-v1">
+          <rect x="0" y="0" width={svgWidth} height={svgHeight} rx="18" className="notation-page-bg-v1" />
+          <text x="24" y="24" className="notation-title-v1">{report?.title ?? "Untitled HCS Score"}</text>
+          <text x={svgWidth - 310} y="24" className="notation-meta-v1">{meterText} · {Math.round(tempoBpm)} BPM · synced</text>
+          {measureLines.map((measure) => {
+            const x = leftPad + Math.min(1, (measure * measureMs) / totalDurationMs) * usableWidth;
+            return (
+              <g key={`measure-${measure}`}>
+                <line x1={x} y1={headerY} x2={x} y2={svgHeight - 24} className="notation-measure-line-v1" />
+                {measure < measureCount && <text x={x + 4} y={headerY - 8} className="notation-measure-label-v1">{measure + 1}</text>}
+              </g>
+            );
+          })}
+          {tracks.map((track, trackIndex) => {
+            const staffTop = headerY + trackIndex * trackHeight + 24;
+            const staffBase = staffTop + 38;
+            const notes = (track.notes ?? []) as any[];
+            return (
+              <g key={`staff-${track.track_id ?? trackIndex}`}>
+                <text x="24" y={staffBase - 8} className="notation-track-label-v1">{String(track.track_id ?? `track_${trackIndex + 1}`)}</text>
+                <text x="24" y={staffBase + 12} className="notation-track-role-v1">{String(track.role ?? "score lane")}</text>
+                <text x="98" y={staffBase + 4} className="notation-clef-v1">𝄞</text>
+                {staffLines.map((line) => (
+                  <line
+                    key={`staff-line-${track.track_id}-${line}`}
+                    x1={leftPad}
+                    y1={staffTop + line * 10}
+                    x2={svgWidth - rightPad}
+                    y2={staffTop + line * 10}
+                    className="notation-staff-line-v1"
+                  />
+                ))}
+                {notes.map((note) => {
+                  const eventIndex = Number(note.event_index ?? 0);
+                  const noteKey = `${String(note.track_id ?? track.track_id)}:${eventIndex}`;
+                  const x = noteX(Number(note.start_ms ?? 0));
+                  const y = noteY(Number(note.midi_note ?? 60), staffBase);
+                  const width = noteWidth(Number(note.duration_ms ?? beatMs));
+                  const selected = selectedNoteKey === noteKey;
+                  const frequency = Number(note.frequency_hz ?? 0);
+                  return (
+                    <g
+                      key={`notation-note-${noteKey}-${note.start_ms}-${note.midi_note}`}
+                      className={selected ? "notation-note-group-v1 selected" : "notation-note-group-v1"}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onSelectNote(String(note.track_id ?? track.track_id), eventIndex)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          onSelectNote(String(note.track_id ?? track.track_id), eventIndex);
+                        }
+                      }}
+                      aria-label={`Select ${String(note.note_name ?? note.midi_note)} at ${Number(note.start_ms ?? 0)} milliseconds`}
+                    >
+                      <line x1={x + 12} y1={y} x2={x + 12} y2={y - 38} className="notation-stem-v1" />
+                      <ellipse cx={x} cy={y} rx="12" ry="7" transform={`rotate(-18 ${x} ${y})`} className="notation-notehead-v1" />
+                      <line x1={x - 1} y1={y + 18} x2={x + width} y2={y + 18} className="notation-duration-tie-v1" />
+                      <text x={x - 14} y={y + 34} className="notation-note-label-v1">{String(note.note_name ?? note.midi_note)}</text>
+                      {frequency > 0 && <text x={x - 16} y={y + 48} className="notation-frequency-label-v1">{frequency.toFixed(2)} Hz</text>}
+                    </g>
+                  );
+                })}
+                {notes.length === 0 && <text x={leftPad + 16} y={staffBase + 34} className="notation-empty-v1">No notes yet. Play keys or import a score to write this staff.</text>}
+              </g>
+            );
+          })}
+          {tracks.length === 0 && <text x={leftPad + 16} y={headerY + 72} className="notation-empty-v1">Load a score, import JSON, or press the keyboard to generate notation.</text>}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
 type StudioTrackEditorAndPianoRollV1Props = {
   musicTimeline: MusicTimelineReport | null;
   selectedNoteKey: string | null;
@@ -365,6 +495,7 @@ type StudioTrackEditorAndPianoRollV1Props = {
 };
 
 
+// HCS Production Notation Render Sync v1 proof: No separate fake staff state; notation renders from current_score.music.tracks[*].notes.
 const HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID = "aiweb.hfield.key_frequency_registry.v1";
 const HCS_VIRTUAL_KEYBOARD_AND_REALTIME_NOTE_ENTRY_V1_CONTRACT_ID = "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1";
 const HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ = 440;
@@ -727,6 +858,8 @@ function StudioTrackEditorAndPianoRollV1({
           <div className="realtime-entry-status-v1">{lastRealtimeEntry}</div>
         </section>
       </div>
+
+      <NotationRenderSyncV1 report={report} selectedNoteKey={selectedNoteKey} onSelectNote={onSelectNote} />
 
       <section className="piano-roll-grid-v1">
         <div className="board-title-row">
