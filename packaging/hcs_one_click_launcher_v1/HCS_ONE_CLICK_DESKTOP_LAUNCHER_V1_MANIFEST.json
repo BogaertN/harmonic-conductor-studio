@@ -1,0 +1,20 @@
+{
+  "contract_id": "aiweb.hfield.one_click_desktop_launcher.v1",
+  "patch_name": "HCS_ONE_CLICK_DESKTOP_LAUNCHER_V1",
+  "expected_base_commit": "2f10dba",
+  "application": "Harmonic Conductor Studio",
+  "launcher_role": "local Linux desktop and application-menu launcher for one-click HCS startup",
+  "icon_source_rule": "prefer /home/nic/Downloads generated HCS icon image; package fallback only if missing",
+  "installed_command": "/home/nic/.local/bin/hcs-harmonic-conductor-studio",
+  "installed_desktop_file": "/home/nic/Desktop/Harmonic Conductor Studio.desktop",
+  "installed_app_menu_file": "/home/nic/.local/share/applications/harmonic-conductor-studio.desktop",
+  "installed_icon": "/home/nic/.local/share/icons/harmonic-conductor-studio/hcs_app_icon.png",
+  "authority_boundaries": {
+    "launcher_is_source_authority": false,
+    "launcher_is_forge_authority": false,
+    "launcher_mutates_forge": false,
+    "launcher_performs_identity_vault_write": false,
+    "launcher_exports_private_identity": false,
+    "launcher_changes_hfield_custody_semantics": false
+  }
+}
