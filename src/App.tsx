@@ -26,6 +26,7 @@ import {
   saveCurrentHcsSqliteReceiptV1,
   getHcsProductionPackagingV1Report,
   getHcsTrackEditorAndPianoRollV1Report,
+  getHcsComposerWaveformEditorTrueSoundBodyV1Report,
   importHcsStudioScoreJsonV1,
   loadHcsStudioScorePresetV1,
   setHcsPianoRollNoteV1,
@@ -112,6 +113,7 @@ import {
   type HcsSqliteMotifProjectLibraryV1Report,
   type HcsProductionPackagingV1Report,
   type HcsTrackEditorAndPianoRollV1Report,
+  type HcsComposerWaveformEditorTrueSoundBodyV1Report,
   type HcsStudioCreationBackendAndPlaceholderPurgeV1Report,
   type HfieldExportReplayVerifierReport,
   type PlaybackReport,
@@ -930,9 +932,133 @@ function WaveformTo3DFieldBodyV1({ report }: { report: HcsTrackEditorAndPianoRol
   );
 }
 
-function ComposerStudioCanvasRebuildV1({
+
+function hcsWaveformEditorPathV1(points: Array<{ t_norm: number; signed_sample: number }>, width = 280, height = 56): string {
+  if (!points.length) return "";
+  return points
+    .map((point, index) => {
+      const x = Math.max(0, Math.min(width, point.t_norm * width));
+      const y = Math.max(2, Math.min(height - 2, height / 2 - point.signed_sample * (height * 0.42)));
+      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
+function hcsWaveformEditorFillPathV1(points: Array<{ t_norm: number; upper_y: number; lower_y: number }>, width = 280, height = 56): string {
+  if (!points.length) return "";
+  const top = points.map((point, index) => {
+    const x = Math.max(0, Math.min(width, point.t_norm * width));
+    const y = Math.max(2, Math.min(height - 2, point.upper_y * height));
+    return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+  });
+  const bottom = [...points].reverse().map((point) => {
+    const x = Math.max(0, Math.min(width, point.t_norm * width));
+    const y = Math.max(2, Math.min(height - 2, point.lower_y * height));
+    return `L${x.toFixed(2)} ${y.toFixed(2)}`;
+  });
+  return `${top.join(" ")} ${bottom.join(" ")} Z`;
+}
+
+function ComposerWaveformEditorTrueSoundBodyV1({
   report,
   selectedNoteKey,
+  onSelectNote
+}: {
+  report: HcsComposerWaveformEditorTrueSoundBodyV1Report | null;
+  selectedNoteKey: string | null;
+  onSelectNote: (trackId: string, eventIndex: number) => void;
+}) {
+  const lanes = report?.track_lanes ?? [];
+  const totalDurationMs = Math.max(1, report?.total_duration_ms ?? 1);
+
+  return (
+    <section className="composer-waveform-editor-true-sound-body-v1" aria-label="Composer waveform editor and true sound body source">
+      <div className="board-title-row waveform-editor-title-row-v1">
+        <div>
+          <p className="eyebrow">Waveform Editor · True Sound Body v1</p>
+          <h3>2D sound lanes drive the 3D Glass Reader body</h3>
+          <p className="note">Each note now renders as a deterministic waveform segment first. The waveform is the source view for extrusion: length, radius, contour, local thickness, segmentation, density, tapering, swelling, and internal ring rhythm.</p>
+        </div>
+        <span>{report?.contract_id ?? HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1_CONTRACT_ID}</span>
+      </div>
+
+      <div className="waveform-editor-proof-row-v1">
+        <span><strong>{report?.track_count ?? 0}</strong> tracks</span>
+        <span><strong>{report?.note_count ?? 0}</strong> notes</span>
+        <span><strong>{report?.segment_count ?? 0}</strong> waveform segments</span>
+        <span><strong>{Math.round(totalDurationMs)}</strong> ms</span>
+      </div>
+
+      <div className="waveform-editor-ruler-v1" aria-label="Waveform editor time ruler">
+        {Array.from({ length: 9 }, (_, index) => (
+          <span key={index} style={{ left: `${index * 12.5}%` }}>M{index + 1}</span>
+        ))}
+      </div>
+
+      <div className="waveform-editor-lanes-v1">
+        {lanes.length === 0 ? <p className="note waveform-editor-empty-v1">Load or play notes to generate real waveform lanes.</p> : null}
+        {lanes.map((lane) => (
+          <div key={lane.lane_id} className="waveform-editor-lane-v1">
+            <div className="waveform-editor-lane-label-v1">
+              <strong>{lane.track_id}</strong>
+              <span>{lane.role}</span>
+              <em>peak {lane.aggregate_peak_abs.toFixed(3)} · rms {lane.aggregate_rms.toFixed(3)}</em>
+            </div>
+            <div className="waveform-editor-lane-body-v1">
+              <svg className="waveform-editor-aggregate-svg-v1" viewBox="0 0 1000 96" preserveAspectRatio="none" aria-hidden="true">
+                <path className="waveform-editor-aggregate-fill-v1" d={hcsWaveformEditorFillPathV1(lane.aggregate_points, 1000, 96)} />
+                <path className="waveform-editor-aggregate-line-v1" d={hcsWaveformEditorPathV1(lane.aggregate_points, 1000, 96)} />
+              </svg>
+
+              {lane.note_segments.map((segment) => {
+                const noteKey = `${segment.track_id}:${segment.event_index}`;
+                const selected = selectedNoteKey === noteKey;
+                const height = Math.max(26, Math.min(88, 24 + segment.visual_body.local_thickness * 58));
+                const top = Math.max(4, Math.min(82, segment.pitch_y_percent - height / 2));
+                return (
+                  <button
+                    key={segment.note_id}
+                    type="button"
+                    className={selected ? "waveform-editor-note-segment-v1 selected" : "waveform-editor-note-segment-v1"}
+                    style={{
+                      left: `${segment.x_percent}%`,
+                      width: `${Math.max(1.5, segment.width_percent)}%`,
+                      top: `${top}%`,
+                      height: `${height}%`,
+                      borderColor: lane.lane_color
+                    }}
+                    onClick={() => onSelectNote(segment.track_id, segment.event_index)}
+                    title={`${segment.note_name} · ${segment.frequency_hz.toFixed(2)} Hz · ${segment.duration_ms}ms · ring ${segment.visual_body.ring_count}`}
+                  >
+                    <svg viewBox="0 0 280 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path className="waveform-editor-note-fill-v1" d={hcsWaveformEditorFillPathV1(segment.waveform_points, 280, 64)} />
+                      <path className="waveform-editor-note-line-v1" d={hcsWaveformEditorPathV1(segment.waveform_points, 280, 64)} />
+                    </svg>
+                    <span>{segment.note_name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="waveform-editor-chain-v1">
+        <span>note event</span>
+        <span>deterministic waveform</span>
+        <span>2D editable segment</span>
+        <span>3D extrusion body</span>
+        <span>Glass Reader cymatic response</span>
+      </div>
+    </section>
+  );
+}
+
+function ComposerStudioCanvasRebuildV1({
+  report,
+  waveformEditorReport,
+  selectedNoteKey,
+  onSelectNote,
   onPlayStudio,
   onLoadPreset,
   onStepBack,
@@ -943,7 +1069,9 @@ function ComposerStudioCanvasRebuildV1({
   onLonger
 }: {
   report: HcsTrackEditorAndPianoRollV1Report | null;
+  waveformEditorReport: HcsComposerWaveformEditorTrueSoundBodyV1Report | null;
   selectedNoteKey: string | null;
+  onSelectNote: (trackId: string, eventIndex: number) => void;
   onPlayStudio: () => void;
   onLoadPreset: (presetId: string) => void;
   onStepBack: () => void;
@@ -989,30 +1117,11 @@ function ComposerStudioCanvasRebuildV1({
         <button onClick={onLonger} type="button">Longer</button>
       </div>
 
-      <div className="composer-canvas-glass-preview-v1" aria-label="Inline Glass Reader preview">
-        <div>
-          <p className="eyebrow">Live Glass Reader Preview</p>
-          <h3>Score → Instrument → Wave Body</h3>
-          <p className="note">This mini field is a composer preview. The full Glass Reader remains available on the Glass Reader tab.</p>
-        </div>
-        <div className="composer-mini-field-v1">
-          {tracks.length === 0 && <span className="mini-field-empty-v1">Play or load notes to wake the field.</span>}
-          {tracks.map((track, index) => {
-            const notes = Number(track.note_count ?? (track.notes ?? []).length ?? 0);
-            const width = Math.max(36, Math.min(160, 34 + notes * 18));
-            const top = 18 + index * 23;
-            return (
-              <span
-                key={`mini-field-${track.track_id ?? index}`}
-                className={`mini-wave-body-v1 mini-wave-${index + 1}`}
-                style={{ width: `${width}px`, top: `${top}%`, left: `${10 + index * 16}%` }}
-                title={`${String(track.track_id ?? "track")} · ${notes} notes`}
-              />
-            );
-          })}
-          <span className="glass-plane-line-v1" />
-        </div>
-      </div>
+      <ComposerWaveformEditorTrueSoundBodyV1
+        report={waveformEditorReport}
+        selectedNoteKey={selectedNoteKey}
+        onSelectNote={onSelectNote}
+      />
     </section>
   );
 }
@@ -1266,6 +1375,7 @@ type StudioTrackEditorAndPianoRollV1Props = {
 // HCS Composer First Workflow and SoundFont Foundation v1 proof: normal composer path hides raw JSON, score renders first, and SoundFont/FluidSynth foundation is surfaced.
 // HCS Production Notation Render Sync v1 proof: No separate fake staff state; notation renders from current_score.music.tracks[*].notes.
 const HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID = "aiweb.hfield.waveform_to_3d_field_body.v1";
+const HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1_CONTRACT_ID = "aiweb.hcs.composer_waveform_editor_true_sound_body.v1";
 const HCS_COMPOSER_STUDIO_CANVAS_REBUILD_V1_CONTRACT_ID = "aiweb.hfield.composer_studio_canvas_rebuild.v1";
 
 const HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1_CONTRACT_ID = "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1";
@@ -1367,6 +1477,8 @@ function StudioTrackEditorAndPianoRollV1({
   const [computerKeyboardEnabled, setComputerKeyboardEnabled] = useState(true);
   const [autoAdvanceStep, setAutoAdvanceStep] = useState(true);
   const [lastRealtimeEntry, setLastRealtimeEntry] = useState("No realtime note entered yet.");
+  const [waveformEditorReport, setWaveformEditorReport] = useState<HcsComposerWaveformEditorTrueSoundBodyV1Report | null>(null);
+  const [waveformEditorStatus, setWaveformEditorStatus] = useState("Waiting for waveform editor report.");
   const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -1374,6 +1486,25 @@ function StudioTrackEditorAndPianoRollV1({
       setActiveTrackId(tracks[0].track_id);
     }
   }, [activeTrackId, tracks]);
+
+  useEffect(() => {
+    let mounted = true;
+    setWaveformEditorStatus("Refreshing waveform editor from current score...");
+    getHcsComposerWaveformEditorTrueSoundBodyV1Report()
+      .then((nextReport) => {
+        if (!mounted) return;
+        setWaveformEditorReport(nextReport);
+        setWaveformEditorStatus(`${nextReport.segment_count} waveform note bodies ready.`);
+      })
+      .catch((error: unknown) => {
+        if (!mounted) return;
+        setWaveformEditorReport(null);
+        setWaveformEditorStatus(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [report?.score_hash, report?.note_count, musicTimeline?.total_duration_ms]);
 
   const totalDurationMs = Math.max(1, musicTimeline?.total_duration_ms ?? 1);
   const gridSteps = Array.from({ length: 32 }, (_, index) => index);
@@ -1656,7 +1787,9 @@ function StudioTrackEditorAndPianoRollV1({
 
       <ComposerStudioCanvasRebuildV1
         report={report}
+        waveformEditorReport={waveformEditorReport}
         selectedNoteKey={selectedNoteKey}
+        onSelectNote={onSelectNote}
         onPlayStudio={onPlayStudio}
         onLoadPreset={onLoadPreset}
         onStepBack={() => setActiveStepIndex(Math.max(0, activeStepIndex - 1))}
@@ -1666,6 +1799,7 @@ function StudioTrackEditorAndPianoRollV1({
         onShorter={() => setDurationSteps(Math.max(1, durationSteps - 1))}
         onLonger={() => setDurationSteps(durationSteps + 1)}
       />
+      <p className="waveform-editor-status-v1">{waveformEditorStatus}</p>
 
       <details className="advanced-waveform-body-preview-v1">
         <summary>Advanced: waveform body audit for native Glass Reader renderer</summary>

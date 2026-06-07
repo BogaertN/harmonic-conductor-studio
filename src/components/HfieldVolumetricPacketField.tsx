@@ -2,7 +2,7 @@ import { Line, OrbitControls } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import type { HcsWaveformTo3DFieldBodyV1Report, HfieldCymaticReaderSurfaceReport, HfieldFieldSynthesisReport, HfieldRuntimeCarrierPacketReport, HfieldRustRenderManifestReport, PlayheadCursorReport } from "../bridge/tauriCommands";
+import type { HcsComposerWaveformEditorTrueSoundBodyV1Report, HcsWaveformTo3DFieldBodyV1Report, HfieldCymaticReaderSurfaceReport, HfieldFieldSynthesisReport, HfieldRuntimeCarrierPacketReport, HfieldRustRenderManifestReport, PlayheadCursorReport } from "../bridge/tauriCommands";
 
 export type HfieldVolumetricPacketFieldProps = {
   fieldReport?: HfieldFieldSynthesisReport | null;
@@ -10,6 +10,7 @@ export type HfieldVolumetricPacketFieldProps = {
   carrierReport?: HfieldRuntimeCarrierPacketReport | null;
   renderManifest?: HfieldRustRenderManifestReport | null;
   waveformBodyReport?: HcsWaveformTo3DFieldBodyV1Report | null;
+  waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null;
   playheadReport?: PlayheadCursorReport | null;
   isPlaying?: boolean;
   readerMode?: "production" | "inspection";
@@ -22,6 +23,9 @@ type ManifestReferenceLine = HfieldRustRenderManifestReport["reference_lines"][n
 type ManifestReferencePoint = HfieldRustRenderManifestReport["reference_points"][number];
 type NativeWaveformTrackBody = HcsWaveformTo3DFieldBodyV1Report["waveform_bodies"][number];
 type NativeWaveformEnvelopePoint = NativeWaveformTrackBody["envelope_points"][number];
+type TrueSoundBodyTrackLane = HcsComposerWaveformEditorTrueSoundBodyV1Report["track_lanes"][number];
+type TrueSoundBodyNoteSegment = TrueSoundBodyTrackLane["note_segments"][number];
+type TrueSoundBodyPoint = TrueSoundBodyNoteSegment["waveform_points"][number];
 type FieldHarmonicEvent = HfieldFieldSynthesisReport["harmonic_events"][number];
 type FieldTracePoint = HfieldFieldSynthesisReport["field_trace"][number];
 type CarrierRipple = HfieldRuntimeCarrierPacketReport["information_ripples"][number];
@@ -32,6 +36,7 @@ const HCS_GLASS_READER_NATIVE_WAVEFORM_BODY_INTEGRATION_V1 = "HCS_GLASS_READER_N
 const HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID = "aiweb.hfield.waveform_to_3d_field_body.v1";
 const HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1 = "HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1";
 const HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1 = "HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1";
+const HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1 = "HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1";
 
 function phaseColor(phase: number): string {
   const palette: Record<number, string> = {
@@ -823,6 +828,119 @@ function ActiveGestureInfluenceLayer({ fieldReport, playheadReport, scanMinZ, sc
 }
 
 
+
+function trueSoundBodyLaneX(lane: TrueSoundBodyTrackLane, laneCount: number): number {
+  const center = (laneCount - 1) / 2;
+  return (lane.lane_index - center) * 0.86;
+}
+
+function trueSoundBodyPitchY(segment: TrueSoundBodyNoteSegment, lane: TrueSoundBodyTrackLane): number {
+  const laneBase = 0.58 + lane.lane_index * 0.34;
+  const pitchLift = (50 - segment.pitch_y_percent) / 100;
+  return laneBase + pitchLift * 0.72;
+}
+
+function trueSoundBodyZ(timeMs: number, totalDurationMs: number, scanMinZ: number, scanMaxZ: number): number {
+  const t = Math.max(0, Math.min(1, timeMs / Math.max(1, totalDurationMs)));
+  return THREE.MathUtils.lerp(scanMinZ, scanMaxZ, t);
+}
+
+function createTrueSoundBodyGeometry(segment: TrueSoundBodyNoteSegment, lane: TrueSoundBodyTrackLane, laneCount: number, totalDurationMs: number, scanMinZ: number, scanMaxZ: number): THREE.BufferGeometry {
+  const points: TrueSoundBodyPoint[] = segment.waveform_points.length >= 2 ? segment.waveform_points : [
+    { point_index: 0, t_norm: 0, time_ms: segment.start_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: 0 },
+    { point_index: 1, t_norm: 1, time_ms: segment.end_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: Math.PI }
+  ];
+  const radialSegments = 22;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const laneX = trueSoundBodyLaneX(lane, laneCount);
+  const pitchY = trueSoundBodyPitchY(segment, lane);
+  const maxRadius = Math.max(0.035, segment.visual_body.radius_norm * 0.12);
+
+  points.forEach((point) => {
+    const z = trueSoundBodyZ(point.time_ms, totalDurationMs, scanMinZ, scanMaxZ);
+    const waveOffsetX = point.signed_sample * (0.11 + segment.velocity * 0.08);
+    const waveOffsetY = point.signed_sample * (0.08 + segment.velocity * 0.04);
+    const centerX = laneX + waveOffsetX;
+    const centerY = pitchY + waveOffsetY;
+    const envelope = Math.max(point.envelope, point.amplitude);
+    const radius = Math.max(0.018, maxRadius * (0.42 + envelope * 1.24 + point.local_thickness * 0.22));
+
+    for (let column = 0; column < radialSegments; column += 1) {
+      const angle = (column / radialSegments) * Math.PI * 2;
+      const ring = 1 + Math.sin(angle * 3 + point.ring_phase) * 0.055;
+      positions.push(
+        centerX + Math.cos(angle) * radius * ring,
+        centerY + Math.sin(angle) * radius * 0.72 * ring,
+        z
+      );
+    }
+  });
+
+  for (let row = 0; row < points.length - 1; row += 1) {
+    for (let column = 0; column < radialSegments; column += 1) {
+      const current = row * radialSegments + column;
+      const next = row * radialSegments + ((column + 1) % radialSegments);
+      const above = (row + 1) * radialSegments + column;
+      const aboveNext = (row + 1) * radialSegments + ((column + 1) % radialSegments);
+      indices.push(current, above, next, next, above, aboveNext);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  geometry.userData = {
+    contract_id: HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1,
+    note_id: segment.note_id,
+    render_role: "true_sound_waveform_body_extrusion"
+  };
+  return geometry;
+}
+
+function TrueSoundBodyExtrusionLayer({ waveformEditorReport, playheadReport, scanMinZ, scanMaxZ }: { waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null; playheadReport?: PlayheadCursorReport | null; scanMinZ: number; scanMaxZ: number }) {
+  const lanes = waveformEditorReport?.track_lanes ?? [];
+  const totalDurationMs = Math.max(1, waveformEditorReport?.total_duration_ms ?? 1);
+  const activeEntries = useMemo(() => {
+    const active = new Set<string>();
+    for (const note of playheadReport?.active_notes ?? []) {
+      active.add(`${note.track_id}:${note.event_index}`);
+    }
+    return active;
+  }, [playheadReport]);
+
+  if (lanes.length === 0) {
+    return null;
+  }
+
+  return (
+    <group userData={{ scene_contract: HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1, layer: "true_sound_body_extrusions" }}>
+      {lanes.flatMap((lane) => lane.note_segments.map((segment) => (
+        <TrueSoundBodyExtrusion key={segment.note_id} lane={lane} laneCount={lanes.length} segment={segment} totalDurationMs={totalDurationMs} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} active={activeEntries.has(`${segment.track_id}:${segment.event_index}`)} />
+      )))}
+    </group>
+  );
+}
+
+function TrueSoundBodyExtrusion({ lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ, active }: { lane: TrueSoundBodyTrackLane; laneCount: number; segment: TrueSoundBodyNoteSegment; totalDurationMs: number; scanMinZ: number; scanMaxZ: number; active: boolean }) {
+  const geometry = useMemo(() => createTrueSoundBodyGeometry(segment, lane, laneCount, totalDurationMs, scanMinZ, scanMaxZ), [lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ]);
+  const color = lane.lane_color;
+  const opacity = active ? 0.62 : 0.38;
+
+  return (
+    <group userData={{ contract_id: HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1, note_id: segment.note_id, track_id: segment.track_id, event_index: segment.event_index }}>
+      <mesh geometry={geometry}>
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.54 : 0.24} transparent opacity={opacity} roughness={0.16} metalness={0.04} depthWrite={false} />
+      </mesh>
+      <mesh geometry={geometry} scale={[1.018, 1.018, 1.002]}>
+        <meshBasicMaterial color={color} transparent opacity={active ? 0.42 : 0.2} wireframe depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
 type ProductionTrackCorridor = {
   trackId: string;
   role: string;
@@ -1020,6 +1138,7 @@ export default function HfieldVolumetricPacketField({
   carrierReport,
   renderManifest,
   waveformBodyReport,
+  waveformEditorReport,
   playheadReport,
   isPlaying = false,
   readerMode = "production",
@@ -1042,7 +1161,8 @@ export default function HfieldVolumetricPacketField({
   const baseProgress = currentPlayheadProgress(playheadReport);
   const inspectionMode = readerMode === "inspection";
   const showProductionComposer = readerMode === "production";
-  const visibleBodies = useMemo(() => inspectionMode ? bodies : bodies.filter((body) => body.layer_key === "payload_tone" || body.layer_key === "file_identity_carrier"), [bodies, inspectionMode]);
+  const hasTrueSoundBodyReport = (waveformEditorReport?.segment_count ?? 0) > 0;
+  const visibleBodies = useMemo(() => inspectionMode ? bodies : (hasTrueSoundBodyReport ? [] : bodies.filter((body) => body.layer_key === "payload_tone")), [bodies, hasTrueSoundBodyReport, inspectionMode]);
   const controlsTarget: [number, number, number] = cameraPresetId === "through-wave" ? [0, 0.95, 0.25] : cameraPresetId === "glass-plane" ? [0, 0.75, 0] : [0, 1.25, 0];
 
   useFrame(() => {
@@ -1092,8 +1212,9 @@ export default function HfieldVolumetricPacketField({
 
       <ReaderGrid width={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
       <GlassReaderSurfaceLayer cymaticReport={cymaticReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
-      {showProductionComposer ? <ProductionWaveformTrackCorridors waveformBodyReport={waveformBodyReport} bodies={bodies} /> : null}
-      <CarrierRippleLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
+      {showProductionComposer && hasTrueSoundBodyReport ? <TrueSoundBodyExtrusionLayer waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {showProductionComposer && !hasTrueSoundBodyReport ? <ProductionWaveformTrackCorridors waveformBodyReport={waveformBodyReport} bodies={bodies} /> : null}
+      {inspectionMode ? <CarrierRippleLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
       <ConductorGestureFlowLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} inspection={inspectionMode} />
 
       {inspectionMode ? <RuntimePathRailsLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}

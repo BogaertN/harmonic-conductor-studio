@@ -24,7 +24,10 @@ use hfield_field::{synthesize_gesture_aware_field_renderer_v2_report, synthesize
 use hfield_forge_bridge::create_forge_packet_bridge_stub_report;
 use hfield_loop::{create_loop_phrase_report, extract_loop_phrase_score};
 use hfield_mapping::{apply_generated_mapping, create_conductor_mapping_report};
-use hfield_music::{append_note_to_track, clear_track_notes, create_music_timeline_report};
+use hfield_music::{
+    append_note_to_track, clear_track_notes, create_music_timeline_report,
+    midi_note_to_frequency_hz, midi_note_to_name,
+};
 use hfield_notation::{
     create_notation_layout_report, delete_notation_note, edit_notation_note,
     nudge_notation_note_by_beats, position_notation_note_measure_beat,
@@ -1118,6 +1121,309 @@ fn get_hcs_instrument_rack_and_track_sound_v1_report(
 
 const HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID: &str =
     "aiweb.hfield.waveform_to_3d_field_body.v1";
+
+const HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1_CONTRACT_ID: &str =
+    "aiweb.hcs.composer_waveform_editor_true_sound_body.v1";
+
+fn hcs_editor_track_gain_v1(role: &str) -> f64 {
+    match role {
+        "melody" => 0.28,
+        "bass_depth" => 0.24,
+        "harmonic_field_support" => 0.15,
+        _ => 0.18,
+    }
+}
+
+fn hcs_editor_music_envelope_v1(t_norm: f64) -> f64 {
+    let t = t_norm.clamp(0.0, 1.0);
+    let attack = 0.085_f64;
+    let release = 0.18_f64;
+    if t < attack {
+        (t / attack).clamp(0.0, 1.0)
+    } else if t > 1.0 - release {
+        ((1.0 - t) / release).clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
+}
+
+fn hcs_editor_note_sample_v1(
+    frequency_hz: f64,
+    local_time_seconds: f64,
+    t_norm: f64,
+    velocity: f64,
+    role_gain: f64,
+) -> f64 {
+    let envelope = hcs_editor_music_envelope_v1(t_norm);
+    let amplitude = (role_gain * velocity.clamp(0.0, 1.0)).clamp(0.0, 0.42);
+    let fundamental = (std::f64::consts::TAU * frequency_hz * local_time_seconds).sin();
+    let second_harmonic =
+        0.18 * (std::f64::consts::TAU * frequency_hz * 2.0 * local_time_seconds).sin();
+    let octave_air = 0.05 * (std::f64::consts::TAU * frequency_hz * 4.0 * local_time_seconds).sin();
+    (amplitude * envelope * (fundamental + second_harmonic + octave_air)).clamp(-1.0, 1.0)
+}
+
+fn hcs_editor_waveform_point_v1(
+    point_index: usize,
+    point_count: usize,
+    time_ms: f64,
+    signed_sample: f64,
+    envelope: f64,
+    radius_base: f64,
+    ring_count: u32,
+) -> serde_json::Value {
+    let t_norm = if point_count <= 1 {
+        0.0
+    } else {
+        point_index as f64 / (point_count - 1) as f64
+    };
+    let amplitude = signed_sample.abs().clamp(0.0, 1.0);
+    let local_thickness =
+        (radius_base * (0.36 + amplitude * 1.42 + envelope * 0.36)).clamp(0.015, 0.85);
+    json!({
+        "point_index": point_index,
+        "t_norm": t_norm,
+        "time_ms": time_ms.round() as u32,
+        "signed_sample": signed_sample,
+        "amplitude": amplitude,
+        "envelope": envelope,
+        "upper_y": 0.5 - signed_sample * 0.46,
+        "lower_y": 0.5 + signed_sample * 0.46,
+        "radius": local_thickness,
+        "local_thickness": local_thickness,
+        "ring_phase": (t_norm * ring_count as f64 * std::f64::consts::TAU) % std::f64::consts::TAU
+    })
+}
+
+#[tauri::command]
+fn get_hcs_composer_waveform_editor_true_sound_body_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    let timeline = create_music_timeline_report(&guard);
+    let score_hash = score_hash_hex(&guard).map_err(|err| format!("score hash failed: {err}"))?;
+    let total_duration_ms = timeline.total_duration_ms.max(1);
+    let mut track_lanes = Vec::new();
+    let mut total_segments = 0_usize;
+
+    for (lane_index, track) in guard.music.tracks.iter().enumerate() {
+        let role_gain = hcs_editor_track_gain_v1(track.role.as_str());
+        let lane_duration_ms = track
+            .notes
+            .iter()
+            .map(|note| note.start_ms.saturating_add(note.duration_ms))
+            .max()
+            .unwrap_or(1)
+            .max(1);
+        let mut note_segments = Vec::new();
+        let mut aggregate_points = Vec::new();
+        let aggregate_count = 192_usize;
+        let mut peak_abs = 0.0_f64;
+        let mut sum_squares = 0.0_f64;
+
+        for point_index in 0..aggregate_count {
+            let t_norm = if aggregate_count <= 1 {
+                0.0
+            } else {
+                point_index as f64 / (aggregate_count - 1) as f64
+            };
+            let absolute_time_ms = t_norm * total_duration_ms as f64;
+            let mut signed_sample = 0.0_f64;
+            let mut envelope_peak = 0.0_f64;
+
+            for note in &track.notes {
+                let note_start = note.start_ms as f64;
+                let note_duration = note.duration_ms.max(1) as f64;
+                let note_end = note_start + note_duration;
+                if absolute_time_ms >= note_start && absolute_time_ms <= note_end {
+                    let local_time_ms = absolute_time_ms - note_start;
+                    let local_norm = (local_time_ms / note_duration).clamp(0.0, 1.0);
+                    let frequency_hz = midi_note_to_frequency_hz(note.midi_note) as f64;
+                    let envelope = hcs_editor_music_envelope_v1(local_norm);
+                    envelope_peak = envelope_peak.max(envelope * note.velocity as f64);
+                    signed_sample += hcs_editor_note_sample_v1(
+                        frequency_hz,
+                        local_time_ms / 1000.0,
+                        local_norm,
+                        note.velocity as f64,
+                        role_gain,
+                    );
+                }
+            }
+
+            let signed_sample = signed_sample.clamp(-0.95, 0.95);
+            peak_abs = peak_abs.max(signed_sample.abs());
+            sum_squares += signed_sample * signed_sample;
+            aggregate_points.push(hcs_editor_waveform_point_v1(
+                point_index,
+                aggregate_count,
+                absolute_time_ms,
+                signed_sample,
+                envelope_peak.clamp(0.0, 1.0),
+                0.18 + role_gain,
+                8 + lane_index as u32,
+            ));
+        }
+
+        for (event_index, note) in track.notes.iter().enumerate() {
+            let note_point_count = 72_usize;
+            let note_duration_ms = note.duration_ms.max(1);
+            let start_ms = note.start_ms;
+            let end_ms = note.start_ms.saturating_add(note_duration_ms);
+            let frequency_hz = midi_note_to_frequency_hz(note.midi_note) as f64;
+            let note_name = midi_note_to_name(note.midi_note);
+            let velocity = note.velocity as f64;
+            let pitch_y_percent = (100.0
+                - (((note.midi_note as f64 - 24.0) / 72.0).clamp(0.0, 1.0) * 100.0))
+                .clamp(4.0, 96.0);
+            let x_percent =
+                ((start_ms as f64 / total_duration_ms as f64) * 100.0).clamp(0.0, 100.0);
+            let width_percent =
+                ((note_duration_ms as f64 / total_duration_ms as f64) * 100.0).clamp(0.8, 100.0);
+            let ring_count = ((note_duration_ms as f64 / 120.0).round() as u32).clamp(3, 48);
+            let radius_norm = (0.10 + velocity * 0.46 + role_gain * 0.22).clamp(0.08, 0.86);
+            let local_thickness = (radius_norm * (0.38 + velocity * 0.72)).clamp(0.08, 0.92);
+            let mut points = Vec::new();
+
+            for point_index in 0..note_point_count {
+                let t_norm = if note_point_count <= 1 {
+                    0.0
+                } else {
+                    point_index as f64 / (note_point_count - 1) as f64
+                };
+                let local_time_ms = t_norm * note_duration_ms as f64;
+                let envelope = hcs_editor_music_envelope_v1(t_norm) * velocity.clamp(0.0, 1.0);
+                let signed_sample = hcs_editor_note_sample_v1(
+                    frequency_hz,
+                    local_time_ms / 1000.0,
+                    t_norm,
+                    velocity,
+                    role_gain,
+                );
+                points.push(hcs_editor_waveform_point_v1(
+                    point_index,
+                    note_point_count,
+                    start_ms as f64 + local_time_ms,
+                    signed_sample,
+                    envelope,
+                    radius_norm,
+                    ring_count,
+                ));
+            }
+
+            note_segments.push(json!({
+                "note_id": format!("{}:{}", track.track_id, event_index),
+                "track_id": track.track_id,
+                "event_index": event_index,
+                "note_name": note_name,
+                "midi_note": note.midi_note,
+                "frequency_hz": frequency_hz,
+                "start_ms": start_ms,
+                "duration_ms": note_duration_ms,
+                "end_ms": end_ms,
+                "velocity": velocity,
+                "x_percent": x_percent,
+                "width_percent": width_percent,
+                "pitch_y_percent": pitch_y_percent,
+                "waveform_points": points,
+                "visual_body": {
+                    "length_rule": "note duration becomes extrusion length",
+                    "radius_rule": "velocity and envelope become local radius",
+                    "contour_rule": "signed harmonic sample becomes visible contour",
+                    "density_rule": "frequency and duration determine internal ring rhythm",
+                    "taper_rule": "deterministic attack/release envelope tapers body ends",
+                    "length_norm": (note_duration_ms as f64 / total_duration_ms as f64).clamp(0.0, 1.0),
+                    "radius_norm": radius_norm,
+                    "local_thickness": local_thickness,
+                    "density": (frequency_hz / 144.0).clamp(0.05, 32.0),
+                    "taper_attack": 0.085,
+                    "taper_release": 0.18,
+                    "swelling": velocity.clamp(0.0, 1.0),
+                    "ring_count": ring_count,
+                    "internal_ring_rhythm_hz": frequency_hz,
+                    "glass_reader_extrusion_axis": "time/depth"
+                }
+            }));
+            total_segments += 1;
+        }
+
+        let aggregate_rms = if aggregate_count > 0 {
+            (sum_squares / aggregate_count as f64).sqrt()
+        } else {
+            0.0
+        };
+
+        track_lanes.push(json!({
+            "lane_id": format!("waveform_lane_{}", lane_index + 1),
+            "track_id": track.track_id,
+            "role": track.role,
+            "lane_index": lane_index,
+            "note_count": track.notes.len(),
+            "track_duration_ms": lane_duration_ms,
+            "x_percent": 0.0,
+            "width_percent": ((lane_duration_ms as f64 / total_duration_ms as f64) * 100.0).clamp(0.0, 100.0),
+            "lane_color": match track.role.as_str() {
+                "melody" => "#f5d28e",
+                "bass_depth" => "#66d8ff",
+                "harmonic_field_support" => "#efe9a6",
+                _ => "#d7f7ff"
+            },
+            "aggregate_peak_abs": peak_abs,
+            "aggregate_rms": aggregate_rms,
+            "aggregate_points": aggregate_points,
+            "note_segments": note_segments
+        }));
+    }
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "purpose": "composer waveform editor source layer that renders each note as a deterministic 2D waveform segment before Glass Reader 3D extrusion",
+        "title": guard.title,
+        "score_hash": score_hash,
+        "tempo_bpm": guard.music.tempo_bpm,
+        "meter": guard.music.meter,
+        "track_count": timeline.track_count,
+        "note_count": timeline.total_note_count,
+        "total_duration_ms": total_duration_ms,
+        "segment_count": total_segments,
+        "sample_contract": {
+            "sample_source": "current_score.music.tracks[*].notes with deterministic harmonic synthesis formula",
+            "formula_matches_audio_engine_family": "fundamental + quiet second harmonic + octave air with deterministic attack/release envelope",
+            "sample_points_per_note": 72,
+            "aggregate_points_per_track": 192,
+            "randomness": false,
+            "device_input": false
+        },
+        "extrusion_rule": {
+            "length": "note duration / score duration",
+            "radius": "velocity plus envelope amplitude",
+            "contour": "signed waveform sample",
+            "local_thickness": "radius times envelope/signed-sample energy",
+            "segmentation": "one editable segment per note event",
+            "density": "frequency ratio against 144 Hz root",
+            "tapering": "attack/release envelope",
+            "swelling": "velocity and RMS energy",
+            "internal_ring_rhythm": "note frequency drives ring cadence"
+        },
+        "track_lanes": track_lanes,
+        "authority_boundaries": {
+            "mutates_current_hcs_score": false,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false,
+            "uses_llm": false,
+            "is_source_authority": false,
+            "is_rendered_from_score_source": true
+        }
+    }))
+}
 
 #[tauri::command]
 fn get_hcs_waveform_to_3d_field_body_v1_report(
@@ -5565,6 +5871,7 @@ fn main() {
             get_hcs_composer_first_workflow_and_soundfont_foundation_v1_report,
             get_hcs_composer_studio_canvas_rebuild_v1_report,
             play_hcs_fluidsynth_soundfont_mix_v1,
+            get_hcs_composer_waveform_editor_true_sound_body_v1_report,
             get_hcs_waveform_to_3d_field_body_v1_report,
             get_hcs_key_frequency_registry_v1_report,
             lookup_hcs_key_frequency_v1,

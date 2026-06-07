@@ -1,0 +1,8 @@
+{
+  "patch_id": "HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1_R2_FIX",
+  "supersedes_failed_run": "HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1_PACKAGE_R1",
+  "target_contract": "aiweb.hcs.composer_waveform_editor_true_sound_body.v1",
+  "purpose": "Repair the failed Rust compile after the partially applied Composer waveform editor true sound body patch by using FieldScore.music.tempo_bpm and FieldScore.music.meter, then run full gates and commit the uncommitted patch state.",
+  "expected_failed_symptom": "error[E0609]: no field tempo_bpm or meter on MutexGuard<FieldScore>",
+  "authoring_rule": "No source guessing beyond the compile error; patch only the confirmed field path correction and proof gates."
+}

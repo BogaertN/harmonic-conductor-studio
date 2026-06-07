@@ -474,6 +474,89 @@ export type HcsInstrumentRackAndTrackSoundV1Report = {
   authority_boundaries: Record<string, boolean>;
 };
 
+export type HcsComposerWaveformEditorPointV1 = {
+  point_index: number;
+  t_norm: number;
+  time_ms: number;
+  signed_sample: number;
+  amplitude: number;
+  envelope: number;
+  upper_y: number;
+  lower_y: number;
+  radius: number;
+  local_thickness: number;
+  ring_phase: number;
+};
+
+export type HcsComposerWaveformEditorNoteSegmentV1 = {
+  note_id: string;
+  track_id: string;
+  event_index: number;
+  note_name: string;
+  midi_note: number;
+  frequency_hz: number;
+  start_ms: number;
+  duration_ms: number;
+  end_ms: number;
+  velocity: number;
+  x_percent: number;
+  width_percent: number;
+  pitch_y_percent: number;
+  waveform_points: HcsComposerWaveformEditorPointV1[];
+  visual_body: {
+    length_rule: string;
+    radius_rule: string;
+    contour_rule: string;
+    density_rule: string;
+    taper_rule: string;
+    length_norm: number;
+    radius_norm: number;
+    local_thickness: number;
+    density: number;
+    taper_attack: number;
+    taper_release: number;
+    swelling: number;
+    ring_count: number;
+    internal_ring_rhythm_hz: number;
+    glass_reader_extrusion_axis: string;
+  };
+};
+
+export type HcsComposerWaveformEditorTrackLaneV1 = {
+  lane_id: string;
+  track_id: string;
+  role: string;
+  lane_index: number;
+  note_count: number;
+  track_duration_ms: number;
+  x_percent: number;
+  width_percent: number;
+  lane_color: string;
+  aggregate_peak_abs: number;
+  aggregate_rms: number;
+  aggregate_points: HcsComposerWaveformEditorPointV1[];
+  note_segments: HcsComposerWaveformEditorNoteSegmentV1[];
+};
+
+export type HcsComposerWaveformEditorTrueSoundBodyV1Report = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  purpose: string;
+  title: string;
+  score_hash: string;
+  tempo_bpm: number;
+  meter: string;
+  track_count: number;
+  note_count: number;
+  total_duration_ms: number;
+  segment_count: number;
+  sample_contract: Record<string, unknown>;
+  extrusion_rule: Record<string, unknown>;
+  track_lanes: HcsComposerWaveformEditorTrackLaneV1[];
+  authority_boundaries: Record<string, boolean>;
+};
+
 export type HcsWaveformEnvelopePointV1 = {
   sample_index: number;
   t_norm: number;
@@ -1985,6 +2068,10 @@ export async function lookupHcsKeyFrequencyV1(midiNote: number): Promise<HcsKeyF
 
 export async function getHcsInstrumentRackAndTrackSoundV1Report(): Promise<HcsInstrumentRackAndTrackSoundV1Report> {
   return await invoke<HcsInstrumentRackAndTrackSoundV1Report>("get_hcs_instrument_rack_and_track_sound_v1_report");
+}
+
+export async function getHcsComposerWaveformEditorTrueSoundBodyV1Report(): Promise<HcsComposerWaveformEditorTrueSoundBodyV1Report> {
+  return await invoke<HcsComposerWaveformEditorTrueSoundBodyV1Report>("get_hcs_composer_waveform_editor_true_sound_body_v1_report");
 }
 
 export async function getHcsWaveformTo3DFieldBodyV1Report(): Promise<HcsWaveformTo3DFieldBodyV1Report> {

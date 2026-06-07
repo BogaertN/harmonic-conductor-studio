@@ -2963,3 +2963,185 @@ body {
   }
 }
 /* END HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1 */
+
+/* HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1 */
+.composer-waveform-editor-true-sound-body-v1 {
+  margin-top: 1rem;
+  border: 1px solid rgba(246, 211, 107, 0.18);
+  border-radius: 18px;
+  padding: 1rem;
+  background: linear-gradient(180deg, rgba(9, 14, 18, 0.96), rgba(3, 8, 12, 0.94));
+  box-shadow: inset 0 0 36px rgba(86, 214, 255, 0.045), 0 14px 40px rgba(0, 0, 0, 0.34);
+}
+
+.waveform-editor-title-row-v1 > span {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waveform-editor-proof-row-v1,
+.waveform-editor-chain-v1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.7rem 0;
+}
+
+.waveform-editor-proof-row-v1 span,
+.waveform-editor-chain-v1 span,
+.waveform-editor-status-v1 {
+  border: 1px solid rgba(86, 214, 255, 0.16);
+  border-radius: 999px;
+  padding: 0.32rem 0.55rem;
+  background: rgba(4, 12, 18, 0.72);
+  color: rgba(232, 246, 255, 0.82);
+  font-size: 0.72rem;
+}
+
+.waveform-editor-proof-row-v1 strong {
+  color: #fff0b0;
+  margin-right: 0.24rem;
+}
+
+.waveform-editor-ruler-v1 {
+  position: relative;
+  height: 1.55rem;
+  margin-left: 9.8rem;
+  border-bottom: 1px solid rgba(246, 211, 107, 0.16);
+  color: rgba(246, 211, 107, 0.76);
+  font-size: 0.66rem;
+}
+
+.waveform-editor-ruler-v1 span {
+  position: absolute;
+  top: 0.1rem;
+  transform: translateX(-50%);
+}
+
+.waveform-editor-lanes-v1 {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.waveform-editor-lane-v1 {
+  display: grid;
+  grid-template-columns: 9.2rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
+.waveform-editor-lane-label-v1 {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.55rem;
+  background: rgba(255, 255, 255, 0.035);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.16rem;
+}
+
+.waveform-editor-lane-label-v1 strong {
+  color: #fff0b0;
+  font-size: 0.76rem;
+}
+
+.waveform-editor-lane-label-v1 span,
+.waveform-editor-lane-label-v1 em {
+  color: rgba(230, 246, 255, 0.68);
+  font-size: 0.64rem;
+  font-style: normal;
+}
+
+.waveform-editor-lane-body-v1 {
+  position: relative;
+  min-height: 6.2rem;
+  border: 1px solid rgba(86, 214, 255, 0.12);
+  border-radius: 16px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 6.25% 100%,
+    linear-gradient(180deg, transparent 48%, rgba(246, 211, 107, 0.1) 50%, transparent 52%),
+    rgba(2, 8, 12, 0.82);
+}
+
+.waveform-editor-aggregate-svg-v1 {
+  position: absolute;
+  inset: 0.38rem 0.45rem;
+  width: calc(100% - 0.9rem);
+  height: calc(100% - 0.76rem);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.waveform-editor-aggregate-fill-v1,
+.waveform-editor-note-fill-v1 {
+  fill: rgba(86, 214, 255, 0.16);
+  stroke: none;
+}
+
+.waveform-editor-aggregate-line-v1,
+.waveform-editor-note-line-v1 {
+  fill: none;
+  stroke: rgba(239, 246, 199, 0.78);
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.waveform-editor-note-segment-v1 {
+  position: absolute;
+  min-width: 1.2rem;
+  border: 1px solid rgba(246, 211, 107, 0.38);
+  border-radius: 11px;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  color: #fff5bd;
+  background: linear-gradient(180deg, rgba(246, 211, 107, 0.22), rgba(86, 214, 255, 0.09));
+  box-shadow: inset 0 0 18px rgba(246, 211, 107, 0.08), 0 0 16px rgba(0, 0, 0, 0.22);
+}
+
+.waveform-editor-note-segment-v1:hover,
+.waveform-editor-note-segment-v1.selected {
+  border-color: rgba(255, 247, 201, 0.95) !important;
+  box-shadow: 0 0 0 2px rgba(255, 247, 201, 0.16), 0 0 22px rgba(246, 211, 107, 0.45);
+  z-index: 4;
+}
+
+.waveform-editor-note-segment-v1 svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.waveform-editor-note-segment-v1 span {
+  position: absolute;
+  left: 0.35rem;
+  bottom: 0.18rem;
+  z-index: 2;
+  font-size: 0.58rem;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.8);
+}
+
+.waveform-editor-empty-v1 {
+  padding: 1rem;
+}
+
+.waveform-editor-status-v1 {
+  display: inline-flex;
+  margin: 0.5rem 0 0.85rem;
+}
+
+@media (max-width: 960px) {
+  .waveform-editor-lane-v1 {
+    grid-template-columns: 1fr;
+  }
+
+  .waveform-editor-ruler-v1 {
+    margin-left: 0;
+  }
+}
+/* END HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1 */

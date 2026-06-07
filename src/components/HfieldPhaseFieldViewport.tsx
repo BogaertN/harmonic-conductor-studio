@@ -9,7 +9,9 @@ import {
   getCurrentHfieldRuntimeCarrierPacketReport,
   getCurrentHfieldRustRenderManifestReport,
   getHcsWaveformTo3DFieldBodyV1Report,
+  getHcsComposerWaveformEditorTrueSoundBodyV1Report,
   type HcsWaveformTo3DFieldBodyV1Report,
+  type HcsComposerWaveformEditorTrueSoundBodyV1Report,
   type HfieldCymaticReaderSurfaceReport,
   type HfieldFieldSynthesisReport,
   type HfieldRuntimeCarrierPacketReport,
@@ -256,6 +258,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
   const [carrierReport, setCarrierReport] = useState<HfieldRuntimeCarrierPacketReport | null>(null);
   const [renderManifest, setRenderManifest] = useState<HfieldRustRenderManifestReport | null>(null);
   const [waveformBodyReport, setWaveformBodyReport] = useState<HcsWaveformTo3DFieldBodyV1Report | null>(null);
+  const [waveformEditorReport, setWaveformEditorReport] = useState<HcsComposerWaveformEditorTrueSoundBodyV1Report | null>(null);
   const [readerError, setReaderError] = useState<string | null>(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [readerMode, setReaderMode] = useState<"production" | "inspection">("production");
@@ -270,9 +273,10 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
       getCurrentHfieldCymaticReaderSurfaceReport(),
       getCurrentHfieldRuntimeCarrierPacketReport(),
       getCurrentHfieldRustRenderManifestReport(),
-      getHcsWaveformTo3DFieldBodyV1Report()
+      getHcsWaveformTo3DFieldBodyV1Report(),
+      getHcsComposerWaveformEditorTrueSoundBodyV1Report()
     ])
-      .then(([nextCymaticReport, nextCarrierReport, nextRenderManifest, nextWaveformBodyReport]) => {
+      .then(([nextCymaticReport, nextCarrierReport, nextRenderManifest, nextWaveformBodyReport, nextWaveformEditorReport]) => {
         if (!mounted) {
           return;
         }
@@ -280,6 +284,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
         setCarrierReport(nextCarrierReport);
         setRenderManifest(nextRenderManifest);
         setWaveformBodyReport(nextWaveformBodyReport);
+        setWaveformEditorReport(nextWaveformEditorReport);
       })
       .catch((error: unknown) => {
         if (!mounted) {
@@ -332,6 +337,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
     carrierReport ? "carrier" : null,
     renderManifest ? "manifest" : null,
     waveformBodyReport ? "waveform" : null,
+    waveformEditorReport ? "true-wave-editor" : null,
     playheadReport ? "playhead" : null
   ].filter(Boolean).join(" + ");
 
@@ -361,7 +367,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
 
       <div className="field-canvas-shell carrier-reader-canvas-shell">
         <Canvas key={`carrier-reader-${readerMode}-${cameraPresetId}-${isFocusMode ? "focus" : "inline"}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
-          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} playheadReport={playheadReport} isPlaying={isPlaying} readerMode={readerMode} cameraPresetId={cameraPresetId} />
+          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} isPlaying={isPlaying} readerMode={readerMode} cameraPresetId={cameraPresetId} />
         </Canvas>
         <div className="field-reader-stage-hint">Production hides raw rails and composes the waveform bodies, cymatic reader, conductor flow, and playhead scanner. Inspect restores the source/report overlays.</div>
       </div>
@@ -382,6 +388,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
         <div className="mini-stat"><span>runtime paths</span><strong>{carrierReport?.runtime_paths.length ?? 0}</strong></div>
         <div className="mini-stat"><span>render bodies</span><strong>{renderManifest?.field_bodies.length ?? 0}</strong></div>
         <div className="mini-stat"><span>waveform bodies</span><strong>{waveformBodyReport?.waveform_bodies.length ?? 0}</strong></div>
+        <div className="mini-stat"><span>true wave segments</span><strong>{waveformEditorReport?.segment_count ?? 0}</strong></div>
         <div className="mini-stat"><span>reference pts</span><strong>{renderManifest?.reference_points.length ?? 0}</strong></div>
         <div className="mini-stat"><span>ripples</span><strong>{carrierReport?.information_ripples.length ?? 0}</strong></div>
         <div className="mini-stat"><span>surface</span><strong>{cymaticReport ? `${cymaticReport.reader_surface.vertex_count} vertices` : "—"}</strong></div>
