@@ -1,0 +1,44 @@
+{
+  "patch_id": "HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1",
+  "baseline_head": "932abb9",
+  "baseline_commit": "932abb9 Add Glass Reader native waveform body integration v1",
+  "purpose": "Synchronize the Persistent Score Spine, conductor cue strip, playhead report, waveform bodies, field synthesis report, cymatic reader surface, and runtime carrier packet inside the real Glass Reader page.",
+  "scope": {
+    "frontend_files": [
+      "src/App.tsx",
+      "src/style.css",
+      "src/components/HfieldPhaseFieldViewport.tsx",
+      "src/components/HfieldVolumetricPacketField.tsx"
+    ],
+    "rust_files_changed": [],
+    "new_preview_panels": false,
+    "forge_mutation": false,
+    "identity_vault_write": false
+  },
+  "sync_law": {
+    "single_page_chain": "score note + conductor cue + playhead time + waveform body + field/cymatic/carrier renderer",
+    "active_note_source": "PlayheadCursorReport.active_notes",
+    "active_cue_source": "PlayheadCursorReport.active_conductor_cue and active_gesture_id",
+    "scene_inputs_consumed": [
+      "fieldReport",
+      "cymaticReport",
+      "carrierReport",
+      "renderManifest",
+      "waveformBodyReport",
+      "playheadReport"
+    ]
+  },
+  "acceptance_gates": [
+    "git status clean before apply",
+    "baseline head starts with 932abb9",
+    "patch markers present",
+    "cargo fmt --check",
+    "cargo test --workspace",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "npm run typecheck",
+    "npm run build",
+    "npm run tauri info",
+    "git commit created",
+    "final git status clean"
+  ]
+}

@@ -1741,6 +1741,17 @@ function StudioTrackEditorAndPianoRollV1({
   );
 }
 
+
+function beatsPerMeasureFromMeterText(meterText: string): number {
+  const parsed = Number(String(meterText).split("/")[0]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 4;
+}
+
+function beatPositionFromMs(timeMs: number, tempoBpm: number): number {
+  const safeTempo = Math.max(20, Number.isFinite(tempoBpm) ? tempoBpm : 84);
+  return Math.max(0, timeMs / (60000 / safeTempo));
+}
+
 function StatusChip({ label, value }: { label: string; value: string | number }) {
   return (
     <span className="status-chip">
@@ -1795,24 +1806,32 @@ function NotationSpine({
     }))
   }));
 
-  const fallbackCueStrip = (gestureTimeline?.events ?? []).map((cue) => ({
-    event_index: cue.event_index,
-    gesture_id: cue.gesture_id,
-    gesture_name: cue.gesture_name,
-    operator: cue.operator,
-    field_region: cue.field_region,
-    anchor: cue.anchor,
-    start_ms: cue.start_ms,
-    duration_ms: cue.duration_ms,
-    end_ms: cue.end_ms,
-    start_beat: cue.start_seconds * 1.4,
-    duration_beats: cue.duration_seconds * 1.4,
-    measure_index: Math.floor((cue.start_seconds * 1.4) / 4) + 1,
-    beat_in_measure: ((cue.start_seconds * 1.4) % 4) + 1,
-    x_percent: Math.min(96, Math.max(0, (cue.start_ms / Math.max(1, gestureTimeline?.total_duration_ms ?? 1)) * 100)),
-    width_percent: Math.max(1.2, Math.min(18, (cue.duration_ms / Math.max(1, gestureTimeline?.total_duration_ms ?? 1)) * 100)),
-    cue_text: cue.cue_text
-  }));
+  const fallbackMeter = notationLayout?.meter ?? musicTimeline?.meter ?? "4/4";
+  const fallbackTempoBpm = notationLayout?.tempo_bpm ?? musicTimeline?.tempo_bpm ?? 84;
+  const fallbackBeatsPerMeasure = beatsPerMeasureFromMeterText(fallbackMeter);
+  const fallbackCueStrip = (gestureTimeline?.events ?? []).map((cue) => {
+    const startBeat = beatPositionFromMs(cue.start_ms, fallbackTempoBpm);
+    const durationBeats = Math.max(0.05, beatPositionFromMs(cue.duration_ms, fallbackTempoBpm));
+
+    return {
+      event_index: cue.event_index,
+      gesture_id: cue.gesture_id,
+      gesture_name: cue.gesture_name,
+      operator: cue.operator,
+      field_region: cue.field_region,
+      anchor: cue.anchor,
+      start_ms: cue.start_ms,
+      duration_ms: cue.duration_ms,
+      end_ms: cue.end_ms,
+      start_beat: startBeat,
+      duration_beats: durationBeats,
+      measure_index: Math.floor(startBeat / fallbackBeatsPerMeasure) + 1,
+      beat_in_measure: (startBeat % fallbackBeatsPerMeasure) + 1,
+      x_percent: Math.min(96, Math.max(0, (cue.start_ms / Math.max(1, gestureTimeline?.total_duration_ms ?? 1)) * 100)),
+      width_percent: Math.max(1.2, Math.min(18, (cue.duration_ms / Math.max(1, gestureTimeline?.total_duration_ms ?? 1)) * 100)),
+      cue_text: cue.cue_text
+    };
+  });
 
   const voices = notationLayout?.voices ?? fallbackVoices;
   const cueBlocks = notationLayout?.cue_strip ?? fallbackCueStrip;

@@ -312,6 +312,18 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
 
   const cameraPosition: [number, number, number] = isFocusMode ? [0, 2.0, 4.45] : [0, 2.35, 5.25];
   const cameraFov = isFocusMode ? 36 : 40;
+  const activeNoteProof = playheadReport?.active_notes.map((note) => `${note.track_id}:${note.event_index}:${note.note_name}`).join(" · ") || "—";
+  const activeCueProof = playheadReport?.active_conductor_cue
+    ? `${playheadReport.active_conductor_cue.gesture_id}:${playheadReport.active_conductor_cue.event_index}`
+    : "—";
+  const syncProofStatus = [
+    report ? "field" : null,
+    cymaticReport ? "cymatic" : null,
+    carrierReport ? "carrier" : null,
+    renderManifest ? "manifest" : null,
+    waveformBodyReport ? "waveform" : null,
+    playheadReport ? "playhead" : null
+  ].filter(Boolean).join(" + ");
 
   return (
     <section className={panelClassName}>
@@ -337,6 +349,12 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
           <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} playheadReport={playheadReport} isPlaying={isPlaying} />
         </Canvas>
         <div className="field-reader-stage-hint">Orbit: drag · Zoom: wheel · Pan: right-drag · Reset Camera returns the packet to inspection view</div>
+      </div>
+
+      <div className="glass-reader-sync-proof-v1" aria-label="Glass Reader sync proof">
+        <span><strong>sync</strong>{syncProofStatus || "waiting"}</span>
+        <span><strong>active notes</strong>{activeNoteProof}</span>
+        <span><strong>active cue</strong>{activeCueProof}</span>
       </div>
 
       {readerError ? <p className="error-text">{readerError}</p> : null}
