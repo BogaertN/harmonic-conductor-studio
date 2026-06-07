@@ -258,6 +258,8 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
   const [waveformBodyReport, setWaveformBodyReport] = useState<HcsWaveformTo3DFieldBodyV1Report | null>(null);
   const [readerError, setReaderError] = useState<string | null>(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [readerMode, setReaderMode] = useState<"production" | "inspection">("production");
+  const [cameraPresetId, setCameraPresetId] = useState("studio-angle");
   const [cameraRevision, setCameraRevision] = useState(0);
 
   useEffect(() => {
@@ -310,8 +312,16 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
     ? "panel field-viewport-panel carrier-reader-panel field-reader-focus-active"
     : "panel field-viewport-panel carrier-reader-panel";
 
-  const cameraPosition: [number, number, number] = isFocusMode ? [0, 2.0, 4.45] : [0, 2.35, 5.25];
-  const cameraFov = isFocusMode ? 36 : 40;
+  const cameraPosition: [number, number, number] = cameraPresetId === "through-wave"
+    ? [0, 1.08, 8.35]
+    : cameraPresetId === "glass-plane"
+      ? [0, 4.6, 0.75]
+      : cameraPresetId === "active-follow"
+        ? [2.45, 1.72, 3.6]
+        : isFocusMode
+          ? [0, 2.0, 4.45]
+          : [0, 2.35, 5.25];
+  const cameraFov = cameraPresetId === "through-wave" ? 30 : cameraPresetId === "glass-plane" ? 42 : isFocusMode ? 36 : 40;
   const activeNoteProof = playheadReport?.active_notes.map((note) => `${note.track_id}:${note.event_index}:${note.note_name}`).join(" · ") || "—";
   const activeCueProof = playheadReport?.active_conductor_cue
     ? `${playheadReport.active_conductor_cue.gesture_id}:${playheadReport.active_conductor_cue.event_index}`
@@ -337,7 +347,12 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
         </div>
         <div className="toolbar-row field-reader-stage-toolbar">
           <button type="button" className="btn" onClick={onRefresh}>Refresh Reader</button>
-          <button type="button" className="btn" onClick={() => setCameraRevision((value) => value + 1)}>Reset Camera</button>
+          <button type="button" className={readerMode === "production" ? "btn reader-mode-active" : "btn"} onClick={() => setReaderMode("production")}>Production</button>
+          <button type="button" className={readerMode === "inspection" ? "btn reader-mode-active" : "btn"} onClick={() => setReaderMode("inspection")}>Inspect</button>
+          <button type="button" className="btn" onClick={() => { setCameraPresetId("studio-angle"); setCameraRevision((value) => value + 1); }}>Studio</button>
+          <button type="button" className="btn" onClick={() => { setCameraPresetId("through-wave"); setCameraRevision((value) => value + 1); }}>Through Wave</button>
+          <button type="button" className="btn" onClick={() => { setCameraPresetId("glass-plane"); setCameraRevision((value) => value + 1); }}>Glass Plane</button>
+          <button type="button" className="btn" onClick={() => { setCameraPresetId("active-follow"); setCameraRevision((value) => value + 1); }}>Follow Active</button>
           <button type="button" className="btn" onClick={() => setIsFocusMode((value) => !value)}>{isFocusMode ? "Exit Focus" : "Focus Stage"}</button>
           <button type="button" className="btn" onClick={onPlay}>Play</button>
           <button type="button" className="btn btn-danger" onClick={onStop}>Stop</button>
@@ -345,13 +360,14 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
       </div>
 
       <div className="field-canvas-shell carrier-reader-canvas-shell">
-        <Canvas key={`carrier-reader-${isFocusMode ? "focus" : "inline"}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
-          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} playheadReport={playheadReport} isPlaying={isPlaying} />
+        <Canvas key={`carrier-reader-${readerMode}-${cameraPresetId}-${isFocusMode ? "focus" : "inline"}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
+          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} playheadReport={playheadReport} isPlaying={isPlaying} readerMode={readerMode} cameraPresetId={cameraPresetId} />
         </Canvas>
-        <div className="field-reader-stage-hint">Orbit: drag · Zoom: wheel · Pan: right-drag · Reset Camera returns the packet to inspection view</div>
+        <div className="field-reader-stage-hint">Production hides raw rails and composes the waveform bodies, cymatic reader, conductor flow, and playhead scanner. Inspect restores the source/report overlays.</div>
       </div>
 
       <div className="glass-reader-sync-proof-v1" aria-label="Glass Reader sync proof">
+        <span><strong>mode</strong>{readerMode} · {cameraPresetId}</span>
         <span><strong>sync</strong>{syncProofStatus || "waiting"}</span>
         <span><strong>active notes</strong>{activeNoteProof}</span>
         <span><strong>active cue</strong>{activeCueProof}</span>

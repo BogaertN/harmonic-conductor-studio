@@ -12,6 +12,8 @@ export type HfieldVolumetricPacketFieldProps = {
   waveformBodyReport?: HcsWaveformTo3DFieldBodyV1Report | null;
   playheadReport?: PlayheadCursorReport | null;
   isPlaying?: boolean;
+  readerMode?: "production" | "inspection";
+  cameraPresetId?: string;
 };
 
 type ManifestBody = HfieldRustRenderManifestReport["field_bodies"][number];
@@ -29,6 +31,7 @@ type RuntimePath = HfieldRuntimeCarrierPacketReport["runtime_paths"][number];
 const HCS_GLASS_READER_NATIVE_WAVEFORM_BODY_INTEGRATION_V1 = "HCS_GLASS_READER_NATIVE_WAVEFORM_BODY_INTEGRATION_V1";
 const HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID = "aiweb.hfield.waveform_to_3d_field_body.v1";
 const HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1 = "HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1";
+const HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1 = "HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1";
 
 function phaseColor(phase: number): string {
   const palette: Record<number, string> = {
@@ -546,7 +549,7 @@ function playheadActiveSourceEntryIds(playheadReport: PlayheadCursorReport | nul
 }
 
 function isBodyActiveFromPlayhead(body: ManifestBody, activeSourceEntryIds: Set<string>): boolean {
-  return activeSourceEntryIds.has(body.source_entry_id);
+  return activeSourceEntryIds.has(body.source_entry_id) || activeSourceEntryIds.has(`${body.track_id}:${body.note_name ?? ""}:${body.start_ms}:${body.duration_ms}`);
 }
 
 function eventActivationFromPlayhead(event: FieldHarmonicEvent, playheadReport: PlayheadCursorReport | null | undefined): number {
@@ -819,6 +822,198 @@ function ActiveGestureInfluenceLayer({ fieldReport, playheadReport, scanMinZ, sc
   );
 }
 
+
+type ProductionTrackCorridor = {
+  trackId: string;
+  role: string;
+  colorHex: string;
+  x: number;
+  y: number;
+  zCenter: number;
+  zLength: number;
+  radius: number;
+  phaseIndex: number;
+  peak: number;
+  points: NativeWaveformEnvelopePoint[];
+};
+
+function productionTrackCorridors(waveformBodyReport: HcsWaveformTo3DFieldBodyV1Report | null | undefined, bodies: ManifestBody[]): ProductionTrackCorridor[] {
+  const waveformBodies = waveformBodyReport?.waveform_bodies ?? [];
+
+  return waveformBodies
+    .map((waveformBody, index) => {
+      const trackBodies = bodies.filter((body) => body.layer_key === "payload_tone" && body.track_id === waveformBody.track_id);
+      const zStart = trackBodies.length > 0 ? Math.min(...trackBodies.map((body) => Math.min(body.z_start, body.z_end))) : waveformBody.glass_reader_placement.z - waveformBody.body.length / 2;
+      const zEnd = trackBodies.length > 0 ? Math.max(...trackBodies.map((body) => Math.max(body.z_start, body.z_end))) : waveformBody.glass_reader_placement.z + waveformBody.body.length / 2;
+      const weight = Math.max(1, trackBodies.length);
+      const x = trackBodies.length > 0 ? trackBodies.reduce((sum, body) => sum + body.x, 0) / weight : waveformBody.glass_reader_placement.x;
+      const y = trackBodies.length > 0 ? trackBodies.reduce((sum, body) => sum + body.y, 0) / weight : waveformBody.glass_reader_placement.y + 0.28 + index * 0.12;
+      const colorHex = trackBodies[0]?.color_hex ?? (waveformBody.role.includes("bass") ? "#56d6ff" : waveformBody.role.includes("field") ? "#f6d36b" : "#fff2ad");
+
+      return {
+        trackId: waveformBody.track_id,
+        role: waveformBody.role,
+        colorHex,
+        x,
+        y,
+        zCenter: (zStart + zEnd) / 2,
+        zLength: Math.max(0.32, Math.abs(zEnd - zStart)),
+        radius: Math.max(0.08, waveformBody.body.radius),
+        phaseIndex: waveformBody.phase_index,
+        peak: Math.max(waveformBody.peak_velocity, waveformBody.rms_energy),
+        points: nativeEnvelopePoints(waveformBody)
+      };
+    })
+    .filter((corridor) => corridor.zLength > 0.05);
+}
+
+function createProductionTrackCorridorGeometry(corridor: ProductionTrackCorridor): THREE.BufferGeometry {
+  const points = corridor.points;
+  const longitudinalSegments = Math.max(24, Math.min(96, points.length * 4));
+  const radialSegments = 28;
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let row = 0; row <= longitudinalSegments; row += 1) {
+    const t = row / longitudinalSegments;
+    const z = -corridor.zLength / 2 + t * corridor.zLength;
+    const envelope = envelopeAmplitudeAt(points, t);
+    const transient = Math.sin(Math.PI * t);
+    const bodyRipple = Math.sin(t * Math.PI * (6 + corridor.phaseIndex) + corridor.phaseIndex * 0.77) * 0.09 * transient;
+    const radiusBase = corridor.radius * (0.58 + envelope * 1.1 + corridor.peak * 0.2 + bodyRipple);
+    const radiusX = Math.max(0.035, radiusBase * (1.1 + envelope * 0.32));
+    const radiusY = Math.max(0.028, radiusBase * (0.52 + envelope * 0.48));
+
+    for (let column = 0; column < radialSegments; column += 1) {
+      const angle = (column / radialSegments) * Math.PI * 2;
+      const cymaticRipple = 1 + Math.sin(angle * (3 + (corridor.phaseIndex % 4)) + t * Math.PI * 8) * 0.085;
+      positions.push(Math.cos(angle) * radiusX * cymaticRipple, Math.sin(angle) * radiusY * cymaticRipple, z);
+    }
+  }
+
+  for (let row = 0; row < longitudinalSegments; row += 1) {
+    for (let column = 0; column < radialSegments; column += 1) {
+      const current = row * radialSegments + column;
+      const next = row * radialSegments + ((column + 1) % radialSegments);
+      const above = (row + 1) * radialSegments + column;
+      const aboveNext = (row + 1) * radialSegments + ((column + 1) % radialSegments);
+      indices.push(current, above, next, next, above, aboveNext);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  geometry.userData = {
+    contract_id: HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1,
+    source_contract_id: HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID,
+    track_id: corridor.trackId,
+    render_role: "production_waveform_lane_body"
+  };
+  return geometry;
+}
+
+function ProductionWaveformTrackCorridors({ waveformBodyReport, bodies }: { waveformBodyReport?: HcsWaveformTo3DFieldBodyV1Report | null; bodies: ManifestBody[] }) {
+  const corridors = useMemo(() => productionTrackCorridors(waveformBodyReport, bodies), [bodies, waveformBodyReport]);
+
+  return (
+    <group userData={{ scene_contract: HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1, layer: "production_waveform_track_corridors" }}>
+      {corridors.map((corridor) => (
+        <ProductionWaveformTrackCorridor key={corridor.trackId} corridor={corridor} />
+      ))}
+    </group>
+  );
+}
+
+function ProductionWaveformTrackCorridor({ corridor }: { corridor: ProductionTrackCorridor }) {
+  const geometry = useMemo(() => createProductionTrackCorridorGeometry(corridor), [corridor]);
+  const shellOpacity = corridor.role.includes("bass") ? 0.24 : corridor.role.includes("field") ? 0.2 : 0.18;
+
+  return (
+    <group position={[corridor.x, corridor.y, corridor.zCenter]} userData={{ scene_contract: HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1, track_id: corridor.trackId, role: corridor.role }}>
+      <mesh geometry={geometry}>
+        <meshStandardMaterial color={corridor.colorHex} emissive={corridor.colorHex} emissiveIntensity={0.08 + corridor.peak * 0.12} transparent opacity={shellOpacity} roughness={0.18} metalness={0.04} depthWrite={false} />
+      </mesh>
+      <mesh geometry={geometry} scale={[1.018, 1.018, 1.002]}>
+        <meshBasicMaterial color={corridor.colorHex} transparent opacity={0.18} wireframe depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function gestureSpread(event: FieldHarmonicEvent): number {
+  const gesture = `${event.gesture_id ?? ""} ${event.operator ?? ""}`.toLowerCase();
+
+  if (gesture.includes("open") || gesture.includes("emergence") || gesture.includes("extension")) {
+    return 0.58;
+  }
+
+  if (gesture.includes("settle") || gesture.includes("root")) {
+    return -0.34;
+  }
+
+  if (gesture.includes("cut") || gesture.includes("arrest")) {
+    return -0.12;
+  }
+
+  return 0.22;
+}
+
+function gestureFlowPoints(event: FieldHarmonicEvent, fieldReport: HfieldFieldSynthesisReport, scanMinZ: number, scanMaxZ: number): THREE.Vector3[] {
+  const anchor = fieldReport.phase_nodes.find((node) => node.phase === event.anchor_phase) ?? fieldReport.anchors.center_1;
+  const startZ = zFromTimeNorm(event.time_norm_start, scanMinZ, scanMaxZ);
+  const endZ = zFromTimeNorm(event.time_norm_end, scanMinZ, scanMaxZ);
+  const spread = gestureSpread(event);
+  const lift = event.field_region.toLowerCase().includes("upper") ? 0.52 : event.field_region.toLowerCase().includes("lower") ? -0.08 : 0.24;
+
+  return [
+    new THREE.Vector3(anchor.x * 0.58, anchor.y + 0.42, startZ),
+    new THREE.Vector3((anchor.x + event.x) * 0.42 + spread, event.y + lift + 0.35, THREE.MathUtils.lerp(startZ, endZ, 0.32)),
+    new THREE.Vector3(event.x + spread * 0.5, event.y + lift + 0.5 + event.amplitude * 0.2, THREE.MathUtils.lerp(startZ, endZ, 0.68)),
+    new THREE.Vector3(event.x, event.y + lift + 0.2, endZ)
+  ];
+}
+
+function ConductorGestureFlowLayer({ fieldReport, playheadReport, scanMinZ, scanMaxZ, inspection }: { fieldReport?: HfieldFieldSynthesisReport | null; playheadReport?: PlayheadCursorReport | null; scanMinZ: number; scanMaxZ: number; inspection: boolean }) {
+  if (!fieldReport) {
+    return null;
+  }
+
+  const activeCue = playheadReport?.active_conductor_cue ?? null;
+  const now = playheadReport?.current_time_ms ?? 0;
+  const events = fieldReport.harmonic_events
+    .filter((event) => event.event_kind === "gesture")
+    .filter((event) => inspection || Math.abs(event.start_ms - now) < 2600 || (now >= event.start_ms && now <= event.end_ms))
+    .slice(0, inspection ? 18 : 8);
+
+  return (
+    <group userData={{ scene_contract: HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1, layer: "conductor_gesture_flow_field" }}>
+      {events.map((event) => {
+        const active = activeCue ? event.event_index === activeCue.event_index || event.gesture_id === activeCue.gesture_id : eventActivationFromPlayhead(event, playheadReport) > 0.35;
+        const color = active ? "#fff2ad" : phaseColor(event.phase);
+        const curve = new THREE.CatmullRomCurve3(gestureFlowPoints(event, fieldReport, scanMinZ, scanMaxZ));
+        const radius = active ? 0.025 + event.amplitude * 0.024 : 0.012 + event.amplitude * 0.012;
+        return (
+          <group key={`gesture-flow-${event.event_index}-${event.start_ms}`} userData={{ gesture_id: event.gesture_id, active }}>
+            <mesh>
+              <tubeGeometry args={[curve, 44, radius, 10, false]} />
+              <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.48 : 0.16} transparent opacity={active ? 0.72 : 0.26} roughness={0.22} metalness={0.04} depthWrite={false} />
+            </mesh>
+            {active ? (
+              <mesh position={curve.getPoint(0.72)}>
+                <sphereGeometry args={[0.105 + event.amplitude * 0.04, 24, 16]} />
+                <meshBasicMaterial color="#fff7c9" transparent opacity={0.78} depthWrite={false} />
+              </mesh>
+            ) : null}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 export default function HfieldVolumetricPacketField({
   fieldReport,
   cymaticReport,
@@ -827,6 +1022,8 @@ export default function HfieldVolumetricPacketField({
   waveformBodyReport,
   playheadReport,
   isPlaying = false,
+  readerMode = "production",
+  cameraPresetId = "studio-angle",
 }: HfieldVolumetricPacketFieldProps) {
   const scanRef = useRef<THREE.Group | null>(null);
   const sliceRefs = useRef<Array<THREE.Group | null>>([]);
@@ -843,6 +1040,10 @@ export default function HfieldVolumetricPacketField({
   const waveformBodiesByTrack = useMemo(() => waveformTrackBodyMap(waveformBodyReport), [waveformBodyReport]);
   const activeSourceEntryIds = useMemo(() => playheadActiveSourceEntryIds(playheadReport), [playheadReport]);
   const baseProgress = currentPlayheadProgress(playheadReport);
+  const inspectionMode = readerMode === "inspection";
+  const showProductionComposer = readerMode === "production";
+  const visibleBodies = useMemo(() => inspectionMode ? bodies : bodies.filter((body) => body.layer_key === "payload_tone" || body.layer_key === "file_identity_carrier"), [bodies, inspectionMode]);
+  const controlsTarget: [number, number, number] = cameraPresetId === "through-wave" ? [0, 0.95, 0.25] : cameraPresetId === "glass-plane" ? [0, 0.75, 0] : [0, 1.25, 0];
 
   useFrame(() => {
     const progress = baseProgress ?? 0;
@@ -852,7 +1053,7 @@ export default function HfieldVolumetricPacketField({
       scanRef.current.position.z = scanZ;
     }
 
-    bodies.forEach((body, index) => {
+    visibleBodies.forEach((body, index) => {
       const slice = sliceRefs.current[index] ?? null;
       const activation = activationForScan(body, scanZ);
 
@@ -867,6 +1068,8 @@ export default function HfieldVolumetricPacketField({
       }
     });
   });
+
+  void totalDurationMs;
 
   return (
     <group>
@@ -884,33 +1087,36 @@ export default function HfieldVolumetricPacketField({
         autoRotate={false}
         minDistance={1.45}
         maxDistance={16}
-        target={[0, 1.25, 0]}
+        target={controlsTarget}
       />
 
       <ReaderGrid width={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
       <GlassReaderSurfaceLayer cymaticReport={cymaticReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
-      <RuntimePathRailsLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
-      <CarrierTimeSliceLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
+      {showProductionComposer ? <ProductionWaveformTrackCorridors waveformBodyReport={waveformBodyReport} bodies={bodies} /> : null}
       <CarrierRippleLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
-      <FieldTraceLayer fieldReport={fieldReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
-      <FieldEventNodesLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
-      <ActiveGestureInfluenceLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
+      <ConductorGestureFlowLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} inspection={inspectionMode} />
 
-      {referenceLines.map((line) => (
+      {inspectionMode ? <RuntimePathRailsLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {inspectionMode ? <CarrierTimeSliceLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {inspectionMode ? <FieldTraceLayer fieldReport={fieldReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {inspectionMode ? <FieldEventNodesLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {inspectionMode ? <ActiveGestureInfluenceLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+
+      {inspectionMode ? referenceLines.map((line) => (
         <ReferenceLineMesh key={line.line_id} line={line} />
-      ))}
+      )) : null}
 
-      {bridges.map((bridge) => (
+      {inspectionMode ? bridges.map((bridge) => (
         <BridgeMesh key={bridge.bridge_id} bridge={bridge} />
-      ))}
+      )) : null}
 
-      {bodies.map((body) => (
+      {visibleBodies.map((body) => (
         <ToneBodyMesh key={body.body_id} body={body} waveformBody={waveformBodiesByTrack.get(body.track_id) ?? null} active={isBodyActiveFromPlayhead(body, activeSourceEntryIds)} />
       ))}
 
-      {referencePoints.map((point) => (
+      {inspectionMode ? referencePoints.map((point) => (
         <ReferencePointMesh key={point.point_id} point={point} />
-      ))}
+      )) : null}
 
       <group ref={scanRef}>
         <mesh position={[0, fieldHeight / 2 - 0.04, 0]}>
@@ -939,7 +1145,7 @@ export default function HfieldVolumetricPacketField({
         </mesh>
       </group>
 
-      {bodies.map((body, index) => (
+      {visibleBodies.map((body, index) => (
         <group
           key={`slice-${body.body_id}`}
           ref={(node) => {

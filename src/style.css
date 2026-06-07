@@ -2930,3 +2930,36 @@ body {
   }
 }
 /* END HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1 */
+
+/* HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1 */
+.reader-mode-active {
+  border-color: rgba(246, 211, 107, 0.6) !important;
+  background: linear-gradient(180deg, rgba(246, 211, 107, 0.24), rgba(246, 211, 107, 0.1)) !important;
+  color: #fff7c9 !important;
+  box-shadow: 0 0 0 2px rgba(246, 211, 107, 0.08), 0 0 18px rgba(246, 211, 107, 0.18);
+}
+
+.field-reader-stage-toolbar .btn {
+  white-space: nowrap;
+}
+
+.field-reader-stage-hint::before {
+  content: "Production scene composer active: waveform lanes become 3D sound bodies; conductor gestures flow through the cymatic field; raw rails are inspection-only · ";
+  color: rgba(246, 211, 107, 0.92);
+}
+
+.field-reader-stage-hint::after {
+  content: " · HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1";
+  color: rgba(86, 214, 255, 0.88);
+}
+
+.glass-reader-sync-proof-v1 {
+  grid-template-columns: minmax(150px, 0.55fr) minmax(180px, 0.75fr) minmax(260px, 1.35fr) minmax(160px, 0.7fr);
+}
+
+@media (max-width: 1180px) {
+  .glass-reader-sync-proof-v1 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+/* END HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1 */

@@ -1,0 +1,27 @@
+{
+  "patch_id": "HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1",
+  "supersedes_visual_result": "HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1",
+  "expected_base_head": "50412ca Add Score Spine Conductor Glass Reader Sync v1",
+  "purpose": "Replace raw stacked debug-layer Glass Reader scene with a professional production scene composer where waveform lanes become 3D sound bodies and conductor gestures flow through the audio/cymatic field.",
+  "changes": [
+    "Production mode is now the default Glass Reader mode.",
+    "Raw runtime rails, time slices, field traces, event nodes, bridges, and reference points are gated behind Inspect mode instead of appearing in the main production scene.",
+    "Waveform body reports are composed into continuous 3D track corridors, so DAW-style waveform lanes become readable volumetric sound bodies.",
+    "Conductor gestures are rendered as flowing 3D tube/ribbon motion fields through the sound bodies, not as debug floor lines.",
+    "Camera presets added: Studio, Through Wave, Glass Plane, Follow Active.",
+    "Active note linkage fixed by matching playhead note identity against body track, note, start, and duration fields."
+  ],
+  "authority_boundaries": {
+    "does_not_modify_forge_core": true,
+    "does_not_execute_forge": true,
+    "does_not_export_private_identity": true,
+    "does_not_create_disconnected_preview_panel": true,
+    "uses_existing_rust_reports_as_source_truth": true,
+    "production_view_separates_from_inspection_view": true
+  },
+  "target_files": [
+    "src/components/HfieldVolumetricPacketField.tsx",
+    "src/components/HfieldPhaseFieldViewport.tsx",
+    "src/style.css"
+  ]
+}
