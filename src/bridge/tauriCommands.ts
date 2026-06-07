@@ -474,6 +474,22 @@ export type HcsInstrumentRackAndTrackSoundV1Report = {
   authority_boundaries: Record<string, boolean>;
 };
 
+export type HcsWaveformTo3DFieldBodyV1Report = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  purpose: string;
+  title: string;
+  score_hash: string;
+  track_count: number;
+  note_count: number;
+  total_duration_ms: number;
+  waveform_bodies: unknown[];
+  conversion_rule: Record<string, unknown>;
+  glass_reader_placement_rule: Record<string, unknown>;
+  authority_boundaries: Record<string, boolean>;
+};
+
 export type HcsFluidSynthSoundFontPlaybackReportV1 = {
   status: string;
   contract_id: string;
@@ -1927,6 +1943,10 @@ export async function lookupHcsKeyFrequencyV1(midiNote: number): Promise<HcsKeyF
 
 export async function getHcsInstrumentRackAndTrackSoundV1Report(): Promise<HcsInstrumentRackAndTrackSoundV1Report> {
   return await invoke<HcsInstrumentRackAndTrackSoundV1Report>("get_hcs_instrument_rack_and_track_sound_v1_report");
+}
+
+export async function getHcsWaveformTo3DFieldBodyV1Report(): Promise<HcsWaveformTo3DFieldBodyV1Report> {
+  return await invoke<HcsWaveformTo3DFieldBodyV1Report>("get_hcs_waveform_to_3d_field_body_v1_report");
 }
 
 export async function playHcsFluidSynthSoundFontMixV1(assignments: Record<string, unknown>): Promise<HcsFluidSynthSoundFontPlaybackReportV1> {

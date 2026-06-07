@@ -1,4 +1,4 @@
-#![recursion_limit = "512"]
+#![recursion_limit = "1024"]
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use hfield_analysis::summarize_waveform;
 use hfield_carrier::synthesize_hfield_runtime_carrier_packet_model;
@@ -1104,6 +1104,180 @@ fn get_hcs_instrument_rack_and_track_sound_v1_report(
             "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
             "formula_id": "frequency_hz = 440 * 2^((midi_note - 69) / 12)",
             "simulated": false
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score": false,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false,
+            "uses_llm": false
+        }
+    }))
+}
+
+const HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.waveform_to_3d_field_body.v1";
+
+#[tauri::command]
+fn get_hcs_waveform_to_3d_field_body_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+
+    let timeline = create_music_timeline_report(&guard);
+    let score_hash = score_hash_hex(&guard).map_err(|err| format!("score hash failed: {err}"))?;
+    let mut waveform_bodies = Vec::new();
+
+    for (track_index, track) in guard.music.tracks.iter().enumerate() {
+        let duration_ms = track
+            .notes
+            .iter()
+            .map(|note| note.start_ms.saturating_add(note.duration_ms))
+            .max()
+            .unwrap_or(1)
+            .max(1);
+
+        let note_count = track.notes.len();
+        let mut peak_velocity = 0.0_f64;
+        let mut velocity_energy = 0.0_f64;
+        let mut min_midi = 127_u8;
+        let mut max_midi = 0_u8;
+        let mut weighted_midi = 0.0_f64;
+        let mut weight_sum = 0.0_f64;
+
+        for note in &track.notes {
+            let velocity = (note.velocity as f64).clamp(0.0, 1.0);
+            peak_velocity = peak_velocity.max(velocity);
+            velocity_energy += velocity * velocity;
+            min_midi = min_midi.min(note.midi_note);
+            max_midi = max_midi.max(note.midi_note);
+            let duration_weight = note.duration_ms.max(1) as f64 * velocity.max(0.05);
+            weighted_midi += note.midi_note as f64 * duration_weight;
+            weight_sum += duration_weight;
+        }
+
+        if note_count == 0 {
+            min_midi = 60;
+            max_midi = 60;
+        }
+
+        let rms_energy = if note_count > 0 {
+            (velocity_energy / note_count as f64).sqrt()
+        } else {
+            0.0
+        };
+
+        let pitch_center = if weight_sum > 0.0 {
+            weighted_midi / weight_sum
+        } else {
+            60.0
+        };
+
+        let phase_index = (track_index % 9) + 1;
+        let lane_x = -1.0 + (track_index as f64 * 0.38);
+        let lane_y = ((pitch_center - 60.0) / 24.0).clamp(-0.75, 0.75);
+        let lane_z = (phase_index as f64 - 5.0) / 5.0;
+
+        let body_length = (0.72 + (duration_ms as f64 / 8000.0)).clamp(0.72, 2.85);
+        let body_radius = (0.10 + peak_velocity * 0.28 + rms_energy * 0.18).clamp(0.10, 0.62);
+        let pitch_width = (max_midi.saturating_sub(min_midi) as f64 / 24.0).clamp(0.0, 1.0);
+        let undulation_depth = (0.04 + pitch_width * 0.12 + rms_energy * 0.10).clamp(0.04, 0.28);
+
+        let sample_count = 24_u32;
+        let mut envelope_points = Vec::new();
+
+        for sample_index in 0..sample_count {
+            let t_norm = if sample_count <= 1 {
+                0.0
+            } else {
+                sample_index as f64 / (sample_count - 1) as f64
+            };
+            let sample_time = t_norm * duration_ms as f64;
+            let mut amplitude = 0.0_f64;
+
+            for note in &track.notes {
+                let start = note.start_ms as f64;
+                let end = note.start_ms.saturating_add(note.duration_ms) as f64;
+                if sample_time >= start && sample_time <= end {
+                    amplitude = amplitude.max((note.velocity as f64).clamp(0.0, 1.0));
+                }
+            }
+
+            let radius = body_radius * (0.42 + amplitude * 0.58);
+            let theta = t_norm * std::f64::consts::TAU;
+            envelope_points.push(json!({
+                "sample_index": sample_index,
+                "t_norm": t_norm,
+                "time_ms": sample_time.round() as u32,
+                "amplitude": amplitude,
+                "radius": radius,
+                "surface_x": t_norm * body_length,
+                "surface_y": radius * theta.sin(),
+                "surface_z": radius * theta.cos()
+            }));
+        }
+
+        waveform_bodies.push(json!({
+            "track_id": track.track_id,
+            "role": track.role,
+            "phase_index": phase_index,
+            "note_count": note_count,
+            "duration_ms": duration_ms,
+            "min_midi": min_midi,
+            "max_midi": max_midi,
+            "pitch_center_midi": pitch_center,
+            "peak_velocity": peak_velocity,
+            "rms_energy": rms_energy,
+            "body": {
+                "shape": "elongated_resonant_wave_capsule",
+                "length": body_length,
+                "radius": body_radius,
+                "undulation_depth": undulation_depth,
+                "not_random_bubble": true,
+                "generated_from_waveform_envelope": true
+            },
+            "glass_reader_placement": {
+                "x": lane_x,
+                "y": lane_y,
+                "z": lane_z,
+                "lane_index": track_index,
+                "plane": "Glass Reader Plane",
+                "depth_rule": "phase index and track order determine field depth",
+                "vertical_rule": "weighted pitch center determines vertical offset"
+            },
+            "envelope_points": envelope_points
+        }));
+    }
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "purpose": "extract per-track waveform envelopes and convert them into elongated 3D resonant bodies for Glass Reader placement",
+        "title": guard.title,
+        "score_hash": score_hash,
+        "track_count": timeline.track_count,
+        "note_count": timeline.total_note_count,
+        "total_duration_ms": timeline.total_duration_ms,
+        "waveform_bodies": waveform_bodies,
+        "conversion_rule": {
+            "source": "current_score.music.tracks[*].notes",
+            "waveform_extraction": "timing + duration + velocity + pitch range + envelope samples",
+            "amplitude_to_radius": true,
+            "duration_to_length": true,
+            "pitch_center_to_vertical_offset": true,
+            "phase_index_to_field_depth": true,
+            "random_spheres_allowed": false
+        },
+        "glass_reader_placement_rule": {
+            "plane": "Glass Reader Plane",
+            "body_type": "elongated_resonant_wave_capsule",
+            "visual_chain": "score -> SoundFont/audio waveform -> envelope -> 3D body -> Glass Reader field",
+            "replay_deterministic": true
         },
         "authority_boundaries": {
             "mutates_current_hcs_score": false,
@@ -3066,6 +3240,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "composer_first_workflow_and_soundfont_foundation_v1_contract_id": "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1",
         "composer_studio_canvas_rebuild_v1_contract_id": "aiweb.hfield.composer_studio_canvas_rebuild.v1",
         "fluidsynth_soundfont_playback_engine_v1_contract_id": "aiweb.hfield.fluidsynth_soundfont_playback_engine.v1",
+        "waveform_to_3d_field_body_v1_contract_id": "aiweb.hfield.waveform_to_3d_field_body.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -5390,6 +5565,7 @@ fn main() {
             get_hcs_composer_first_workflow_and_soundfont_foundation_v1_report,
             get_hcs_composer_studio_canvas_rebuild_v1_report,
             play_hcs_fluidsynth_soundfont_mix_v1,
+            get_hcs_waveform_to_3d_field_body_v1_report,
             get_hcs_key_frequency_registry_v1_report,
             lookup_hcs_key_frequency_v1,
             import_hcs_studio_score_json_v1,

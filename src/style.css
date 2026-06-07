@@ -2821,3 +2821,38 @@ body {
   content:"  · SoundFont when Real Sound is used";
   color:#8bdcff;
 }
+
+
+/* HCS Waveform to 3D Field Body v1 */
+.waveform-to-3d-field-body-v1{
+  grid-area:fieldbody;
+  padding:1rem;
+  border-radius:22px;
+  border:1px solid rgba(94,221,255,.26);
+  background:
+    radial-gradient(circle at 18% 12%,rgba(94,221,255,.16),transparent 34%),
+    radial-gradient(circle at 82% 18%,rgba(231,216,164,.14),transparent 36%),
+    linear-gradient(135deg,rgba(5,13,22,.96),rgba(6,8,15,.96));
+  box-shadow:0 18px 50px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.wave-body-chain-v1{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.45rem;margin:.8rem 0}
+.wave-body-chain-v1 span{text-align:center;padding:.5rem .35rem;border-radius:999px;border:1px solid rgba(231,216,164,.18);background:rgba(231,216,164,.08);color:#efe2b9;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em}
+.wave-body-stage-v1{position:relative;min-height:310px;overflow:hidden;border-radius:20px;border:1px solid rgba(94,221,255,.18);background:linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(0deg,rgba(255,255,255,.035) 1px,transparent 1px),radial-gradient(circle at 50% 50%,rgba(94,221,255,.10),rgba(0,0,0,.28));background-size:52px 52px,52px 52px,100% 100%}
+.wave-body-plane-v1{position:absolute;left:9%;right:7%;top:13%;bottom:15%;transform:skewX(-10deg);border:1px solid rgba(94,221,255,.24);background:linear-gradient(135deg,rgba(94,221,255,.10),rgba(231,216,164,.04));box-shadow:inset 0 0 38px rgba(94,221,255,.08)}
+.wave-body-depth-line-v1{position:absolute;left:8%;right:8%;height:1px;background:linear-gradient(90deg,transparent,rgba(231,216,164,.32),transparent)}
+.wave-body-depth-line-v1.top{top:24%}
+.wave-body-depth-line-v1.middle{top:50%}
+.wave-body-depth-line-v1.bottom{top:76%}
+.wave-body-capsule-v1{position:absolute;display:grid;place-items:center;isolation:isolate;border-radius:999px;border:1px solid rgba(231,216,164,.58);background:radial-gradient(circle at 28% 34%,rgba(255,249,204,.95),rgba(231,216,164,.38) 20%,rgba(94,221,255,.14) 60%,rgba(0,0,0,.10));box-shadow:0 0 34px rgba(231,216,164,.22),inset 0 0 28px rgba(255,255,255,.08);color:#fff2be;text-shadow:0 1px 2px rgba(0,0,0,.65)}
+.wave-body-capsule-v1 strong{position:relative;z-index:3;font-size:.72rem;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wave-body-capsule-v1 em{position:absolute;bottom:-1.25rem;z-index:3;font-size:.6rem;color:#bfefff;font-style:normal;white-space:nowrap}
+.wave-body-core-v1{position:absolute;inset:18%;border-radius:999px;border:1px solid rgba(255,255,255,.32);background:radial-gradient(circle,rgba(255,255,255,.34),transparent 64%)}
+.wave-body-ripple-v1{position:absolute;inset:-8px;border-radius:999px;border:1px solid rgba(231,216,164,.18)}
+.wave-body-ripple-v1.r2{inset:-18px;border-color:rgba(94,221,255,.14)}
+.wave-body-ripple-v1.r3{inset:-30px;border-color:rgba(255,126,86,.10)}
+.wave-body-track-2{background:radial-gradient(circle at 28% 34%,rgba(185,242,255,.92),rgba(94,221,255,.30) 35%,rgba(231,216,164,.12))}
+.wave-body-track-3{background:radial-gradient(circle at 28% 34%,rgba(255,147,107,.85),rgba(255,117,79,.30) 35%,rgba(231,216,164,.10))}
+.wave-body-track-4{background:radial-gradient(circle at 28% 34%,rgba(199,255,191,.85),rgba(117,255,160,.22) 35%,rgba(94,221,255,.10))}
+.wave-body-empty-v1{position:absolute;inset:0;display:grid;place-items:center;color:#e7d8a4;font-size:.86rem}
+.studio-track-editor-v1{grid-template-areas:"hero hero" "fieldbody fieldbody" "score mixer" "roll mixer" "keys mixer"}
+@media(max-width:1350px){.studio-track-editor-v1{grid-template-areas:"hero" "fieldbody" "score" "roll" "keys" "mixer"}.wave-body-chain-v1{grid-template-columns:1fr}}

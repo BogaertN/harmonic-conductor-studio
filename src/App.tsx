@@ -133,7 +133,8 @@ import {
   type MusicTimelineReport,
   type GestureTimelineReport,
   type ResonanceLevelBundle,
-  playHcsFluidSynthSoundFontMixV1,} from "./bridge/tauriCommands";
+  playHcsFluidSynthSoundFontMixV1,
+} from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
 
@@ -835,6 +836,100 @@ function hcsScheduleInstrumentNoteV1(
   return endAt + releaseSeconds;
 }
 
+
+function WaveformTo3DFieldBodyV1({ report }: { report: HcsTrackEditorAndPianoRollV1Report | null }) {
+  const timeline = (report as any)?.music_timeline ?? null;
+  const tracks = ((timeline?.tracks ?? []) as any[]).slice(0, 6);
+  const totalDurationMs = Math.max(1, Number(timeline?.total_duration_ms ?? report?.total_duration_ms ?? 1));
+
+  const bodies = tracks.map((track, index) => {
+    const notes = ((track.notes ?? []) as any[]);
+    const noteCount = Number(track.note_count ?? notes.length ?? 0);
+    const peakVelocity = notes.reduce((peak, note) => Math.max(peak, Number(note.velocity ?? 0)), 0);
+    const midiValues = notes.map((note) => Number(note.midi_note ?? 60)).filter((n) => Number.isFinite(n));
+    const minMidi = midiValues.length ? Math.min(...midiValues) : 60;
+    const maxMidi = midiValues.length ? Math.max(...midiValues) : 60;
+    const pitchCenter = (minMidi + maxMidi) / 2;
+    const duration = Math.max(1, notes.reduce((end, note) => Math.max(end, Number(note.start_ms ?? 0) + Number(note.duration_ms ?? 0)), 1));
+    const bodyLength = Math.max(90, Math.min(330, 70 + (duration / totalDurationMs) * 250));
+    const bodyHeight = Math.max(22, Math.min(72, 22 + peakVelocity * 42 + noteCount * 1.8));
+    const x = 11 + index * 12;
+    const y = 18 + index * 10 + Math.max(-8, Math.min(14, (72 - pitchCenter) * 0.42));
+    const rotation = -12 + index * 7;
+    const phase = (index % 9) + 1;
+
+    return {
+      id: String(track.track_id ?? `track_${index + 1}`),
+      role: String(track.role ?? "field_voice"),
+      noteCount,
+      peakVelocity,
+      minMidi,
+      maxMidi,
+      pitchCenter,
+      bodyLength,
+      bodyHeight,
+      x,
+      y,
+      rotation,
+      phase
+    };
+  });
+
+  return (
+    <section className="waveform-to-3d-field-body-v1" aria-label="Waveform to 3D field body v1">
+      <div className="board-title-row">
+        <div>
+          <p className="eyebrow">Waveform → 3D Field Body</p>
+          <h3>Sound-shaped resonant bodies for the Glass Reader</h3>
+          <p className="note">Each elongated body is generated from track timing, pitch range, velocity, and envelope shape. These are not decorative bubbles; they are the deterministic bridge from score to sound to field.</p>
+        </div>
+        <span>{HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID}</span>
+      </div>
+
+      <div className="wave-body-chain-v1">
+        <span>score notes</span>
+        <span>track envelope</span>
+        <span>amplitude radius</span>
+        <span>elongated body</span>
+        <span>Glass Reader plane</span>
+      </div>
+
+      <div className="wave-body-stage-v1" role="img" aria-label="Generated 3D waveform bodies placed on a Glass Reader plane">
+        <div className="wave-body-plane-v1" />
+        <div className="wave-body-depth-line-v1 top" />
+        <div className="wave-body-depth-line-v1 middle" />
+        <div className="wave-body-depth-line-v1 bottom" />
+
+        {bodies.length === 0 && (
+          <div className="wave-body-empty-v1">Play keys, load a score, or import notes to generate waveform bodies.</div>
+        )}
+
+        {bodies.map((body, index) => (
+          <div
+            key={body.id}
+            className={`wave-body-capsule-v1 wave-body-track-${index + 1}`}
+            style={{
+              left: `${body.x}%`,
+              top: `${body.y}%`,
+              width: `${body.bodyLength}px`,
+              height: `${body.bodyHeight}px`,
+              transform: `rotate(${body.rotation}deg)`
+            }}
+            title={`${body.id}: ${body.noteCount} notes, phase ${body.phase}, MIDI ${Math.round(body.minMidi)}-${Math.round(body.maxMidi)}`}
+          >
+            <span className="wave-body-core-v1" />
+            <span className="wave-body-ripple-v1 r1" />
+            <span className="wave-body-ripple-v1 r2" />
+            <span className="wave-body-ripple-v1 r3" />
+            <strong>{body.id}</strong>
+            <em>Φ{body.phase} · {body.noteCount} notes · MIDI {Math.round(body.minMidi)}–{Math.round(body.maxMidi)}</em>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function ComposerStudioCanvasRebuildV1({
   report,
   selectedNoteKey,
@@ -1166,9 +1261,11 @@ type StudioTrackEditorAndPianoRollV1Props = {
 };
 
 
+// HCS Waveform to 3D Field Body v1 proof: waveform envelopes render as elongated deterministic Glass Reader bodies, not random bubbles.
 // HCS FluidSynth SoundFont Playback Engine v1 proof: real sampled GM programs render through FluidSynth; Web Audio is fallback only.\n// HCS Composer Studio Canvas Rebuild v1 proof: one normal composer canvas, score first, piano roll/keyboard/instruments/Glass Reader preview unified, raw JSON hidden.
 // HCS Composer First Workflow and SoundFont Foundation v1 proof: normal composer path hides raw JSON, score renders first, and SoundFont/FluidSynth foundation is surfaced.
 // HCS Production Notation Render Sync v1 proof: No separate fake staff state; notation renders from current_score.music.tracks[*].notes.
+const HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID = "aiweb.hfield.waveform_to_3d_field_body.v1";
 const HCS_COMPOSER_STUDIO_CANVAS_REBUILD_V1_CONTRACT_ID = "aiweb.hfield.composer_studio_canvas_rebuild.v1";
 
 const HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1_CONTRACT_ID = "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1";
@@ -1569,6 +1666,8 @@ function StudioTrackEditorAndPianoRollV1({
         onShorter={() => setDurationSteps(Math.max(1, durationSteps - 1))}
         onLonger={() => setDurationSteps(durationSteps + 1)}
       />
+
+      <WaveformTo3DFieldBodyV1 report={report} />
 
       <NotationRenderSyncV1 report={report} selectedNoteKey={selectedNoteKey} onSelectNote={onSelectNote} />
 

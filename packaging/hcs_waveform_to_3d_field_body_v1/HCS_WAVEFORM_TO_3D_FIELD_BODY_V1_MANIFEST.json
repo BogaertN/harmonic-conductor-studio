@@ -1,0 +1,19 @@
+{
+  "patch_id": "HCS_WAVEFORM_TO_3D_FIELD_BODY_V1",
+  "contract_id": "aiweb.hfield.waveform_to_3d_field_body.v1",
+  "schema_version": "1.0.0",
+  "purpose": "Convert per-track score/audio waveform envelopes into elongated 3D resonant bodies placed in the Glass Reader plane.",
+  "conversion_rule": {
+    "source": "current_score.music.tracks[*].notes",
+    "waveform_extraction": "per-track note timing, duration, velocity, pitch range, and envelope samples",
+    "body_shape": "elongated resonant capsule / bubble body with amplitude-radius modulation",
+    "spatial_placement": "track lane, phase index, role, and pitch center determine Glass Reader placement",
+    "visual_chain": "score -> sound -> waveform -> 3D body -> Glass Reader"
+  },
+  "authority_boundaries": {
+    "mutates_forge": false,
+    "performs_identity_vault_write": false,
+    "exports_private_identity": false,
+    "uses_llm": false
+  }
+}
