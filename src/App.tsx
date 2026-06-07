@@ -133,7 +133,7 @@ import {
   type MusicTimelineReport,
   type GestureTimelineReport,
   type ResonanceLevelBundle,
-} from "./bridge/tauriCommands";
+  playHcsFluidSynthSoundFontMixV1,} from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
 
@@ -498,6 +498,8 @@ type HcsStarterInstrumentV1 = {
   defaultLevel: number;
   partials: Array<{ ratio: number; gain: number }>;
   description: string;
+  gmProgram?: number;
+  soundfontBacked?: boolean;
 };
 
 const hcsStarterInstrumentCatalogV1: HcsStarterInstrumentV1[] = [
@@ -510,7 +512,9 @@ const hcsStarterInstrumentCatalogV1: HcsStarterInstrumentV1[] = [
     releaseMs: 180,
     defaultLevel: 0.78,
     partials: [{ ratio: 1, gain: 1 }, { ratio: 2, gain: 0.18 }],
-    description: "Bright playable keyboard voice for lead writing."
+    description: "Bright playable keyboard voice for lead writing.",
+    gmProgram: 0,
+    soundfontBacked: true
   },
   {
     instrumentId: "warm_electric_piano",
@@ -521,7 +525,9 @@ const hcsStarterInstrumentCatalogV1: HcsStarterInstrumentV1[] = [
     releaseMs: 260,
     defaultLevel: 0.74,
     partials: [{ ratio: 1, gain: 1 }, { ratio: 2, gain: 0.12 }, { ratio: 3, gain: 0.06 }],
-    description: "Soft harmonic keyboard tone for chords and melody."
+    description: "Soft harmonic keyboard tone for chords and melody.",
+    gmProgram: 4,
+    soundfontBacked: true
   },
   {
     instrumentId: "deep_bass",
@@ -532,7 +538,9 @@ const hcsStarterInstrumentCatalogV1: HcsStarterInstrumentV1[] = [
     releaseMs: 260,
     defaultLevel: 0.68,
     partials: [{ ratio: 1, gain: 1 }, { ratio: 0.5, gain: 0.35 }],
-    description: "Low-frequency depth layer for carrier grounding."
+    description: "Low-frequency depth layer for carrier grounding.",
+    gmProgram: 32,
+    soundfontBacked: true
   },
   {
     instrumentId: "glass_pad",
@@ -543,7 +551,9 @@ const hcsStarterInstrumentCatalogV1: HcsStarterInstrumentV1[] = [
     releaseMs: 900,
     defaultLevel: 0.52,
     partials: [{ ratio: 1, gain: 0.9 }, { ratio: 1.5, gain: 0.16 }, { ratio: 2, gain: 0.12 }],
-    description: "Slow field support layer for sustained resonance."
+    description: "Slow field support layer for sustained resonance.",
+    gmProgram: 88,
+    soundfontBacked: true
   },
   {
     instrumentId: "mallet_bell",
@@ -554,7 +564,9 @@ const hcsStarterInstrumentCatalogV1: HcsStarterInstrumentV1[] = [
     releaseMs: 520,
     defaultLevel: 0.66,
     partials: [{ ratio: 1, gain: 1 }, { ratio: 2.4, gain: 0.2 }],
-    description: "Percussive bell-like attack for cue and motif testing."
+    description: "Percussive bell-like attack for cue and motif testing.",
+    gmProgram: 14,
+    soundfontBacked: true
   },
   {
     instrumentId: "pulse_lead",
@@ -565,12 +577,208 @@ const hcsStarterInstrumentCatalogV1: HcsStarterInstrumentV1[] = [
     releaseMs: 110,
     defaultLevel: 0.6,
     partials: [{ ratio: 1, gain: 0.86 }, { ratio: 2, gain: 0.11 }],
-    description: "Clear synthetic lead for timing and phrase work."
+    description: "Clear synthetic lead for timing and phrase work.",
+    gmProgram: 80,
+    soundfontBacked: true
   }
+,
+{
+    instrumentId: "sf_grand_piano",
+    displayName: "Grand Piano",
+    family: "soundfont_keys",
+    waveform: "triangle",
+    attackMs: 4,
+    releaseMs: 240,
+    defaultLevel: 0.82,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM acoustic grand piano.",
+    gmProgram: 0,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_bright_piano",
+    displayName: "Bright Piano",
+    family: "soundfont_keys",
+    waveform: "triangle",
+    attackMs: 4,
+    releaseMs: 220,
+    defaultLevel: 0.8,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM bright acoustic piano.",
+    gmProgram: 1,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_electric_piano",
+    displayName: "Electric Piano",
+    family: "soundfont_keys",
+    waveform: "sine",
+    attackMs: 8,
+    releaseMs: 260,
+    defaultLevel: 0.78,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM electric piano.",
+    gmProgram: 4,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_church_organ",
+    displayName: "Church Organ",
+    family: "soundfont_organ",
+    waveform: "sine",
+    attackMs: 10,
+    releaseMs: 500,
+    defaultLevel: 0.76,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM church organ.",
+    gmProgram: 19,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_nylon_guitar",
+    displayName: "Nylon Guitar",
+    family: "soundfont_guitar",
+    waveform: "triangle",
+    attackMs: 5,
+    releaseMs: 320,
+    defaultLevel: 0.78,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM nylon guitar.",
+    gmProgram: 24,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_clean_guitar",
+    displayName: "Clean Guitar",
+    family: "soundfont_guitar",
+    waveform: "triangle",
+    attackMs: 5,
+    releaseMs: 280,
+    defaultLevel: 0.78,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM clean electric guitar.",
+    gmProgram: 27,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_finger_bass",
+    displayName: "Finger Bass",
+    family: "soundfont_bass",
+    waveform: "sine",
+    attackMs: 8,
+    releaseMs: 250,
+    defaultLevel: 0.8,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM electric finger bass.",
+    gmProgram: 33,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_strings",
+    displayName: "String Ensemble",
+    family: "soundfont_strings",
+    waveform: "sine",
+    attackMs: 90,
+    releaseMs: 700,
+    defaultLevel: 0.72,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM string ensemble.",
+    gmProgram: 48,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_violin",
+    displayName: "Violin",
+    family: "soundfont_strings",
+    waveform: "sine",
+    attackMs: 50,
+    releaseMs: 500,
+    defaultLevel: 0.72,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM violin.",
+    gmProgram: 40,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_cello",
+    displayName: "Cello",
+    family: "soundfont_strings",
+    waveform: "sine",
+    attackMs: 60,
+    releaseMs: 560,
+    defaultLevel: 0.72,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM cello.",
+    gmProgram: 42,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_trumpet",
+    displayName: "Trumpet",
+    family: "soundfont_brass",
+    waveform: "sawtooth",
+    attackMs: 16,
+    releaseMs: 340,
+    defaultLevel: 0.7,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM trumpet.",
+    gmProgram: 56,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_choir",
+    displayName: "Choir Aahs",
+    family: "soundfont_voice",
+    waveform: "sine",
+    attackMs: 130,
+    releaseMs: 850,
+    defaultLevel: 0.68,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM choir aahs.",
+    gmProgram: 52,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_warm_pad",
+    displayName: "Warm Pad",
+    family: "soundfont_pad",
+    waveform: "sine",
+    attackMs: 180,
+    releaseMs: 900,
+    defaultLevel: 0.62,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM warm pad.",
+    gmProgram: 89,
+    soundfontBacked: true
+  },
+  {
+    instrumentId: "sf_bells",
+    displayName: "Tubular Bells",
+    family: "soundfont_bells",
+    waveform: "triangle",
+    attackMs: 4,
+    releaseMs: 900,
+    defaultLevel: 0.68,
+    partials: [{ ratio: 1, gain: 1 }],
+    description: "FluidR3 GM tubular bells.",
+    gmProgram: 14,
+    soundfontBacked: true
+  },
 ];
 
 function hcsRackFrequencyFromMidiV1(midiNote: number): number {
   return 440 * Math.pow(2, (Math.max(0, Math.min(127, Math.round(midiNote))) - 69) / 12);
+}
+
+
+function hcsGmProgramForInstrumentV1(instrumentId: string): number {
+  const instrument = hcsStarterInstrumentCatalogV1.find((item) => item.instrumentId === instrumentId);
+  if (typeof instrument?.gmProgram === "number") return instrument.gmProgram;
+  if (instrumentId.includes("bass")) return 32;
+  if (instrumentId.includes("pad")) return 88;
+  if (instrumentId.includes("bell")) return 14;
+  if (instrumentId.includes("electric")) return 4;
+  return 0;
 }
 
 function hcsDefaultInstrumentForTrackV1(trackId: string, role: string): string {
@@ -771,6 +979,35 @@ function InstrumentRackAndTrackSoundV1({ report }: { report: HcsTrackEditorAndPi
     }));
   }
 
+
+  async function playRealSoundFontMix(filterTrackId?: string) {
+    const assignments: Record<string, unknown> = {};
+    for (const track of tracks) {
+      const trackId = String(track?.track_id ?? "track");
+      const profile = getProfile(track);
+      const instrument = hcsStarterInstrumentCatalogV1.find((item) => item.instrumentId === profile.instrumentId) ?? hcsStarterInstrumentCatalogV1[0];
+      assignments[trackId] = {
+        instrument_id: profile.instrumentId,
+        display_name: instrument.displayName,
+        gm_program: hcsGmProgramForInstrumentV1(profile.instrumentId),
+        level: profile.level,
+        muted: profile.muted,
+        soloed: profile.soloed,
+        preview_track_id: filterTrackId ?? null
+      };
+    }
+
+    try {
+      const report = await playHcsFluidSynthSoundFontMixV1(assignments);
+      const rendered = String((report as any).output_wav ?? "WAV rendered");
+      const scheduled = Number((report as any).note_count ?? 0);
+      setLastPreview(`FluidSynth SoundFont playback: ${scheduled} notes rendered and played from ${rendered}`);
+    } catch (error) {
+      setLastPreview(`FluidSynth playback failed: ${String(error)}`);
+    }
+  }
+
+
   async function playInstrumentMix(filterTrackId?: string) {
     const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextCtor) {
@@ -820,7 +1057,8 @@ function InstrumentRackAndTrackSoundV1({ report }: { report: HcsTrackEditorAndPi
           <h3>Assign real sounds to tracks, then play the studio mix</h3>
           <p className="note">Track sound profiles are downstream render settings. The source remains current_score.music.tracks[*].notes, and pitch stays tied to the locked MIDI frequency registry.</p>
         </div>
-        <button onClick={() => void playInstrumentMix()} type="button">Play Instrument Mix</button>
+        <button onClick={() => void playRealSoundFontMix()} type="button">Play Real SoundFont Mix</button>
+        <button onClick={() => void playInstrumentMix()} type="button">Fallback Preview</button>
       </div>
 
       <div className="rack-sync-law-v1">
@@ -849,7 +1087,8 @@ function InstrumentRackAndTrackSoundV1({ report }: { report: HcsTrackEditorAndPi
                   <strong>{trackId}</strong>
                   <span>{role} · {notes.length} notes</span>
                 </div>
-                <button onClick={() => void playInstrumentMix(trackId)} type="button">Preview Track</button>
+                <button onClick={() => void playRealSoundFontMix(trackId)} type="button">Real Sound</button>
+                <button onClick={() => void playInstrumentMix(trackId)} type="button">Fallback</button>
               </div>
 
               <label className="rack-field-v1">
@@ -927,7 +1166,7 @@ type StudioTrackEditorAndPianoRollV1Props = {
 };
 
 
-// HCS Composer Studio Canvas Rebuild v1 proof: one normal composer canvas, score first, piano roll/keyboard/instruments/Glass Reader preview unified, raw JSON hidden.
+// HCS FluidSynth SoundFont Playback Engine v1 proof: real sampled GM programs render through FluidSynth; Web Audio is fallback only.\n// HCS Composer Studio Canvas Rebuild v1 proof: one normal composer canvas, score first, piano roll/keyboard/instruments/Glass Reader preview unified, raw JSON hidden.
 // HCS Composer First Workflow and SoundFont Foundation v1 proof: normal composer path hides raw JSON, score renders first, and SoundFont/FluidSynth foundation is surfaced.
 // HCS Production Notation Render Sync v1 proof: No separate fake staff state; notation renders from current_score.music.tracks[*].notes.
 const HCS_COMPOSER_STUDIO_CANVAS_REBUILD_V1_CONTRACT_ID = "aiweb.hfield.composer_studio_canvas_rebuild.v1";

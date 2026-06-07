@@ -2804,3 +2804,20 @@ body {
   .studio-track-editor-v1>.instrument-rack-v1{position:static;max-height:none}
   .composer-studio-canvas-rebuild-v1,.composer-canvas-glass-preview-v1{grid-template-columns:1fr}
 }
+
+
+/* HCS FluidSynth SoundFont Playback Engine v1 */
+.instrument-catalog-strip-v1 span{
+  min-width:fit-content;
+}
+.track-sound-header-v1 button:first-of-type,
+.instrument-rack-v1 .board-title-row button:first-of-type{
+  background:linear-gradient(135deg,#fff2b0,#8bdcff);
+  color:#111827;
+  border-color:rgba(255,255,255,.35);
+  font-weight:950;
+}
+.instrument-description-v1::after{
+  content:"  · SoundFont when Real Sound is used";
+  color:#8bdcff;
+}

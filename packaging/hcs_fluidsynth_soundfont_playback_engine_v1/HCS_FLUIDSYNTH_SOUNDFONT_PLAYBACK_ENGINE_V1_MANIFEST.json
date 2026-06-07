@@ -1,0 +1,25 @@
+{
+  "patch_id": "HCS_FLUIDSYNTH_SOUNDFONT_PLAYBACK_ENGINE_V1",
+  "contract_id": "aiweb.hfield.fluidsynth_soundfont_playback_engine.v1",
+  "schema_version": "1.0.0",
+  "purpose": "Render HCS score notes through real FluidSynth SoundFont instruments instead of Web Audio fallback tones.",
+  "soundfont_engine": {
+    "runtime": "/usr/bin/fluidsynth",
+    "default_soundfont": "/usr/share/sounds/sf2/FluidR3_GM.sf2",
+    "alternate_soundfont": "/usr/share/sounds/sf2/FluidR3_GS.sf2",
+    "output": "WAV render plus OS audio playback"
+  },
+  "instrument_policy": {
+    "gm_program_assignment": true,
+    "per_track_program_assignment": true,
+    "mute_solo_level_respected": true,
+    "pitch_authority_remains_midi_frequency_registry": true,
+    "web_audio_is_fallback_only": true
+  },
+  "authority_boundaries": {
+    "mutates_forge": false,
+    "performs_identity_vault_write": false,
+    "exports_private_identity": false,
+    "uses_llm": false
+  }
+}

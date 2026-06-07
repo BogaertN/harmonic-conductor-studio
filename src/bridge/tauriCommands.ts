@@ -474,6 +474,24 @@ export type HcsInstrumentRackAndTrackSoundV1Report = {
   authority_boundaries: Record<string, boolean>;
 };
 
+export type HcsFluidSynthSoundFontPlaybackReportV1 = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  soundfont: string;
+  runtime: string;
+  title: string;
+  note_count: number;
+  instrument_assignments: unknown[];
+  output_midi: string;
+  output_wav: string;
+  wav_bytes: number;
+  os_playback: Record<string, unknown>;
+  pitch_authority: Record<string, unknown>;
+  fallback_policy: Record<string, unknown>;
+  authority_boundaries: Record<string, boolean>;
+};
+
 export type HcsComposerStudioCanvasRebuildV1Report = {
   status: string;
   contract_id: string;
@@ -1909,6 +1927,10 @@ export async function lookupHcsKeyFrequencyV1(midiNote: number): Promise<HcsKeyF
 
 export async function getHcsInstrumentRackAndTrackSoundV1Report(): Promise<HcsInstrumentRackAndTrackSoundV1Report> {
   return await invoke<HcsInstrumentRackAndTrackSoundV1Report>("get_hcs_instrument_rack_and_track_sound_v1_report");
+}
+
+export async function playHcsFluidSynthSoundFontMixV1(assignments: Record<string, unknown>): Promise<HcsFluidSynthSoundFontPlaybackReportV1> {
+  return await invoke<HcsFluidSynthSoundFontPlaybackReportV1>("play_hcs_fluidsynth_soundfont_mix_v1", { assignments });
 }
 
 export async function getHcsComposerStudioCanvasRebuildV1Report(): Promise<HcsComposerStudioCanvasRebuildV1Report> {

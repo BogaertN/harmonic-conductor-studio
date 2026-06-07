@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use hfield_analysis::summarize_waveform;
 use hfield_carrier::synthesize_hfield_runtime_carrier_packet_model;
@@ -1110,6 +1111,347 @@ fn get_hcs_instrument_rack_and_track_sound_v1_report(
             "performs_identity_vault_write": false,
             "exports_private_identity": false,
             "changes_bundle_custody_semantics": false,
+            "uses_llm": false
+        }
+    }))
+}
+
+const HCS_FLUIDSYNTH_SOUNDFONT_PLAYBACK_ENGINE_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.fluidsynth_soundfont_playback_engine.v1";
+const HCS_FLUIDSYNTH_GM_SOUNDFONT_V1: &str = "/usr/share/sounds/sf2/FluidR3_GM.sf2";
+
+fn hcs_midi_var_len_v1(mut value: u32, out: &mut Vec<u8>) {
+    let mut buffer = [0_u8; 5];
+    let mut index = 4;
+    buffer[index] = (value & 0x7f) as u8;
+    value >>= 7;
+    while value > 0 {
+        index -= 1;
+        buffer[index] = ((value & 0x7f) as u8) | 0x80;
+        value >>= 7;
+    }
+    out.extend_from_slice(&buffer[index..=4]);
+}
+
+fn hcs_push_midi_u16_v1(out: &mut Vec<u8>, value: u16) {
+    out.push((value >> 8) as u8);
+    out.push((value & 0xff) as u8);
+}
+
+fn hcs_push_midi_u32_v1(out: &mut Vec<u8>, value: u32) {
+    out.push((value >> 24) as u8);
+    out.push(((value >> 16) & 0xff) as u8);
+    out.push(((value >> 8) & 0xff) as u8);
+    out.push((value & 0xff) as u8);
+}
+
+fn hcs_assignment_value_v1<'a>(
+    assignments: &'a serde_json::Value,
+    track_id: &str,
+    key: &str,
+) -> Option<&'a serde_json::Value> {
+    assignments
+        .as_object()
+        .and_then(|map| map.get(track_id))
+        .and_then(|entry| entry.as_object())
+        .and_then(|entry| entry.get(key))
+}
+
+fn hcs_assignment_program_v1(assignments: &serde_json::Value, track_id: &str, role: &str) -> u8 {
+    let default = match hcs_default_instrument_id_for_track_v1(track_id, role) {
+        "deep_bass" => 32,
+        "glass_pad" => 88,
+        "mallet_bell" => 14,
+        "warm_electric_piano" => 4,
+        "pulse_lead" => 80,
+        _ => 0,
+    };
+    hcs_assignment_value_v1(assignments, track_id, "gm_program")
+        .and_then(|value| value.as_u64())
+        .map(|value| value.min(127) as u8)
+        .unwrap_or(default)
+}
+
+fn hcs_assignment_level_v1(assignments: &serde_json::Value, track_id: &str) -> f32 {
+    hcs_assignment_value_v1(assignments, track_id, "level")
+        .and_then(|value| value.as_f64())
+        .map(|value| value.clamp(0.0, 1.25) as f32)
+        .unwrap_or(0.82)
+}
+
+fn hcs_assignment_bool_v1(assignments: &serde_json::Value, track_id: &str, key: &str) -> bool {
+    hcs_assignment_value_v1(assignments, track_id, key)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+fn hcs_assignment_display_v1(assignments: &serde_json::Value, track_id: &str) -> String {
+    hcs_assignment_value_v1(assignments, track_id, "display_name")
+        .and_then(|value| value.as_str())
+        .unwrap_or("GM Instrument")
+        .to_string()
+}
+
+fn hcs_preview_filter_track_id_v1(assignments: &serde_json::Value) -> Option<String> {
+    assignments.as_object().and_then(|map| {
+        map.values()
+            .filter_map(|entry| entry.get("preview_track_id"))
+            .filter_map(|value| value.as_str())
+            .find(|value| !value.trim().is_empty())
+            .map(str::to_string)
+    })
+}
+
+fn hcs_build_soundfont_midi_v1(
+    score: &FieldScore,
+    assignments: &serde_json::Value,
+) -> Result<(Vec<u8>, usize, Vec<serde_json::Value>), String> {
+    let ticks_per_quarter = 480_u16;
+    let quarter_ms = if score.music.tempo_bpm <= 0.0 {
+        625.0
+    } else {
+        60_000.0 / score.music.tempo_bpm
+    };
+    let any_solo = score
+        .music
+        .tracks
+        .iter()
+        .any(|track| hcs_assignment_bool_v1(assignments, &track.track_id, "soloed"));
+    let preview_filter = hcs_preview_filter_track_id_v1(assignments);
+
+    let mut midi = Vec::new();
+    midi.extend_from_slice(b"MThd");
+    hcs_push_midi_u32_v1(&mut midi, 6);
+    hcs_push_midi_u16_v1(&mut midi, 1);
+    hcs_push_midi_u16_v1(&mut midi, (score.music.tracks.len() + 1) as u16);
+    hcs_push_midi_u16_v1(&mut midi, ticks_per_quarter);
+
+    let tempo_micros = (60_000_000.0 / score.music.tempo_bpm.max(20.0)).round() as u32;
+    let mut tempo_track = Vec::new();
+    hcs_midi_var_len_v1(0, &mut tempo_track);
+    tempo_track.extend_from_slice(&[
+        0xff,
+        0x51,
+        0x03,
+        ((tempo_micros >> 16) & 0xff) as u8,
+        ((tempo_micros >> 8) & 0xff) as u8,
+        (tempo_micros & 0xff) as u8,
+    ]);
+    hcs_midi_var_len_v1(0, &mut tempo_track);
+    tempo_track.extend_from_slice(&[0xff, 0x2f, 0x00]);
+    midi.extend_from_slice(b"MTrk");
+    hcs_push_midi_u32_v1(&mut midi, tempo_track.len() as u32);
+    midi.extend_from_slice(&tempo_track);
+
+    let mut rendered_notes = 0_usize;
+    let mut instrument_report = Vec::new();
+
+    for (track_index, track) in score.music.tracks.iter().enumerate() {
+        let channel = if track_index >= 9 {
+            ((track_index + 1) % 16) as u8
+        } else {
+            (track_index % 16) as u8
+        };
+        let program = hcs_assignment_program_v1(assignments, &track.track_id, &track.role);
+        let level = hcs_assignment_level_v1(assignments, &track.track_id);
+        let muted = hcs_assignment_bool_v1(assignments, &track.track_id, "muted");
+        let soloed = hcs_assignment_bool_v1(assignments, &track.track_id, "soloed");
+        let filtered_out = preview_filter
+            .as_ref()
+            .map(|target| target != &track.track_id)
+            .unwrap_or(false);
+        let audible = !muted && (!any_solo || soloed) && !filtered_out;
+
+        instrument_report.push(json!({
+            "track_id": track.track_id,
+            "role": track.role,
+            "display_name": hcs_assignment_display_v1(assignments, &track.track_id),
+            "gm_program": program,
+            "channel": channel,
+            "level": level,
+            "muted": muted,
+            "soloed": soloed,
+            "audible": audible
+        }));
+
+        let mut events: Vec<(u32, u8, u8, u8)> = Vec::new();
+        events.push((0, 0xc0 | channel, program, 0));
+
+        if audible {
+            for note in &track.notes {
+                let start_ticks =
+                    ((note.start_ms as f64 / quarter_ms) * ticks_per_quarter as f64).round() as u32;
+                let end_ticks = (((note.start_ms + note.duration_ms) as f64 / quarter_ms)
+                    * ticks_per_quarter as f64)
+                    .round() as u32;
+                let velocity = ((note.velocity.clamp(0.0, 1.0) * level.clamp(0.0, 1.25) * 112.0)
+                    .round() as u8)
+                    .clamp(1, 127);
+                events.push((
+                    start_ticks,
+                    0x90 | channel,
+                    note.midi_note.min(127),
+                    velocity,
+                ));
+                events.push((
+                    end_ticks.max(start_ticks + 1),
+                    0x80 | channel,
+                    note.midi_note.min(127),
+                    0,
+                ));
+                rendered_notes += 1;
+            }
+        }
+
+        events.sort_by_key(|event| (event.0, if event.1 & 0xf0 == 0x80 { 0 } else { 1 }));
+
+        let mut track_bytes = Vec::new();
+        let mut last_tick = 0_u32;
+        for (tick, status, data1, data2) in events {
+            hcs_midi_var_len_v1(tick.saturating_sub(last_tick), &mut track_bytes);
+            track_bytes.push(status);
+            track_bytes.push(data1);
+            if status & 0xf0 != 0xc0 {
+                track_bytes.push(data2);
+            }
+            last_tick = tick;
+        }
+        hcs_midi_var_len_v1(0, &mut track_bytes);
+        track_bytes.extend_from_slice(&[0xff, 0x2f, 0x00]);
+
+        midi.extend_from_slice(b"MTrk");
+        hcs_push_midi_u32_v1(&mut midi, track_bytes.len() as u32);
+        midi.extend_from_slice(&track_bytes);
+    }
+
+    if rendered_notes == 0 {
+        return Err("no audible notes available for FluidSynth render".to_string());
+    }
+
+    Ok((midi, rendered_notes, instrument_report))
+}
+
+fn hcs_try_spawn_audio_player_v1(path: &std::path::Path) -> serde_json::Value {
+    for binary in ["paplay", "aplay", "ffplay"] {
+        let mut command = Command::new(binary);
+        if binary == "ffplay" {
+            command.args(["-nodisp", "-autoexit", "-loglevel", "quiet"]);
+        }
+        match command.arg(path).spawn() {
+            Ok(_) => {
+                return json!({
+                    "playback_started": true,
+                    "player": binary
+                });
+            }
+            Err(_) => continue,
+        }
+    }
+
+    json!({
+        "playback_started": false,
+        "player": null,
+        "note": "WAV was rendered, but no paplay/aplay/ffplay player was available."
+    })
+}
+
+#[tauri::command]
+fn play_hcs_fluidsynth_soundfont_mix_v1(
+    state: tauri::State<'_, AppState>,
+    assignments: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let score = {
+        let guard = state
+            .current_score
+            .lock()
+            .map_err(|_| "current score lock poisoned".to_string())?;
+        guard.clone()
+    };
+
+    let soundfont_path = Path::new(HCS_FLUIDSYNTH_GM_SOUNDFONT_V1);
+    if !soundfont_path.is_file() {
+        return Err(format!(
+            "SoundFont not found: {HCS_FLUIDSYNTH_GM_SOUNDFONT_V1}"
+        ));
+    }
+
+    let (midi_bytes, note_count, instrument_report) =
+        hcs_build_soundfont_midi_v1(&score, &assignments)?;
+
+    let export_dir = app_root_dir().join("exports").join("audio");
+    std::fs::create_dir_all(&export_dir)
+        .map_err(|err| format!("failed to create audio export dir: {err}"))?;
+
+    let unix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| format!("system time failed: {err}"))?
+        .as_secs();
+
+    let midi_path = export_dir.join(format!("hcs_fluidsynth_soundfont_mix_v1_{unix}.mid"));
+    let wav_path = export_dir.join(format!("hcs_fluidsynth_soundfont_mix_v1_{unix}.wav"));
+
+    std::fs::write(&midi_path, midi_bytes)
+        .map_err(|err| format!("failed to write MIDI file: {err}"))?;
+
+    let output = Command::new("fluidsynth")
+        .args([
+            "-ni",
+            "-F",
+            wav_path
+                .to_str()
+                .ok_or_else(|| "invalid wav path".to_string())?,
+            "-r",
+            "48000",
+            HCS_FLUIDSYNTH_GM_SOUNDFONT_V1,
+            midi_path
+                .to_str()
+                .ok_or_else(|| "invalid midi path".to_string())?,
+        ])
+        .output()
+        .map_err(|err| format!("failed to start fluidsynth: {err}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "FluidSynth render failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let wav_bytes = std::fs::metadata(&wav_path)
+        .map_err(|err| format!("failed to stat rendered WAV: {err}"))?
+        .len();
+
+    let player_report = hcs_try_spawn_audio_player_v1(&wav_path);
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_FLUIDSYNTH_SOUNDFONT_PLAYBACK_ENGINE_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "soundfont": HCS_FLUIDSYNTH_GM_SOUNDFONT_V1,
+        "runtime": "/usr/bin/fluidsynth",
+        "title": score.title,
+        "note_count": note_count,
+        "instrument_assignments": instrument_report,
+        "output_midi": midi_path,
+        "output_wav": wav_path,
+        "wav_bytes": wav_bytes,
+        "os_playback": player_report,
+        "pitch_authority": {
+            "contract_id": HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID,
+            "tuning_mode": "twelve_tone_equal_temperament",
+            "a4_hz": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ,
+            "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
+            "simulated": false
+        },
+        "fallback_policy": {
+            "web_audio_preview_is_fallback_only": true,
+            "production_preview_uses_fluidsynth_soundfont": true
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score": false,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
             "uses_llm": false
         }
     }))
@@ -2723,6 +3065,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "instrument_rack_and_track_sound_v1_contract_id": "aiweb.hfield.instrument_rack_and_track_sound.v1",
         "composer_first_workflow_and_soundfont_foundation_v1_contract_id": "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1",
         "composer_studio_canvas_rebuild_v1_contract_id": "aiweb.hfield.composer_studio_canvas_rebuild.v1",
+        "fluidsynth_soundfont_playback_engine_v1_contract_id": "aiweb.hfield.fluidsynth_soundfont_playback_engine.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -5046,6 +5389,7 @@ fn main() {
             get_hcs_instrument_rack_and_track_sound_v1_report,
             get_hcs_composer_first_workflow_and_soundfont_foundation_v1_report,
             get_hcs_composer_studio_canvas_rebuild_v1_report,
+            play_hcs_fluidsynth_soundfont_mix_v1,
             get_hcs_key_frequency_registry_v1_report,
             lookup_hcs_key_frequency_v1,
             import_hcs_studio_score_json_v1,
