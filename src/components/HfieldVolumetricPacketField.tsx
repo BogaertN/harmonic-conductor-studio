@@ -39,6 +39,7 @@ const HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1 = "HCS_GLASS_READER_PRODUCTI
 const HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1 = "HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1";
 const HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1 = "HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1";
 const HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1 = "HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1";
+const HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1 = "HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1";
 
 function phaseColor(phase: number): string {
   const palette: Record<number, string> = {
@@ -934,11 +935,61 @@ function trueSoundBodyZ(timeMs: number, totalDurationMs: number, scanMinZ: numbe
   return THREE.MathUtils.lerp(scanMinZ, scanMaxZ, t);
 }
 
-function createTrueSoundBodyGeometry(segment: TrueSoundBodyNoteSegment, lane: TrueSoundBodyTrackLane, laneCount: number, totalDurationMs: number, scanMinZ: number, scanMaxZ: number): THREE.BufferGeometry {
-  const points: TrueSoundBodyPoint[] = segment.waveform_points.length >= 2 ? segment.waveform_points : [
+function mutedFrequencySkinColor(midiNote: number, fallback: string): string {
+  const color = new THREE.Color(pitchClassColor(midiNote, fallback));
+  const neutral = new THREE.Color("#9fb8ae");
+  color.lerp(neutral, 0.34);
+  color.multiplyScalar(0.76);
+  return `#${color.getHexString()}`;
+}
+
+function tickerRevealTrailMs(segment: TrueSoundBodyNoteSegment, totalDurationMs: number): number {
+  return Math.max(900, Math.min(6200, Math.max(segment.duration_ms * 0.88, totalDurationMs * 0.026)));
+}
+
+function tickerRevealLeadMs(segment: TrueSoundBodyNoteSegment): number {
+  return Math.max(32, Math.min(120, segment.duration_ms * 0.035));
+}
+
+function tickerRevealPoints(segment: TrueSoundBodyNoteSegment, currentTimeMs: number, totalDurationMs: number): TrueSoundBodyPoint[] {
+  const points = segment.waveform_points.length >= 2 ? segment.waveform_points : [
     { point_index: 0, t_norm: 0, time_ms: segment.start_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: 0 },
     { point_index: 1, t_norm: 1, time_ms: segment.end_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: Math.PI }
   ];
+  const revealStart = Math.max(segment.start_ms, currentTimeMs - tickerRevealTrailMs(segment, totalDurationMs));
+  const revealEnd = Math.min(segment.end_ms, currentTimeMs + tickerRevealLeadMs(segment));
+
+  if (revealEnd <= segment.start_ms || revealStart >= segment.end_ms) {
+    return [];
+  }
+
+  const currentPoint = { ...soundBodyPointAtTime(segment, currentTimeMs), time_ms: Math.max(segment.start_ms, Math.min(segment.end_ms, currentTimeMs)) };
+  const windowed = points
+    .filter((point) => point.time_ms >= revealStart && point.time_ms <= revealEnd)
+    .sort((a, b) => a.time_ms - b.time_ms);
+
+  if (currentPoint.time_ms >= revealStart && currentPoint.time_ms <= revealEnd && !windowed.some((point) => Math.abs(point.time_ms - currentPoint.time_ms) < 1)) {
+    windowed.push(currentPoint);
+  }
+
+  windowed.sort((a, b) => a.time_ms - b.time_ms);
+
+  if (windowed.length >= 2) {
+    return windowed;
+  }
+
+  const fallbackA = { ...currentPoint, time_ms: Math.max(segment.start_ms, currentPoint.time_ms - 28) };
+  const fallbackB = { ...currentPoint, time_ms: Math.min(segment.end_ms, currentPoint.time_ms + 28), ring_phase: currentPoint.ring_phase + 0.38 };
+  return fallbackA.time_ms === fallbackB.time_ms ? [] : [fallbackA, fallbackB];
+}
+
+function createTrueSoundBodyGeometry(segment: TrueSoundBodyNoteSegment, lane: TrueSoundBodyTrackLane, laneCount: number, totalDurationMs: number, scanMinZ: number, scanMaxZ: number, currentTimeMs?: number): THREE.BufferGeometry {
+  const points: TrueSoundBodyPoint[] = typeof currentTimeMs === "number"
+    ? tickerRevealPoints(segment, currentTimeMs, totalDurationMs)
+    : (segment.waveform_points.length >= 2 ? segment.waveform_points : [
+      { point_index: 0, t_norm: 0, time_ms: segment.start_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: 0 },
+      { point_index: 1, t_norm: 1, time_ms: segment.end_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: Math.PI }
+    ]);
   const radialSegments = 44;
   const positions: number[] = [];
   const indices: number[] = [];
@@ -993,41 +1044,39 @@ function createTrueSoundBodyGeometry(segment: TrueSoundBodyNoteSegment, lane: Tr
 function TrueSoundBodyExtrusionLayer({ waveformEditorReport, playheadReport, scanMinZ, scanMaxZ }: { waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null; playheadReport?: PlayheadCursorReport | null; scanMinZ: number; scanMaxZ: number }) {
   const lanes = waveformEditorReport?.track_lanes ?? [];
   const totalDurationMs = Math.max(1, waveformEditorReport?.total_duration_ms ?? 1);
-  const activeEntries = useMemo(() => {
-    const active = new Set<string>();
-    for (const note of playheadReport?.active_notes ?? []) {
-      active.add(`${note.track_id}:${note.event_index}`);
-    }
-    return active;
-  }, [playheadReport]);
+  const currentTimeMs = activeCurrentTimeMs(playheadReport, totalDurationMs);
+  const visibleSegments = useMemo(() => lanes.flatMap((lane) => lane.note_segments
+    .filter((segment) => isSegmentCrossingTicker(segment, currentTimeMs))
+    .map((segment) => ({ lane, segment }))), [lanes, currentTimeMs]);
 
-  if (lanes.length === 0) {
+  if (lanes.length === 0 || visibleSegments.length === 0) {
     return null;
   }
 
   return (
-    <group userData={{ scene_contract: HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1, layer: "true_sound_body_extrusions" }}>
-      {lanes.flatMap((lane) => lane.note_segments.map((segment) => (
-        <TrueSoundBodyExtrusion key={segment.note_id} lane={lane} laneCount={lanes.length} segment={segment} totalDurationMs={totalDurationMs} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} active={activeEntries.has(`${segment.track_id}:${segment.event_index}`)} />
-      )))}
+    <group userData={{ scene_contract: HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1, layer: "ticker_revealed_translucent_sound_skin", current_time_ms: currentTimeMs }}>
+      {visibleSegments.map(({ lane, segment }) => (
+        <TrueSoundBodyExtrusion key={segment.note_id} lane={lane} laneCount={lanes.length} segment={segment} totalDurationMs={totalDurationMs} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} currentTimeMs={currentTimeMs} />
+      ))}
     </group>
   );
 }
 
-function TrueSoundBodyExtrusion({ lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ, active }: { lane: TrueSoundBodyTrackLane; laneCount: number; segment: TrueSoundBodyNoteSegment; totalDurationMs: number; scanMinZ: number; scanMaxZ: number; active: boolean }) {
-  const geometry = useMemo(() => createTrueSoundBodyGeometry(segment, lane, laneCount, totalDurationMs, scanMinZ, scanMaxZ), [lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ]);
-  const color = pitchClassColor(segment.midi_note, lane.lane_color);
-  const opacity = active ? 0.92 : 0.68;
+function TrueSoundBodyExtrusion({ lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ, currentTimeMs }: { lane: TrueSoundBodyTrackLane; laneCount: number; segment: TrueSoundBodyNoteSegment; totalDurationMs: number; scanMinZ: number; scanMaxZ: number; currentTimeMs: number }) {
+  const geometry = useMemo(() => createTrueSoundBodyGeometry(segment, lane, laneCount, totalDurationMs, scanMinZ, scanMaxZ, currentTimeMs), [lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ, currentTimeMs]);
+  const color = mutedFrequencySkinColor(segment.midi_note, lane.lane_color);
+  const activation = noteActivationAtTime(segment, currentTimeMs);
+  const opacity = Math.max(0.24, Math.min(0.5, 0.24 + activation * 0.24));
 
   return (
-    <group userData={{ contract_id: HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1, note_id: segment.note_id, track_id: segment.track_id, event_index: segment.event_index, note_name: segment.note_name, frequency_hz: segment.frequency_hz }}>
+    <group userData={{ contract_id: HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1, note_id: segment.note_id, track_id: segment.track_id, event_index: segment.event_index, note_name: segment.note_name, frequency_hz: segment.frequency_hz, production_visibility: "hidden_until_glass_ticker_crossing" }}>
       <mesh geometry={geometry}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.74 : 0.34} transparent opacity={opacity} roughness={0.12} metalness={0.02} depthWrite={false} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.045 + activation * 0.055} transparent opacity={opacity} roughness={0.62} metalness={0.01} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
-      <mesh geometry={geometry} scale={[1.018, 1.018, 1.002]}>
-        <meshBasicMaterial color={color} transparent opacity={active ? 0.56 : 0.28} wireframe depthWrite={false} />
+      <mesh geometry={geometry} scale={[1.006, 1.006, 1.001]}>
+        <meshBasicMaterial color="#effff8" transparent opacity={0.035 + activation * 0.045} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
-{/* Production labels are ticker-gated in TrueSoundBodyPiezoTickerLayer. */}
+{/* Production wireframe is intentionally removed. Full wire/diagnostic visibility belongs in Inspect mode only. */}
     </group>
   );
 }
@@ -1042,9 +1091,9 @@ function TrueSoundBodyPiezoTickerLayer({ waveformEditorReport, playheadReport, s
     .slice(0, 32);
 
   return (
-    <group userData={{ scene_contract: HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1, layer: "glass_ticker_only_piezoelectric_pmut_readout", current_time_ms: currentTimeMs }}>
+    <group userData={{ scene_contract: HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1, layer: "glass_ticker_only_piezoelectric_pmut_readout", current_time_ms: currentTimeMs }}>
       {activeSegments.map(({ lane, segment, activation, point }) => {
-        const color = pitchClassColor(segment.midi_note, lane.lane_color);
+        const color = mutedFrequencySkinColor(segment.midi_note, lane.lane_color);
         const x = trueSoundBodyLaneX(lane, lanes.length) + point.signed_sample * 0.74;
         const y = trueSoundBodyPitchY(segment, lane) + point.signed_sample * 0.42;
         const base = Math.max(0.58, 0.74 + segment.visual_body.radius_norm * 1.45 + point.amplitude * 0.95);
@@ -1071,7 +1120,7 @@ function TrueSoundBodyPiezoTickerLayer({ waveformEditorReport, playheadReport, s
                 anchorY="middle"
                 outlineWidth={0.018}
                 outlineColor="#010407"
-                userData={{ label_contract: HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1, note_id: segment.note_id, readout_mode: "glass_crossing_only" }}
+                userData={{ label_contract: HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1, note_id: segment.note_id, readout_mode: "glass_crossing_only" }}
               >
                 {`${segment.note_name} · ${segment.frequency_hz.toFixed(2)} Hz`}
               </Text>

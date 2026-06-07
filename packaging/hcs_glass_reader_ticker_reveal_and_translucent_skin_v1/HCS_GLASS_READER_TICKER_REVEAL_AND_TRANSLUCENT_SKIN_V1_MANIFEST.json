@@ -1,0 +1,18 @@
+{
+  "patch_id": "HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1",
+  "expected_base": "8d7a672 Add Glass Reader long air waveform ticker readout v1",
+  "purpose": "Hide production waveform bodies until the glass timing ticker crosses them, reveal a translucent muted frequency skin at the active time slice, keep note/frequency labels gated to glass crossing, and remove production wireframe clutter.",
+  "files": [
+    "src/components/HfieldVolumetricPacketField.tsx",
+    "src/style.css"
+  ],
+  "production_rules": {
+    "waveform_visibility": "hidden_until_glass_ticker_crossing",
+    "future_waveforms": "invisible",
+    "visible_body": "ticker_revealed_translucent_sound_skin",
+    "labels": "note_and_frequency_only_at_glass_crossing",
+    "wireframe": "inspection_only_not_production",
+    "color": "muted_pitch_class_frequency_skin"
+  },
+  "inspection_rule": "Raw/debug material remains reserved for Inspect mode and Advanced panels."
+}

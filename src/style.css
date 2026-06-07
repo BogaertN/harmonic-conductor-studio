@@ -3190,3 +3190,25 @@ body {
 .field-reader-stage-hint::after {
   content: " · readout only at glass crossing · HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1";
 }
+
+/* HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1 */
+.field-canvas-shell.carrier-reader-canvas-shell {
+  min-height: clamp(980px, 74vh, 1360px) !important;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(86, 214, 255, 0.052), transparent 42%),
+    radial-gradient(circle at 52% 74%, rgba(246, 211, 107, 0.028), transparent 38%),
+    linear-gradient(180deg, rgba(0, 3, 7, 0.998), rgba(0, 1, 4, 0.998)) !important;
+}
+
+.field-reader-focus-active .carrier-reader-canvas-shell {
+  height: min(90vh, calc(100vh - 158px)) !important;
+}
+
+.field-reader-stage-hint::before {
+  content: "Ticker reveal chamber: waveform bodies stay hidden until the glass timing plane reads them · muted translucent frequency skin · ";
+}
+
+.field-reader-stage-hint::after {
+  content: " · note/frequency labels only at glass crossing · HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1";
+}
+/* END HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1 */
