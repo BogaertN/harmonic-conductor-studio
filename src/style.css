@@ -3169,3 +3169,24 @@ body {
   color: rgba(86, 214, 255, 0.9);
 }
 /* END HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1 */
+
+/* HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1 */
+.field-canvas-shell.carrier-reader-canvas-shell {
+  min-height: clamp(920px, 72vh, 1280px) !important;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(86, 214, 255, 0.07), transparent 38%),
+    radial-gradient(circle at 50% 80%, rgba(246, 211, 107, 0.035), transparent 36%),
+    linear-gradient(180deg, rgba(0, 3, 7, 0.998), rgba(0, 1, 4, 0.998)) !important;
+}
+
+.field-reader-focus-active .carrier-reader-canvas-shell {
+  height: min(88vh, calc(100vh - 172px)) !important;
+}
+
+.field-reader-stage-hint::before {
+  content: "Long air waveform chamber: huge stretched floating sound bodies · glass plane = timing ticker · ";
+}
+
+.field-reader-stage-hint::after {
+  content: " · readout only at glass crossing · HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1";
+}

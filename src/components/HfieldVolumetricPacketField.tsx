@@ -38,6 +38,7 @@ const HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1 = "HCS_SCORE_SPINE_CONDUCTO
 const HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1 = "HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1";
 const HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1 = "HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1";
 const HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1 = "HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1";
+const HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1 = "HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1";
 
 function phaseColor(phase: number): string {
   const palette: Record<number, string> = {
@@ -915,13 +916,17 @@ function ActiveGestureInfluenceLayer({ fieldReport, playheadReport, scanMinZ, sc
 
 function trueSoundBodyLaneX(lane: TrueSoundBodyTrackLane, laneCount: number): number {
   const center = (laneCount - 1) / 2;
-  return (lane.lane_index - center) * 2.15;
+  return (lane.lane_index - center) * 4.45;
 }
 
 function trueSoundBodyPitchY(segment: TrueSoundBodyNoteSegment, lane: TrueSoundBodyTrackLane): number {
-  const laneBase = 0.82 + lane.lane_index * 0.92;
+  const laneBase = 1.35 + lane.lane_index * 2.35;
   const pitchLift = (50 - segment.pitch_y_percent) / 100;
-  return laneBase + pitchLift * 1.24;
+  return laneBase + pitchLift * 2.15;
+}
+
+function isSegmentCrossingTicker(segment: TrueSoundBodyNoteSegment, currentTimeMs: number): boolean {
+  return currentTimeMs >= segment.start_ms && currentTimeMs <= segment.end_ms;
 }
 
 function trueSoundBodyZ(timeMs: number, totalDurationMs: number, scanMinZ: number, scanMaxZ: number): number {
@@ -934,29 +939,29 @@ function createTrueSoundBodyGeometry(segment: TrueSoundBodyNoteSegment, lane: Tr
     { point_index: 0, t_norm: 0, time_ms: segment.start_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: 0 },
     { point_index: 1, t_norm: 1, time_ms: segment.end_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: Math.PI }
   ];
-  const radialSegments = 34;
+  const radialSegments = 44;
   const positions: number[] = [];
   const indices: number[] = [];
   const laneX = trueSoundBodyLaneX(lane, laneCount);
   const pitchY = trueSoundBodyPitchY(segment, lane);
-  const maxRadius = Math.max(0.12, 0.18 + segment.visual_body.radius_norm * 0.42);
+  const maxRadius = Math.max(0.32, 0.42 + segment.visual_body.radius_norm * 1.18);
 
   points.forEach((point) => {
     const z = trueSoundBodyZ(point.time_ms, totalDurationMs, scanMinZ, scanMaxZ);
-    const waveOffsetX = point.signed_sample * (0.34 + segment.velocity * 0.22);
-    const waveOffsetY = point.signed_sample * (0.22 + segment.velocity * 0.14);
+    const waveOffsetX = point.signed_sample * (0.78 + segment.velocity * 0.42);
+    const waveOffsetY = point.signed_sample * (0.46 + segment.velocity * 0.3);
     const centerX = laneX + waveOffsetX;
     const centerY = pitchY + waveOffsetY;
     const envelope = Math.max(point.envelope, point.amplitude);
-    const radius = Math.max(0.07, maxRadius * (0.52 + envelope * 1.42 + point.local_thickness * 0.34));
+    const radius = Math.max(0.24, maxRadius * (0.76 + envelope * 2.18 + point.local_thickness * 0.62));
 
     for (let column = 0; column < radialSegments; column += 1) {
       const angle = (column / radialSegments) * Math.PI * 2;
       const harmonicLobe = 3 + (Math.round(segment.midi_note) % 5);
-      const ring = 1 + Math.sin(angle * harmonicLobe + point.ring_phase) * 0.14;
+      const ring = 1 + Math.sin(angle * harmonicLobe + point.ring_phase) * 0.22 + Math.sin(angle * (harmonicLobe + 3) - point.ring_phase * 0.5) * 0.075;
       positions.push(
         centerX + Math.cos(angle) * radius * ring,
-        centerY + Math.sin(angle) * radius * 0.78 * ring,
+        centerY + Math.sin(angle) * radius * 0.86 * ring,
         z
       );
     }
@@ -1012,11 +1017,7 @@ function TrueSoundBodyExtrusionLayer({ waveformEditorReport, playheadReport, sca
 function TrueSoundBodyExtrusion({ lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ, active }: { lane: TrueSoundBodyTrackLane; laneCount: number; segment: TrueSoundBodyNoteSegment; totalDurationMs: number; scanMinZ: number; scanMaxZ: number; active: boolean }) {
   const geometry = useMemo(() => createTrueSoundBodyGeometry(segment, lane, laneCount, totalDurationMs, scanMinZ, scanMaxZ), [lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ]);
   const color = pitchClassColor(segment.midi_note, lane.lane_color);
-  const labelColor = active ? "#fff7c9" : color;
-  const opacity = active ? 0.82 : 0.58;
-  const midpointMs = segment.start_ms + segment.duration_ms / 2;
-  const midpointZ = trueSoundBodyZ(midpointMs, totalDurationMs, scanMinZ, scanMaxZ);
-  const labelVisible = active || segment.duration_ms >= 1100 || segment.event_index % 16 === 0;
+  const opacity = active ? 0.92 : 0.68;
 
   return (
     <group userData={{ contract_id: HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1, note_id: segment.note_id, track_id: segment.track_id, event_index: segment.event_index, note_name: segment.note_name, frequency_hz: segment.frequency_hz }}>
@@ -1026,20 +1027,7 @@ function TrueSoundBodyExtrusion({ lane, laneCount, segment, totalDurationMs, sca
       <mesh geometry={geometry} scale={[1.018, 1.018, 1.002]}>
         <meshBasicMaterial color={color} transparent opacity={active ? 0.56 : 0.28} wireframe depthWrite={false} />
       </mesh>
-      {labelVisible ? (
-        <Text
-          position={[trueSoundBodyLaneX(lane, laneCount), trueSoundBodyPitchY(segment, lane) + 0.52, midpointZ]}
-          fontSize={active ? 0.22 : 0.15}
-          color={labelColor}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.012}
-          outlineColor="#010407"
-          userData={{ label_contract: HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1, note_id: segment.note_id }}
-        >
-          {`${segment.note_name} · ${segment.frequency_hz.toFixed(1)}Hz`}
-        </Text>
-      ) : null}
+{/* Production labels are ticker-gated in TrueSoundBodyPiezoTickerLayer. */}
     </group>
   );
 }
@@ -1049,42 +1037,43 @@ function TrueSoundBodyPiezoTickerLayer({ waveformEditorReport, playheadReport, s
   const totalDurationMs = Math.max(1, waveformEditorReport?.total_duration_ms ?? 1);
   const currentTimeMs = activeCurrentTimeMs(playheadReport, totalDurationMs);
   const scanZ = trueSoundBodyZ(currentTimeMs, totalDurationMs, scanMinZ, scanMaxZ);
-  const activeSegments = lanes.flatMap((lane) => lane.note_segments.map((segment) => ({ lane, segment, activation: noteActivationAtTime(segment, currentTimeMs), point: soundBodyPointAtTime(segment, currentTimeMs) })))
-    .filter((entry) => entry.activation > 0.02)
-    .slice(0, 24);
+  const activeSegments = lanes.flatMap((lane) => lane.note_segments.map((segment) => ({ lane, segment, activation: noteActivationAtTime(segment, currentTimeMs), point: soundBodyPointAtTime(segment, currentTimeMs), crossing: isSegmentCrossingTicker(segment, currentTimeMs) })))
+    .filter((entry) => entry.crossing)
+    .slice(0, 32);
 
   return (
-    <group userData={{ scene_contract: HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1, layer: "piezoelectric_pmut_cymatic_ticker", current_time_ms: currentTimeMs }}>
+    <group userData={{ scene_contract: HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1, layer: "glass_ticker_only_piezoelectric_pmut_readout", current_time_ms: currentTimeMs }}>
       {activeSegments.map(({ lane, segment, activation, point }) => {
         const color = pitchClassColor(segment.midi_note, lane.lane_color);
-        const x = trueSoundBodyLaneX(lane, lanes.length) + point.signed_sample * 0.3;
-        const y = trueSoundBodyPitchY(segment, lane) + point.signed_sample * 0.18;
-        const base = Math.max(0.18, 0.28 + segment.visual_body.radius_norm * 0.52 + point.amplitude * 0.38);
-        const ringCount = Math.min(5, Math.max(2, Math.round(segment.visual_body.ring_count / 7)));
+        const x = trueSoundBodyLaneX(lane, lanes.length) + point.signed_sample * 0.74;
+        const y = trueSoundBodyPitchY(segment, lane) + point.signed_sample * 0.42;
+        const base = Math.max(0.58, 0.74 + segment.visual_body.radius_norm * 1.45 + point.amplitude * 0.95);
+        const ringCount = Math.min(9, Math.max(3, Math.round(segment.visual_body.ring_count / 4)));
 
         return (
           <group key={`piezo-ticker-${segment.note_id}`} position={[x, y, scanZ]} userData={{ note_id: segment.note_id, note_name: segment.note_name, frequency_hz: segment.frequency_hz }}>
             {Array.from({ length: ringCount }).map((_, index) => (
               <mesh key={`ring-${index}`}>
-                <torusGeometry args={[base * (1 + index * 0.34), 0.012 + activation * 0.012, 12, 96]} />
-                <meshBasicMaterial color={color} transparent opacity={(0.42 - index * 0.055) * activation} depthWrite={false} />
+                <torusGeometry args={[base * (1 + index * 0.26), 0.018 + activation * 0.018, 16, 128]} />
+                <meshBasicMaterial color={color} transparent opacity={Math.max(0.035, (0.54 - index * 0.048) * activation)} depthWrite={false} />
               </mesh>
             ))}
             <mesh>
-              <circleGeometry args={[base * 0.18, 36]} />
-              <meshBasicMaterial color={color} transparent opacity={0.22 + activation * 0.34} depthWrite={false} side={THREE.DoubleSide} />
+              <circleGeometry args={[base * 0.28, 48]} />
+              <meshBasicMaterial color={color} transparent opacity={0.2 + activation * 0.46} depthWrite={false} side={THREE.DoubleSide} />
             </mesh>
-            {activation > 0.6 ? (
+            {activation > 0.38 ? (
               <Text
-                position={[0, base * 0.92, 0.018]}
-                fontSize={0.18}
+                position={[0, base * 1.18, 0.07]}
+                fontSize={0.34}
                 color="#fff7c9"
                 anchorX="center"
                 anchorY="middle"
-                outlineWidth={0.012}
+                outlineWidth={0.018}
                 outlineColor="#010407"
+                userData={{ label_contract: HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1, note_id: segment.note_id, readout_mode: "glass_crossing_only" }}
               >
-                {segment.note_name}
+                {`${segment.note_name} · ${segment.frequency_hz.toFixed(2)} Hz`}
               </Text>
             ) : null}
           </group>
@@ -1315,12 +1304,12 @@ export default function HfieldVolumetricPacketField({
   const inspectionMode = readerMode === "inspection";
   const showProductionComposer = readerMode === "production";
   const hasTrueSoundBodyReport = (waveformEditorReport?.segment_count ?? 0) > 0;
-  const scanMinZ = showProductionComposer && hasTrueSoundBodyReport ? -13.5 : rawScanMinZ;
-  const scanMaxZ = showProductionComposer && hasTrueSoundBodyReport ? 13.5 : rawScanMaxZ;
-  const fieldWidth = showProductionComposer && hasTrueSoundBodyReport ? Math.max(rawFieldWidth, 10.8) : rawFieldWidth;
-  const fieldHeight = showProductionComposer && hasTrueSoundBodyReport ? Math.max(rawFieldHeight, 6.2) : rawFieldHeight;
+  const scanMinZ = showProductionComposer && hasTrueSoundBodyReport ? -96 : rawScanMinZ;
+  const scanMaxZ = showProductionComposer && hasTrueSoundBodyReport ? 96 : rawScanMaxZ;
+  const fieldWidth = showProductionComposer && hasTrueSoundBodyReport ? Math.max(rawFieldWidth, 18.5) : rawFieldWidth;
+  const fieldHeight = showProductionComposer && hasTrueSoundBodyReport ? Math.max(rawFieldHeight, 12.4) : rawFieldHeight;
   const visibleBodies = useMemo(() => inspectionMode ? bodies : (hasTrueSoundBodyReport ? [] : bodies.filter((body) => body.layer_key === "payload_tone")), [bodies, hasTrueSoundBodyReport, inspectionMode]);
-  const controlsTarget: [number, number, number] = cameraPresetId === "through-wave" ? [0, 1.95, 0.25] : cameraPresetId === "glass-plane" ? [0, 2.0, 0] : [0, 2.25, 0];
+  const controlsTarget: [number, number, number] = cameraPresetId === "through-wave" ? [0, 4.4, 0.25] : cameraPresetId === "glass-plane" ? [0, 4.75, 0] : cameraPresetId === "active-follow" ? [0, 4.85, 0] : [0, 4.9, 0];
 
   useFrame(() => {
     const progress = baseProgress ?? 0;
@@ -1362,8 +1351,8 @@ export default function HfieldVolumetricPacketField({
         enableZoom
         enableRotate
         autoRotate={false}
-        minDistance={1.45}
-        maxDistance={16}
+        minDistance={2.2}
+        maxDistance={190}
         target={controlsTarget}
       />
 
@@ -1405,7 +1394,7 @@ export default function HfieldVolumetricPacketField({
             emissive="#6ae8ff"
             emissiveIntensity={0.16}
             transparent
-            opacity={inspectionMode ? 0.18 : 0.105}
+            opacity={inspectionMode ? 0.18 : 0.145}
             roughness={0.04}
             metalness={0.08}
             side={THREE.DoubleSide}

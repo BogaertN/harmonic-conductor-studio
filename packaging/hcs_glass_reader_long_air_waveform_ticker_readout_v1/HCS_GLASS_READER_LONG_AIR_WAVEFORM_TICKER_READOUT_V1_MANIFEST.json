@@ -1,0 +1,12 @@
+{
+  "patch_id": "HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1",
+  "base_expected": "7e0616b Add Glass Reader air waveform piezo ticker v1",
+  "scope": [
+    "src/components/HfieldVolumetricPacketField.tsx",
+    "src/components/HfieldPhaseFieldViewport.tsx",
+    "src/style.css"
+  ],
+  "production_target": "huge stretched floating waveform bodies with glass-ticker-only note/frequency readouts",
+  "inspection_boundary": "raw rails, grids, carriers, traces, and debug overlays remain inspection-only",
+  "lock_condition": "all gates pass, git commit succeeds, final git status is clean, and Nic visually confirms the Glass Reader readout behavior"
+}

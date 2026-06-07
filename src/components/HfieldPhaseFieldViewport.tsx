@@ -318,15 +318,15 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
     : "panel field-viewport-panel carrier-reader-panel";
 
   const cameraPosition: [number, number, number] = cameraPresetId === "through-wave"
-    ? [0, 2.08, 17.2]
+    ? [0, 4.6, 58]
     : cameraPresetId === "glass-plane"
-      ? [0, 2.45, 7.4]
+      ? [10.5, 6.1, 18]
       : cameraPresetId === "active-follow"
-        ? [3.8, 2.35, 7.8]
+        ? [9.5, 5.8, 24]
         : isFocusMode
-          ? [0, 2.6, 11.6]
-          : [0, 3.05, 13.8];
-  const cameraFov = cameraPresetId === "through-wave" ? 24 : cameraPresetId === "glass-plane" ? 34 : isFocusMode ? 28 : 30;
+          ? [0, 6.25, 48]
+          : [0, 6.85, 62];
+  const cameraFov = cameraPresetId === "through-wave" ? 18 : cameraPresetId === "glass-plane" ? 26 : isFocusMode ? 20 : 22;
   const activeNoteProof = playheadReport?.active_notes.map((note) => `${note.track_id}:${note.event_index}:${note.note_name}`).join(" · ") || "—";
   const activeCueProof = playheadReport?.active_conductor_cue
     ? `${playheadReport.active_conductor_cue.gesture_id}:${playheadReport.active_conductor_cue.event_index}`
@@ -369,7 +369,7 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
         <Canvas key={`carrier-reader-${readerMode}-${cameraPresetId}-${isFocusMode ? "focus" : "inline"}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
           <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} isPlaying={isPlaying} readerMode={readerMode} cameraPresetId={cameraPresetId} />
         </Canvas>
-        <div className="field-reader-stage-hint">Production shows floating note-colored waveform bodies only. The glass ticker is the moving time plane; when a waveform intersects it, the active note blooms into piezoelectric MEMS / PMUT-style cymatic rings.</div>
+        <div className="field-reader-stage-hint">Production shows huge stretched floating waveform bodies only. The glass plane is the timing ticker; note name and frequency readouts appear only when the waveform crosses the glass.</div>
       </div>
 
       <div className="glass-reader-sync-proof-v1" aria-label="Glass Reader sync proof">
