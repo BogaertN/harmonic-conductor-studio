@@ -1,4 +1,4 @@
-import { Line, OrbitControls } from "@react-three/drei";
+import { Line, OrbitControls, Text } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -37,6 +37,7 @@ const HCS_WAVEFORM_TO_3D_FIELD_BODY_V1_CONTRACT_ID = "aiweb.hfield.waveform_to_3
 const HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1 = "HCS_SCORE_SPINE_CONDUCTOR_GLASS_READER_SYNC_V1";
 const HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1 = "HCS_GLASS_READER_PRODUCTION_SCENE_COMPOSER_V1";
 const HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1 = "HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1";
+const HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1 = "HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1";
 
 function phaseColor(phase: number): string {
   const palette: Record<number, string> = {
@@ -52,6 +53,89 @@ function phaseColor(phase: number): string {
   };
 
   return palette[phase] ?? "#d8e4ff";
+}
+
+
+function pitchClassColor(midiNote: number | null | undefined, fallback = "#fff2ad"): string {
+  if (typeof midiNote !== "number" || !Number.isFinite(midiNote)) {
+    return fallback;
+  }
+
+  const palette = [
+    "#ff5c66", // C
+    "#ff7f3f", // C# / Db
+    "#ffb23f", // D
+    "#f6d36b", // D# / Eb
+    "#fff2ad", // E
+    "#bafc7a", // F
+    "#64f29a", // F# / Gb
+    "#46ffd2", // G
+    "#56d6ff", // G# / Ab
+    "#63a4ff", // A
+    "#9d7cff", // A# / Bb
+    "#f06aff"  // B
+  ];
+
+  return palette[((Math.round(midiNote) % 12) + 12) % 12] ?? fallback;
+}
+
+function activeCurrentTimeMs(playheadReport: PlayheadCursorReport | null | undefined, fallbackTotalDurationMs: number): number {
+  const records = collectRecords(playheadReport);
+  const record = records[0];
+
+  if (!record) {
+    return 0;
+  }
+
+  const now = firstNumber(record, ["current_time_ms", "current_ms", "time_ms"]);
+  if (now !== null) {
+    return Math.max(0, now);
+  }
+
+  const progress = currentPlayheadProgress(playheadReport) ?? 0;
+  return Math.max(0, progress * Math.max(1, fallbackTotalDurationMs));
+}
+
+function noteActivationAtTime(segment: TrueSoundBodyNoteSegment, currentTimeMs: number): number {
+  const feather = Math.max(95, Math.min(420, segment.duration_ms * 0.18));
+  const start = segment.start_ms;
+  const end = segment.end_ms;
+
+  if (currentTimeMs < start - feather || currentTimeMs > end + feather) {
+    return 0;
+  }
+
+  if (currentTimeMs >= start && currentTimeMs <= end) {
+    const edgeDistance = Math.min(currentTimeMs - start, end - currentTimeMs);
+    return Math.max(0.42, Math.min(1, 0.42 + edgeDistance / feather));
+  }
+
+  if (currentTimeMs < start) {
+    return Math.max(0, 1 - (start - currentTimeMs) / feather) * 0.42;
+  }
+
+  return Math.max(0, 1 - (currentTimeMs - end) / feather) * 0.42;
+}
+
+function soundBodyPointAtTime(segment: TrueSoundBodyNoteSegment, currentTimeMs: number): TrueSoundBodyPoint {
+  const points = segment.waveform_points;
+
+  if (points.length === 0) {
+    return { point_index: 0, t_norm: 0, time_ms: segment.start_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: 0 };
+  }
+
+  let nearest = points[0];
+  let distance = Math.abs(points[0].time_ms - currentTimeMs);
+
+  for (const point of points) {
+    const nextDistance = Math.abs(point.time_ms - currentTimeMs);
+    if (nextDistance < distance) {
+      nearest = point;
+      distance = nextDistance;
+    }
+  }
+
+  return nearest;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -831,13 +915,13 @@ function ActiveGestureInfluenceLayer({ fieldReport, playheadReport, scanMinZ, sc
 
 function trueSoundBodyLaneX(lane: TrueSoundBodyTrackLane, laneCount: number): number {
   const center = (laneCount - 1) / 2;
-  return (lane.lane_index - center) * 0.86;
+  return (lane.lane_index - center) * 2.15;
 }
 
 function trueSoundBodyPitchY(segment: TrueSoundBodyNoteSegment, lane: TrueSoundBodyTrackLane): number {
-  const laneBase = 0.58 + lane.lane_index * 0.34;
+  const laneBase = 0.82 + lane.lane_index * 0.92;
   const pitchLift = (50 - segment.pitch_y_percent) / 100;
-  return laneBase + pitchLift * 0.72;
+  return laneBase + pitchLift * 1.24;
 }
 
 function trueSoundBodyZ(timeMs: number, totalDurationMs: number, scanMinZ: number, scanMaxZ: number): number {
@@ -850,28 +934,29 @@ function createTrueSoundBodyGeometry(segment: TrueSoundBodyNoteSegment, lane: Tr
     { point_index: 0, t_norm: 0, time_ms: segment.start_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: 0 },
     { point_index: 1, t_norm: 1, time_ms: segment.end_ms, signed_sample: 0, amplitude: 0, envelope: 0, upper_y: 0.5, lower_y: 0.5, radius: 0.08, local_thickness: 0.08, ring_phase: Math.PI }
   ];
-  const radialSegments = 22;
+  const radialSegments = 34;
   const positions: number[] = [];
   const indices: number[] = [];
   const laneX = trueSoundBodyLaneX(lane, laneCount);
   const pitchY = trueSoundBodyPitchY(segment, lane);
-  const maxRadius = Math.max(0.035, segment.visual_body.radius_norm * 0.12);
+  const maxRadius = Math.max(0.12, 0.18 + segment.visual_body.radius_norm * 0.42);
 
   points.forEach((point) => {
     const z = trueSoundBodyZ(point.time_ms, totalDurationMs, scanMinZ, scanMaxZ);
-    const waveOffsetX = point.signed_sample * (0.11 + segment.velocity * 0.08);
-    const waveOffsetY = point.signed_sample * (0.08 + segment.velocity * 0.04);
+    const waveOffsetX = point.signed_sample * (0.34 + segment.velocity * 0.22);
+    const waveOffsetY = point.signed_sample * (0.22 + segment.velocity * 0.14);
     const centerX = laneX + waveOffsetX;
     const centerY = pitchY + waveOffsetY;
     const envelope = Math.max(point.envelope, point.amplitude);
-    const radius = Math.max(0.018, maxRadius * (0.42 + envelope * 1.24 + point.local_thickness * 0.22));
+    const radius = Math.max(0.07, maxRadius * (0.52 + envelope * 1.42 + point.local_thickness * 0.34));
 
     for (let column = 0; column < radialSegments; column += 1) {
       const angle = (column / radialSegments) * Math.PI * 2;
-      const ring = 1 + Math.sin(angle * 3 + point.ring_phase) * 0.055;
+      const harmonicLobe = 3 + (Math.round(segment.midi_note) % 5);
+      const ring = 1 + Math.sin(angle * harmonicLobe + point.ring_phase) * 0.14;
       positions.push(
         centerX + Math.cos(angle) * radius * ring,
-        centerY + Math.sin(angle) * radius * 0.72 * ring,
+        centerY + Math.sin(angle) * radius * 0.78 * ring,
         z
       );
     }
@@ -926,17 +1011,85 @@ function TrueSoundBodyExtrusionLayer({ waveformEditorReport, playheadReport, sca
 
 function TrueSoundBodyExtrusion({ lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ, active }: { lane: TrueSoundBodyTrackLane; laneCount: number; segment: TrueSoundBodyNoteSegment; totalDurationMs: number; scanMinZ: number; scanMaxZ: number; active: boolean }) {
   const geometry = useMemo(() => createTrueSoundBodyGeometry(segment, lane, laneCount, totalDurationMs, scanMinZ, scanMaxZ), [lane, laneCount, segment, totalDurationMs, scanMinZ, scanMaxZ]);
-  const color = lane.lane_color;
-  const opacity = active ? 0.62 : 0.38;
+  const color = pitchClassColor(segment.midi_note, lane.lane_color);
+  const labelColor = active ? "#fff7c9" : color;
+  const opacity = active ? 0.82 : 0.58;
+  const midpointMs = segment.start_ms + segment.duration_ms / 2;
+  const midpointZ = trueSoundBodyZ(midpointMs, totalDurationMs, scanMinZ, scanMaxZ);
+  const labelVisible = active || segment.duration_ms >= 1100 || segment.event_index % 16 === 0;
 
   return (
-    <group userData={{ contract_id: HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1, note_id: segment.note_id, track_id: segment.track_id, event_index: segment.event_index }}>
+    <group userData={{ contract_id: HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1, note_id: segment.note_id, track_id: segment.track_id, event_index: segment.event_index, note_name: segment.note_name, frequency_hz: segment.frequency_hz }}>
       <mesh geometry={geometry}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.54 : 0.24} transparent opacity={opacity} roughness={0.16} metalness={0.04} depthWrite={false} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.74 : 0.34} transparent opacity={opacity} roughness={0.12} metalness={0.02} depthWrite={false} />
       </mesh>
       <mesh geometry={geometry} scale={[1.018, 1.018, 1.002]}>
-        <meshBasicMaterial color={color} transparent opacity={active ? 0.42 : 0.2} wireframe depthWrite={false} />
+        <meshBasicMaterial color={color} transparent opacity={active ? 0.56 : 0.28} wireframe depthWrite={false} />
       </mesh>
+      {labelVisible ? (
+        <Text
+          position={[trueSoundBodyLaneX(lane, laneCount), trueSoundBodyPitchY(segment, lane) + 0.52, midpointZ]}
+          fontSize={active ? 0.22 : 0.15}
+          color={labelColor}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.012}
+          outlineColor="#010407"
+          userData={{ label_contract: HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1, note_id: segment.note_id }}
+        >
+          {`${segment.note_name} · ${segment.frequency_hz.toFixed(1)}Hz`}
+        </Text>
+      ) : null}
+    </group>
+  );
+}
+
+function TrueSoundBodyPiezoTickerLayer({ waveformEditorReport, playheadReport, scanMinZ, scanMaxZ }: { waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null; playheadReport?: PlayheadCursorReport | null; scanMinZ: number; scanMaxZ: number }) {
+  const lanes = waveformEditorReport?.track_lanes ?? [];
+  const totalDurationMs = Math.max(1, waveformEditorReport?.total_duration_ms ?? 1);
+  const currentTimeMs = activeCurrentTimeMs(playheadReport, totalDurationMs);
+  const scanZ = trueSoundBodyZ(currentTimeMs, totalDurationMs, scanMinZ, scanMaxZ);
+  const activeSegments = lanes.flatMap((lane) => lane.note_segments.map((segment) => ({ lane, segment, activation: noteActivationAtTime(segment, currentTimeMs), point: soundBodyPointAtTime(segment, currentTimeMs) })))
+    .filter((entry) => entry.activation > 0.02)
+    .slice(0, 24);
+
+  return (
+    <group userData={{ scene_contract: HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1, layer: "piezoelectric_pmut_cymatic_ticker", current_time_ms: currentTimeMs }}>
+      {activeSegments.map(({ lane, segment, activation, point }) => {
+        const color = pitchClassColor(segment.midi_note, lane.lane_color);
+        const x = trueSoundBodyLaneX(lane, lanes.length) + point.signed_sample * 0.3;
+        const y = trueSoundBodyPitchY(segment, lane) + point.signed_sample * 0.18;
+        const base = Math.max(0.18, 0.28 + segment.visual_body.radius_norm * 0.52 + point.amplitude * 0.38);
+        const ringCount = Math.min(5, Math.max(2, Math.round(segment.visual_body.ring_count / 7)));
+
+        return (
+          <group key={`piezo-ticker-${segment.note_id}`} position={[x, y, scanZ]} userData={{ note_id: segment.note_id, note_name: segment.note_name, frequency_hz: segment.frequency_hz }}>
+            {Array.from({ length: ringCount }).map((_, index) => (
+              <mesh key={`ring-${index}`}>
+                <torusGeometry args={[base * (1 + index * 0.34), 0.012 + activation * 0.012, 12, 96]} />
+                <meshBasicMaterial color={color} transparent opacity={(0.42 - index * 0.055) * activation} depthWrite={false} />
+              </mesh>
+            ))}
+            <mesh>
+              <circleGeometry args={[base * 0.18, 36]} />
+              <meshBasicMaterial color={color} transparent opacity={0.22 + activation * 0.34} depthWrite={false} side={THREE.DoubleSide} />
+            </mesh>
+            {activation > 0.6 ? (
+              <Text
+                position={[0, base * 0.92, 0.018]}
+                fontSize={0.18}
+                color="#fff7c9"
+                anchorX="center"
+                anchorY="middle"
+                outlineWidth={0.012}
+                outlineColor="#010407"
+              >
+                {segment.note_name}
+              </Text>
+            ) : null}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1147,11 +1300,11 @@ export default function HfieldVolumetricPacketField({
   const scanRef = useRef<THREE.Group | null>(null);
   const sliceRefs = useRef<Array<THREE.Group | null>>([]);
 
-  const scanMinZ = renderManifest?.scan_min_z ?? -3.65;
-  const scanMaxZ = renderManifest?.scan_max_z ?? 3.65;
-  const fieldWidth = renderManifest?.field_width ?? 8.4;
-  const fieldHeight = renderManifest?.field_height ?? 3.8;
-  const totalDurationMs = Math.max(1, renderManifest?.total_duration_ms ?? 8000);
+  const rawScanMinZ = renderManifest?.scan_min_z ?? -3.65;
+  const rawScanMaxZ = renderManifest?.scan_max_z ?? 3.65;
+  const rawFieldWidth = renderManifest?.field_width ?? 8.4;
+  const rawFieldHeight = renderManifest?.field_height ?? 3.8;
+  const totalDurationMs = Math.max(1, renderManifest?.total_duration_ms ?? waveformEditorReport?.total_duration_ms ?? 8000);
   const bodies = useMemo(() => renderManifest?.field_bodies ?? [], [renderManifest]);
   const bridges = useMemo(() => renderManifest?.bridge_bodies ?? [], [renderManifest]);
   const referenceLines = useMemo(() => renderManifest?.reference_lines ?? [], [renderManifest]);
@@ -1162,8 +1315,12 @@ export default function HfieldVolumetricPacketField({
   const inspectionMode = readerMode === "inspection";
   const showProductionComposer = readerMode === "production";
   const hasTrueSoundBodyReport = (waveformEditorReport?.segment_count ?? 0) > 0;
+  const scanMinZ = showProductionComposer && hasTrueSoundBodyReport ? -13.5 : rawScanMinZ;
+  const scanMaxZ = showProductionComposer && hasTrueSoundBodyReport ? 13.5 : rawScanMaxZ;
+  const fieldWidth = showProductionComposer && hasTrueSoundBodyReport ? Math.max(rawFieldWidth, 10.8) : rawFieldWidth;
+  const fieldHeight = showProductionComposer && hasTrueSoundBodyReport ? Math.max(rawFieldHeight, 6.2) : rawFieldHeight;
   const visibleBodies = useMemo(() => inspectionMode ? bodies : (hasTrueSoundBodyReport ? [] : bodies.filter((body) => body.layer_key === "payload_tone")), [bodies, hasTrueSoundBodyReport, inspectionMode]);
-  const controlsTarget: [number, number, number] = cameraPresetId === "through-wave" ? [0, 0.95, 0.25] : cameraPresetId === "glass-plane" ? [0, 0.75, 0] : [0, 1.25, 0];
+  const controlsTarget: [number, number, number] = cameraPresetId === "through-wave" ? [0, 1.95, 0.25] : cameraPresetId === "glass-plane" ? [0, 2.0, 0] : [0, 2.25, 0];
 
   useFrame(() => {
     const progress = baseProgress ?? 0;
@@ -1210,12 +1367,13 @@ export default function HfieldVolumetricPacketField({
         target={controlsTarget}
       />
 
-      <ReaderGrid width={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
-      <GlassReaderSurfaceLayer cymaticReport={cymaticReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} />
+      {inspectionMode ? <ReaderGrid width={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {inspectionMode ? <GlassReaderSurfaceLayer cymaticReport={cymaticReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
       {showProductionComposer && hasTrueSoundBodyReport ? <TrueSoundBodyExtrusionLayer waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {showProductionComposer && hasTrueSoundBodyReport ? <TrueSoundBodyPiezoTickerLayer waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
       {showProductionComposer && !hasTrueSoundBodyReport ? <ProductionWaveformTrackCorridors waveformBodyReport={waveformBodyReport} bodies={bodies} /> : null}
       {inspectionMode ? <CarrierRippleLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
-      <ConductorGestureFlowLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} inspection={inspectionMode} />
+      {inspectionMode ? <ConductorGestureFlowLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} inspection={inspectionMode} /> : null}
 
       {inspectionMode ? <RuntimePathRailsLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
       {inspectionMode ? <CarrierTimeSliceLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
@@ -1240,29 +1398,29 @@ export default function HfieldVolumetricPacketField({
       )) : null}
 
       <group ref={scanRef}>
-        <mesh position={[0, fieldHeight / 2 - 0.04, 0]}>
-          <boxGeometry args={[fieldWidth + 1.0, fieldHeight, 0.025]} />
+        <mesh position={[0, fieldHeight / 2 - 0.08, 0]}>
+          <boxGeometry args={[fieldWidth + 1.35, fieldHeight, 0.018]} />
           <meshStandardMaterial
             color="#d8fbff"
             emissive="#6ae8ff"
-            emissiveIntensity={0.1}
+            emissiveIntensity={0.16}
             transparent
-            opacity={0.18}
-            roughness={0.08}
-            metalness={0.04}
+            opacity={inspectionMode ? 0.18 : 0.105}
+            roughness={0.04}
+            metalness={0.08}
             side={THREE.DoubleSide}
             depthWrite={false}
           />
         </mesh>
 
-        <mesh position={[0, fieldHeight - 0.04, 0]}>
-          <boxGeometry args={[fieldWidth + 1.08, 0.026, 0.07]} />
-          <meshBasicMaterial color="#eaffff" transparent opacity={0.76} depthWrite={false} />
+        <mesh position={[0, fieldHeight - 0.08, 0]}>
+          <boxGeometry args={[fieldWidth + 1.45, 0.022, 0.052]} />
+          <meshBasicMaterial color="#eaffff" transparent opacity={inspectionMode ? 0.76 : 0.5} depthWrite={false} />
         </mesh>
 
         <mesh position={[0, 0.02, 0]}>
-          <boxGeometry args={[fieldWidth + 1.08, 0.026, 0.07]} />
-          <meshBasicMaterial color="#eaffff" transparent opacity={0.46} depthWrite={false} />
+          <boxGeometry args={[fieldWidth + 1.45, 0.022, 0.052]} />
+          <meshBasicMaterial color="#eaffff" transparent opacity={inspectionMode ? 0.46 : 0.24} depthWrite={false} />
         </mesh>
       </group>
 
@@ -1277,19 +1435,23 @@ export default function HfieldVolumetricPacketField({
         </group>
       ))}
 
-      <group position={[-fieldWidth / 2 - 0.38, 0.06, scanMinZ - 0.22]}>
-        <mesh>
-          <boxGeometry args={[0.2, 0.2, 0.2]} />
-          <meshBasicMaterial color="#f6d36b" transparent opacity={0.92} />
-        </mesh>
-      </group>
+      {inspectionMode ? (
+        <group position={[-fieldWidth / 2 - 0.38, 0.06, scanMinZ - 0.22]}>
+          <mesh>
+            <boxGeometry args={[0.2, 0.2, 0.2]} />
+            <meshBasicMaterial color="#f6d36b" transparent opacity={0.92} />
+          </mesh>
+        </group>
+      ) : null}
 
-      <group position={[fieldWidth / 2 + 0.38, 0.06, scanMaxZ + 0.22]}>
-        <mesh>
-          <boxGeometry args={[0.2, 0.2, 0.2]} />
-          <meshBasicMaterial color="#56d6ff" transparent opacity={0.92} />
-        </mesh>
-      </group>
+      {inspectionMode ? (
+        <group position={[fieldWidth / 2 + 0.38, 0.06, scanMaxZ + 0.22]}>
+          <mesh>
+            <boxGeometry args={[0.2, 0.2, 0.2]} />
+            <meshBasicMaterial color="#56d6ff" transparent opacity={0.92} />
+          </mesh>
+        </group>
+      ) : null}
     </group>
   );
 }

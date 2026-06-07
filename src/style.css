@@ -3145,3 +3145,27 @@ body {
   }
 }
 /* END HCS_COMPOSER_WAVEFORM_EDITOR_TRUE_SOUND_BODY_V1 */
+
+/* HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1 */
+.field-canvas-shell.carrier-reader-canvas-shell {
+  min-height: clamp(820px, 66vh, 1120px) !important;
+  background:
+    radial-gradient(circle at 52% 38%, rgba(86, 214, 255, 0.09), transparent 34%),
+    radial-gradient(circle at 50% 78%, rgba(246, 211, 107, 0.05), transparent 34%),
+    linear-gradient(180deg, rgba(1, 5, 9, 0.995), rgba(0, 2, 6, 0.995)) !important;
+}
+
+.field-reader-focus-active .carrier-reader-canvas-shell {
+  height: min(84vh, calc(100vh - 190px)) !important;
+}
+
+.field-reader-stage-hint::before {
+  content: "Air waveform chamber active: floating note-colored sound bodies · glass ticker = music time · PMUT cymatic rings at intersection · ";
+  color: rgba(246, 211, 107, 0.94);
+}
+
+.field-reader-stage-hint::after {
+  content: " · HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1";
+  color: rgba(86, 214, 255, 0.9);
+}
+/* END HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1 */

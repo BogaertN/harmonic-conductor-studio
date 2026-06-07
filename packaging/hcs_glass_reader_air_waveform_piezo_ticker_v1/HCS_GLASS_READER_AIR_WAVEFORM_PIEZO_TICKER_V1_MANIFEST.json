@@ -1,0 +1,30 @@
+{
+  "patch_id": "HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1",
+  "base_commit": "4cc0f52 Add HCS full system exerciser demo song v1",
+  "purpose": "Correct Glass Reader production view into an air waveform chamber: waveforms float in space, note/frequency color lives on waveform bodies, and the glass plane becomes the moving timing ticker that blooms piezoelectric MEMS / PMUT-style cymatic rings when sound bodies intersect it.",
+  "visual_law": {
+    "production_ground_grid_hidden": true,
+    "production_full_reader_surface_hidden": true,
+    "glass_plane_is_moving_time_ticker": true,
+    "waveform_bodies_are_primary_geometry": true,
+    "note_color_maps_to_pitch_class_on_waveform_body": true,
+    "note_labels_exist_on_active_and_inspection_relevant_bodies": true,
+    "piezo_pmut_cymatic_rings_appear_at_ticker_intersections": true,
+    "raw_carrier_and_debug_layers_remain_inspection_only": true
+  },
+  "authority_boundaries": {
+    "mutates_current_hcs_score": false,
+    "mutates_forge": false,
+    "performs_identity_vault_write": false,
+    "exports_private_identity": false,
+    "uses_llm": false
+  },
+  "required_gates": [
+    "cargo fmt --all -- --check",
+    "cargo test --workspace",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "npm run typecheck",
+    "npm run build",
+    "npm run tauri info"
+  ]
+}
