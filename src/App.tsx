@@ -627,6 +627,93 @@ function hcsScheduleInstrumentNoteV1(
   return endAt + releaseSeconds;
 }
 
+function ComposerStudioCanvasRebuildV1({
+  report,
+  selectedNoteKey,
+  onPlayStudio,
+  onLoadPreset,
+  onStepBack,
+  onStepForward,
+  onOctaveDown,
+  onOctaveUp,
+  onShorter,
+  onLonger
+}: {
+  report: HcsTrackEditorAndPianoRollV1Report | null;
+  selectedNoteKey: string | null;
+  onPlayStudio: () => void;
+  onLoadPreset: (presetId: string) => void;
+  onStepBack: () => void;
+  onStepForward: () => void;
+  onOctaveDown: () => void;
+  onOctaveUp: () => void;
+  onShorter: () => void;
+  onLonger: () => void;
+}) {
+  const timeline = (report as any)?.music_timeline ?? null;
+  const tracks = ((timeline?.tracks ?? []) as any[]).slice(0, 4);
+  const noteCount = Number(report?.note_count ?? timeline?.total_note_count ?? 0);
+  const trackCount = Number(report?.track_count ?? timeline?.track_count ?? tracks.length ?? 0);
+  const title = String(report?.title ?? "Untitled HCS Score");
+  const selected = selectedNoteKey ? selectedNoteKey.replace(":", " · event ") : "none selected";
+
+  return (
+    <section className="composer-studio-canvas-rebuild-v1" aria-label="Composer Studio Canvas Rebuild v1">
+      <div className="composer-canvas-hero-v1">
+        <div>
+          <p className="eyebrow">Composer Studio</p>
+          <h2>{title}</h2>
+          <p className="note">One workflow: choose an instrument, play the keys, write the score, edit the piano roll, hear the mix, and watch the Glass Reader respond.</p>
+        </div>
+        <div className="composer-canvas-stats-v1">
+          <span><strong>{trackCount}</strong> tracks</span>
+          <span><strong>{noteCount}</strong> notes</span>
+          <span><strong>{selected}</strong> selection</span>
+          <span><strong>{HCS_COMPOSER_STUDIO_CANVAS_REBUILD_V1_CONTRACT_ID}</strong> contract</span>
+        </div>
+      </div>
+
+      <div className="composer-canvas-actionbar-v1">
+        <button onClick={() => onLoadPreset("glass_reader_arpeggio")} type="button">Load Arpeggio</button>
+        <button onClick={() => onLoadPreset("midnight_sonnet_seed")} type="button">Load Song Seed</button>
+        <button onClick={() => onLoadPreset("empty_studio_score")} type="button">New Score</button>
+        <button onClick={onPlayStudio} type="button">Play Mix</button>
+        <button onClick={onStepBack} type="button">◀ Step</button>
+        <button onClick={onStepForward} type="button">Step ▶</button>
+        <button onClick={onOctaveDown} type="button">Octave −</button>
+        <button onClick={onOctaveUp} type="button">Octave +</button>
+        <button onClick={onShorter} type="button">Shorter</button>
+        <button onClick={onLonger} type="button">Longer</button>
+      </div>
+
+      <div className="composer-canvas-glass-preview-v1" aria-label="Inline Glass Reader preview">
+        <div>
+          <p className="eyebrow">Live Glass Reader Preview</p>
+          <h3>Score → Instrument → Wave Body</h3>
+          <p className="note">This mini field is a composer preview. The full Glass Reader remains available on the Glass Reader tab.</p>
+        </div>
+        <div className="composer-mini-field-v1">
+          {tracks.length === 0 && <span className="mini-field-empty-v1">Play or load notes to wake the field.</span>}
+          {tracks.map((track, index) => {
+            const notes = Number(track.note_count ?? (track.notes ?? []).length ?? 0);
+            const width = Math.max(36, Math.min(160, 34 + notes * 18));
+            const top = 18 + index * 23;
+            return (
+              <span
+                key={`mini-field-${track.track_id ?? index}`}
+                className={`mini-wave-body-v1 mini-wave-${index + 1}`}
+                style={{ width: `${width}px`, top: `${top}%`, left: `${10 + index * 16}%` }}
+                title={`${String(track.track_id ?? "track")} · ${notes} notes`}
+              />
+            );
+          })}
+          <span className="glass-plane-line-v1" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ComposerFirstSoundFontFoundationV1() {
   return (
     <section className="composer-first-soundfont-foundation-v1" aria-label="Composer first SoundFont foundation v1">
@@ -840,8 +927,11 @@ type StudioTrackEditorAndPianoRollV1Props = {
 };
 
 
+// HCS Composer Studio Canvas Rebuild v1 proof: one normal composer canvas, score first, piano roll/keyboard/instruments/Glass Reader preview unified, raw JSON hidden.
 // HCS Composer First Workflow and SoundFont Foundation v1 proof: normal composer path hides raw JSON, score renders first, and SoundFont/FluidSynth foundation is surfaced.
 // HCS Production Notation Render Sync v1 proof: No separate fake staff state; notation renders from current_score.music.tracks[*].notes.
+const HCS_COMPOSER_STUDIO_CANVAS_REBUILD_V1_CONTRACT_ID = "aiweb.hfield.composer_studio_canvas_rebuild.v1";
+
 const HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1_CONTRACT_ID = "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1";
 const HCS_COMPOSER_FIRST_GM_SOUNDFONT_V1 = "/usr/share/sounds/sf2/FluidR3_GM.sf2";
 const HCS_COMPOSER_FIRST_GS_SOUNDFONT_V1 = "/usr/share/sounds/sf2/FluidR3_GS.sf2";
@@ -1227,6 +1317,19 @@ function StudioTrackEditorAndPianoRollV1({
           <div className="realtime-entry-status-v1">{lastRealtimeEntry}</div>
         </section>
       </div>
+
+      <ComposerStudioCanvasRebuildV1
+        report={report}
+        selectedNoteKey={selectedNoteKey}
+        onPlayStudio={onPlayStudio}
+        onLoadPreset={onLoadPreset}
+        onStepBack={() => setActiveStepIndex(Math.max(0, activeStepIndex - 1))}
+        onStepForward={() => setActiveStepIndex(activeStepIndex + 1)}
+        onOctaveDown={() => setKeyboardOctave(Math.max(1, keyboardOctave - 1))}
+        onOctaveUp={() => setKeyboardOctave(Math.min(8, keyboardOctave + 1))}
+        onShorter={() => setDurationSteps(Math.max(1, durationSteps - 1))}
+        onLonger={() => setDurationSteps(durationSteps + 1)}
+      />
 
       <NotationRenderSyncV1 report={report} selectedNoteKey={selectedNoteKey} onSelectNote={onSelectNote} />
 

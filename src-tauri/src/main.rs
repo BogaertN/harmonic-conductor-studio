@@ -1115,6 +1115,64 @@ fn get_hcs_instrument_rack_and_track_sound_v1_report(
     }))
 }
 
+const HCS_COMPOSER_STUDIO_CANVAS_REBUILD_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.composer_studio_canvas_rebuild.v1";
+
+#[tauri::command]
+fn get_hcs_composer_studio_canvas_rebuild_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+    let timeline = create_music_timeline_report(&guard);
+    let notation = create_notation_layout_report(&guard);
+    let score_hash = score_hash_hex(&guard).map_err(|err| format!("score hash failed: {err}"))?;
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_COMPOSER_STUDIO_CANVAS_REBUILD_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "purpose": "rebuild normal composer mode into a single musician-facing canvas with score, piano roll, keyboard, instrument rack, and inline Glass Reader preview",
+        "title": guard.title,
+        "score_hash": score_hash,
+        "tempo_bpm": guard.music.tempo_bpm,
+        "meter": guard.music.meter,
+        "track_count": timeline.track_count,
+        "note_count": timeline.total_note_count,
+        "total_duration_ms": timeline.total_duration_ms,
+        "music_timeline": timeline,
+        "notation_layout": notation,
+        "composer_canvas_policy": {
+            "score_is_primary_canvas": true,
+            "piano_roll_below_score": true,
+            "keyboard_large_and_mouse_first": true,
+            "instrument_rack_side_mixer": true,
+            "glass_reader_preview_inline": true,
+            "raw_json_hidden_from_normal_path": true,
+            "soundfont_diagnostics_hidden_from_normal_path": true,
+            "normal_path_is_not_developer_dashboard": true
+        },
+        "single_source_law": {
+            "score_source": "current_score.music.tracks[*].notes",
+            "keyboard_writes_score": true,
+            "notation_renders_score": true,
+            "piano_roll_renders_score": true,
+            "instrument_rack_uses_tracks": true,
+            "glass_reader_preview_uses_score_timeline": true
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score": false,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false,
+            "uses_llm": false
+        }
+    }))
+}
+
 const HCS_COMPOSER_FIRST_WORKFLOW_AND_SOUNDFONT_FOUNDATION_V1_CONTRACT_ID: &str =
     "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1";
 
@@ -2664,6 +2722,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "production_notation_render_sync_v1_contract_id": "aiweb.hfield.production_notation_render_sync.v1",
         "instrument_rack_and_track_sound_v1_contract_id": "aiweb.hfield.instrument_rack_and_track_sound.v1",
         "composer_first_workflow_and_soundfont_foundation_v1_contract_id": "aiweb.hfield.composer_first_workflow_and_soundfont_foundation.v1",
+        "composer_studio_canvas_rebuild_v1_contract_id": "aiweb.hfield.composer_studio_canvas_rebuild.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -4986,6 +5045,7 @@ fn main() {
             get_hcs_production_notation_render_sync_v1_report,
             get_hcs_instrument_rack_and_track_sound_v1_report,
             get_hcs_composer_first_workflow_and_soundfont_foundation_v1_report,
+            get_hcs_composer_studio_canvas_rebuild_v1_report,
             get_hcs_key_frequency_registry_v1_report,
             lookup_hcs_key_frequency_v1,
             import_hcs_studio_score_json_v1,

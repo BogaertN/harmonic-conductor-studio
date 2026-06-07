@@ -1,0 +1,21 @@
+{
+  "patch_id": "HCS_COMPOSER_STUDIO_CANVAS_REBUILD_V1",
+  "contract_id": "aiweb.hfield.composer_studio_canvas_rebuild.v1",
+  "schema_version": "1.0.0",
+  "purpose": "Rebuild HCS normal composer mode into a single composer studio canvas with score, piano roll, keyboard, instruments, and Glass Reader preview in one workflow.",
+  "normal_user_path": {
+    "score_is_primary_canvas": true,
+    "piano_roll_is_editing_surface": true,
+    "keyboard_is_large_and_playable": true,
+    "instrument_rack_is_inline_mixer": true,
+    "glass_reader_preview_is_inline": true,
+    "raw_json_hidden": true,
+    "soundfont_diagnostics_hidden": true
+  },
+  "authority_boundaries": {
+    "mutates_forge": false,
+    "performs_identity_vault_write": false,
+    "exports_private_identity": false,
+    "uses_llm": false
+  }
+}

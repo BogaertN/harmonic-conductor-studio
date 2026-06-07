@@ -2742,3 +2742,65 @@ body {
 .soundfont-foundation-grid-v1 strong{text-transform:uppercase;letter-spacing:.08em;color:#e7d8a4;font-size:.62rem}
 .score-import-panel-v1{display:none!important}
 @media(max-width:1250px){.composer-first-flow-deck-v1,.composer-first-big-actions-v1,.soundfont-foundation-grid-v1{grid-template-columns:1fr}.composer-first-soundfont-foundation-v1{grid-template-columns:1fr}}
+
+
+/* HCS Composer Studio Canvas Rebuild v1 */
+.app-shell:has(.composer-studio-canvas-rebuild-v1) .mode-rail{width:92px}
+.app-shell:has(.composer-studio-canvas-rebuild-v1) .main-shell{max-width:none}
+.composer-studio-canvas-rebuild-v1{
+  grid-area:hero;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(310px,.42fr);
+  gap:1rem;
+  padding:1rem;
+  border-radius:22px;
+  border:1px solid rgba(231,216,164,.26);
+  background:
+    radial-gradient(circle at 18% 0%,rgba(231,216,164,.18),transparent 38%),
+    linear-gradient(135deg,rgba(14,18,28,.96),rgba(5,9,15,.96));
+  box-shadow:0 18px 50px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.composer-canvas-hero-v1 h2{font-size:1.55rem;margin:.15rem 0 .35rem}
+.composer-canvas-stats-v1{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
+.composer-canvas-stats-v1 span{display:grid;gap:.16rem;padding:.62rem;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.08);font-size:.7rem;color:#dcd3b7}
+.composer-canvas-stats-v1 strong{font-size:.82rem;color:#fff2ba;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-canvas-actionbar-v1{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:.5rem;padding:.65rem;border-radius:16px;background:rgba(231,216,164,.08);border:1px solid rgba(231,216,164,.16)}
+.composer-canvas-actionbar-v1 button{padding:.62rem .78rem;font-size:.76rem}
+.composer-canvas-glass-preview-v1{grid-column:1/-1;display:grid;grid-template-columns:minmax(250px,.35fr) 1fr;gap:1rem;align-items:stretch;padding:.8rem;border-radius:18px;background:rgba(0,14,22,.62);border:1px solid rgba(80,210,255,.18)}
+.composer-mini-field-v1{position:relative;min-height:150px;border-radius:18px;overflow:hidden;background:radial-gradient(circle at 50% 50%,rgba(80,210,255,.12),rgba(0,0,0,.35));border:1px solid rgba(80,210,255,.18)}
+.glass-plane-line-v1{position:absolute;left:8%;right:8%;top:50%;height:1px;background:linear-gradient(90deg,transparent,rgba(231,216,164,.5),transparent)}
+.mini-wave-body-v1{position:absolute;height:34px;border-radius:999px;border:1px solid rgba(231,216,164,.55);background:radial-gradient(circle at 35% 45%,rgba(255,245,190,.95),rgba(231,216,164,.22) 55%,rgba(80,210,255,.16));box-shadow:0 0 22px rgba(231,216,164,.18)}
+.mini-wave-2{background:radial-gradient(circle at 35% 45%,rgba(100,220,255,.8),rgba(100,220,255,.18) 55%,rgba(231,216,164,.13))}
+.mini-wave-3{background:radial-gradient(circle at 35% 45%,rgba(255,130,90,.75),rgba(255,130,90,.2) 55%,rgba(231,216,164,.1))}
+.mini-field-empty-v1{position:absolute;inset:0;display:grid;place-items:center;color:#d8ccb0;font-size:.8rem}
+.studio-track-editor-v1{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(330px,410px);
+  grid-template-areas:
+    "hero hero"
+    "score mixer"
+    "roll mixer"
+    "keys mixer";
+  align-items:start;
+  gap:1rem;
+}
+.studio-track-editor-v1>.notation-render-sync-v1{grid-area:score!important;order:unset!important;min-height:420px}
+.studio-track-editor-v1>.piano-roll-grid-v1{grid-area:roll!important;order:unset!important}
+.studio-track-editor-v1>.studio-compose-grid-v1{grid-area:keys!important;order:unset!important;display:block!important}
+.studio-track-editor-v1>.instrument-rack-v1{grid-area:mixer!important;order:unset!important;position:sticky;top:.75rem;max-height:calc(100vh - 140px);overflow:auto}
+.studio-track-editor-v1>.composer-first-soundfont-foundation-v1{display:none!important}
+.studio-track-editor-v1>.composer-first-flow-deck-v1{display:none!important}
+.studio-track-editor-v1 .composer-first-start-panel-v1{display:none!important}
+.studio-track-editor-v1 .advanced-score-import-v1{display:none!important}
+.studio-track-editor-v1 .virtual-keyboard-panel-v1{min-height:245px;border:1px solid rgba(231,216,164,.22);background:linear-gradient(135deg,rgba(231,216,164,.1),rgba(7,11,18,.94))}
+.studio-track-editor-v1 .keyboard-controls-v1{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem}
+.studio-track-editor-v1 .mouse-first-compose-controls-v1{font-size:.82rem;padding:.8rem}
+.studio-track-editor-v1 .piano-key-v1,
+.studio-track-editor-v1 .keyboard-key-v1,
+.studio-track-editor-v1 .virtual-keyboard-v1 button{min-height:72px;font-size:.82rem}
+.score-import-panel-v1{display:none!important}
+@media(max-width:1350px){
+  .studio-track-editor-v1{grid-template-columns:1fr;grid-template-areas:"hero" "score" "roll" "keys" "mixer"}
+  .studio-track-editor-v1>.instrument-rack-v1{position:static;max-height:none}
+  .composer-studio-canvas-rebuild-v1,.composer-canvas-glass-preview-v1{grid-template-columns:1fr}
+}
