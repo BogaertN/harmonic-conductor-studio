@@ -929,6 +929,190 @@ fn lookup_hcs_key_frequency_v1(midi_note: u8) -> Result<serde_json::Value, Strin
     Ok(hcs_key_frequency_registry_record_v1(midi_note.min(127)))
 }
 
+const HCS_INSTRUMENT_RACK_AND_TRACK_SOUND_V1_CONTRACT_ID: &str =
+    "aiweb.hfield.instrument_rack_and_track_sound.v1";
+
+fn hcs_instrument_catalog_v1() -> Vec<serde_json::Value> {
+    vec![
+        json!({
+            "instrument_id": "glass_piano",
+            "display_name": "Glass Piano",
+            "family": "keys",
+            "waveform": "triangle",
+            "partials": [{"ratio": 1.0, "gain": 1.0}, {"ratio": 2.0, "gain": 0.18}],
+            "attack_ms": 8,
+            "release_ms": 180,
+            "default_level": 0.78,
+            "description": "bright playable keyboard voice for lead writing"
+        }),
+        json!({
+            "instrument_id": "warm_electric_piano",
+            "display_name": "Warm Electric Piano",
+            "family": "keys",
+            "waveform": "sine",
+            "partials": [{"ratio": 1.0, "gain": 1.0}, {"ratio": 2.0, "gain": 0.12}, {"ratio": 3.0, "gain": 0.06}],
+            "attack_ms": 14,
+            "release_ms": 260,
+            "default_level": 0.74,
+            "description": "soft harmonic keyboard tone for chords and melody"
+        }),
+        json!({
+            "instrument_id": "deep_bass",
+            "display_name": "Deep Bass",
+            "family": "bass",
+            "waveform": "sine",
+            "partials": [{"ratio": 1.0, "gain": 1.0}, {"ratio": 0.5, "gain": 0.35}],
+            "attack_ms": 22,
+            "release_ms": 260,
+            "default_level": 0.68,
+            "description": "low-frequency depth layer for carrier grounding"
+        }),
+        json!({
+            "instrument_id": "glass_pad",
+            "display_name": "Glass Pad",
+            "family": "pad",
+            "waveform": "sine",
+            "partials": [{"ratio": 1.0, "gain": 0.9}, {"ratio": 1.5, "gain": 0.16}, {"ratio": 2.0, "gain": 0.12}],
+            "attack_ms": 180,
+            "release_ms": 900,
+            "default_level": 0.52,
+            "description": "slow field support layer for sustained resonance"
+        }),
+        json!({
+            "instrument_id": "mallet_bell",
+            "display_name": "Mallet Bell",
+            "family": "percussion",
+            "waveform": "triangle",
+            "partials": [{"ratio": 1.0, "gain": 1.0}, {"ratio": 2.4, "gain": 0.2}],
+            "attack_ms": 3,
+            "release_ms": 520,
+            "default_level": 0.66,
+            "description": "percussive bell-like attack for cue and motif testing"
+        }),
+        json!({
+            "instrument_id": "pulse_lead",
+            "display_name": "Pulse Lead",
+            "family": "synth",
+            "waveform": "sawtooth",
+            "partials": [{"ratio": 1.0, "gain": 0.86}, {"ratio": 2.0, "gain": 0.11}],
+            "attack_ms": 6,
+            "release_ms": 110,
+            "default_level": 0.60,
+            "description": "clear synthetic lead for timing and phrase work"
+        }),
+    ]
+}
+
+fn hcs_default_instrument_id_for_track_v1(track_id: &str, role: &str) -> &'static str {
+    let id = track_id.to_ascii_lowercase();
+    let role = role.to_ascii_lowercase();
+    if id.contains("depth") || role.contains("bass") || role.contains("depth") {
+        "deep_bass"
+    } else if id.contains("field") || role.contains("field") || role.contains("pad") {
+        "glass_pad"
+    } else if role.contains("bell") || role.contains("cue") {
+        "mallet_bell"
+    } else {
+        "glass_piano"
+    }
+}
+
+fn hcs_default_track_sound_profile_v1(
+    track_id: &str,
+    role: &str,
+    note_count: usize,
+) -> serde_json::Value {
+    let instrument_id = hcs_default_instrument_id_for_track_v1(track_id, role);
+    let default_level = match instrument_id {
+        "deep_bass" => 0.68,
+        "glass_pad" => 0.52,
+        "mallet_bell" => 0.66,
+        "pulse_lead" => 0.60,
+        "warm_electric_piano" => 0.74,
+        _ => 0.78,
+    };
+    json!({
+        "track_id": track_id,
+        "role": role,
+        "instrument_id": instrument_id,
+        "level": default_level,
+        "muted": false,
+        "soloed": false,
+        "note_count": note_count,
+        "assignment_source": "deterministic_default_from_track_role",
+        "source_authority": "current_score.music.tracks[*].notes",
+        "render_authority": HCS_INSTRUMENT_RACK_AND_TRACK_SOUND_V1_CONTRACT_ID
+    })
+}
+
+#[tauri::command]
+fn get_hcs_instrument_rack_and_track_sound_v1_report(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let guard = state
+        .current_score
+        .lock()
+        .map_err(|_| "current score lock poisoned".to_string())?;
+    let timeline = create_music_timeline_report(&guard);
+    let score_hash = score_hash_hex(&guard).map_err(|err| format!("score hash failed: {err}"))?;
+    let track_profiles = timeline
+        .tracks
+        .iter()
+        .map(|track| {
+            hcs_default_track_sound_profile_v1(&track.track_id, &track.role, track.note_count)
+        })
+        .collect::<Vec<_>>();
+
+    Ok(json!({
+        "status": "ok",
+        "contract_id": HCS_INSTRUMENT_RACK_AND_TRACK_SOUND_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "purpose": "per-track instrument assignment and musician-facing mixer control for HCS score playback previews",
+        "title": guard.title,
+        "score_hash": score_hash,
+        "tempo_bpm": guard.music.tempo_bpm,
+        "meter": guard.music.meter,
+        "track_count": timeline.track_count,
+        "note_count": timeline.total_note_count,
+        "instrument_catalog": hcs_instrument_catalog_v1(),
+        "track_sound_profiles": track_profiles,
+        "mixer_features": {
+            "per_track_instrument_assignment": true,
+            "track_mute": true,
+            "track_solo": true,
+            "track_level": true,
+            "starter_instrument_set": true,
+            "sound_variety_beyond_flat_tone": true,
+            "web_audio_preview_surface": true,
+            "deterministic_score_source": true
+        },
+        "sync_law": {
+            "single_score_source": "current_score.music.tracks[*].notes",
+            "track_sound_profiles_are_downstream_render_config": true,
+            "instrument_selection_does_not_change_note_frequency": true,
+            "frequency_authority_contract": HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID,
+            "notation_and_piano_roll_stay_source_views": true,
+            "glass_reader_field_stays_frequency_authoritative": true
+        },
+        "frequency_authority": {
+            "contract_id": HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID,
+            "tuning_mode": "twelve_tone_equal_temperament",
+            "a4_hz": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ,
+            "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
+            "formula_id": "frequency_hz = 440 * 2^((midi_note - 69) / 12)",
+            "simulated": false
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score": false,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false,
+            "uses_llm": false
+        }
+    }))
+}
+
 const HCS_PRODUCTION_NOTATION_RENDER_SYNC_V1_CONTRACT_ID: &str =
     "aiweb.hfield.production_notation_render_sync.v1";
 
@@ -2380,6 +2564,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "key_frequency_registry_v1_contract_id": "aiweb.hfield.key_frequency_registry.v1",
         "virtual_keyboard_and_realtime_note_entry_v1_contract_id": "aiweb.hfield.virtual_keyboard_and_realtime_note_entry.v1",
         "production_notation_render_sync_v1_contract_id": "aiweb.hfield.production_notation_render_sync.v1",
+        "instrument_rack_and_track_sound_v1_contract_id": "aiweb.hfield.instrument_rack_and_track_sound.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -4700,6 +4885,7 @@ fn main() {
             get_hcs_track_editor_and_piano_roll_v1_report,
             get_hcs_virtual_keyboard_and_realtime_note_entry_v1_report,
             get_hcs_production_notation_render_sync_v1_report,
+            get_hcs_instrument_rack_and_track_sound_v1_report,
             get_hcs_key_frequency_registry_v1_report,
             lookup_hcs_key_frequency_v1,
             import_hcs_studio_score_json_v1,

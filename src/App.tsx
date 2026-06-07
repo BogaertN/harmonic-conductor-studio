@@ -479,6 +479,321 @@ function NotationRenderSyncV1({
   );
 }
 
+
+
+type HcsTrackSoundProfileStateV1 = {
+  instrumentId: string;
+  level: number;
+  muted: boolean;
+  soloed: boolean;
+};
+
+type HcsStarterInstrumentV1 = {
+  instrumentId: string;
+  displayName: string;
+  family: string;
+  waveform: OscillatorType;
+  attackMs: number;
+  releaseMs: number;
+  defaultLevel: number;
+  partials: Array<{ ratio: number; gain: number }>;
+  description: string;
+};
+
+const hcsStarterInstrumentCatalogV1: HcsStarterInstrumentV1[] = [
+  {
+    instrumentId: "glass_piano",
+    displayName: "Glass Piano",
+    family: "keys",
+    waveform: "triangle",
+    attackMs: 8,
+    releaseMs: 180,
+    defaultLevel: 0.78,
+    partials: [{ ratio: 1, gain: 1 }, { ratio: 2, gain: 0.18 }],
+    description: "Bright playable keyboard voice for lead writing."
+  },
+  {
+    instrumentId: "warm_electric_piano",
+    displayName: "Warm Electric Piano",
+    family: "keys",
+    waveform: "sine",
+    attackMs: 14,
+    releaseMs: 260,
+    defaultLevel: 0.74,
+    partials: [{ ratio: 1, gain: 1 }, { ratio: 2, gain: 0.12 }, { ratio: 3, gain: 0.06 }],
+    description: "Soft harmonic keyboard tone for chords and melody."
+  },
+  {
+    instrumentId: "deep_bass",
+    displayName: "Deep Bass",
+    family: "bass",
+    waveform: "sine",
+    attackMs: 22,
+    releaseMs: 260,
+    defaultLevel: 0.68,
+    partials: [{ ratio: 1, gain: 1 }, { ratio: 0.5, gain: 0.35 }],
+    description: "Low-frequency depth layer for carrier grounding."
+  },
+  {
+    instrumentId: "glass_pad",
+    displayName: "Glass Pad",
+    family: "pad",
+    waveform: "sine",
+    attackMs: 180,
+    releaseMs: 900,
+    defaultLevel: 0.52,
+    partials: [{ ratio: 1, gain: 0.9 }, { ratio: 1.5, gain: 0.16 }, { ratio: 2, gain: 0.12 }],
+    description: "Slow field support layer for sustained resonance."
+  },
+  {
+    instrumentId: "mallet_bell",
+    displayName: "Mallet Bell",
+    family: "percussion",
+    waveform: "triangle",
+    attackMs: 3,
+    releaseMs: 520,
+    defaultLevel: 0.66,
+    partials: [{ ratio: 1, gain: 1 }, { ratio: 2.4, gain: 0.2 }],
+    description: "Percussive bell-like attack for cue and motif testing."
+  },
+  {
+    instrumentId: "pulse_lead",
+    displayName: "Pulse Lead",
+    family: "synth",
+    waveform: "sawtooth",
+    attackMs: 6,
+    releaseMs: 110,
+    defaultLevel: 0.6,
+    partials: [{ ratio: 1, gain: 0.86 }, { ratio: 2, gain: 0.11 }],
+    description: "Clear synthetic lead for timing and phrase work."
+  }
+];
+
+function hcsRackFrequencyFromMidiV1(midiNote: number): number {
+  return 440 * Math.pow(2, (Math.max(0, Math.min(127, Math.round(midiNote))) - 69) / 12);
+}
+
+function hcsDefaultInstrumentForTrackV1(trackId: string, role: string): string {
+  const text = `${trackId} ${role}`.toLowerCase();
+  if (text.includes("depth") || text.includes("bass")) return "deep_bass";
+  if (text.includes("field") || text.includes("pad")) return "glass_pad";
+  if (text.includes("bell") || text.includes("cue")) return "mallet_bell";
+  return "glass_piano";
+}
+
+function hcsDefaultTrackSoundProfileV1(track: any): HcsTrackSoundProfileStateV1 {
+  const instrumentId = hcsDefaultInstrumentForTrackV1(String(track?.track_id ?? "track"), String(track?.role ?? ""));
+  const instrument = hcsStarterInstrumentCatalogV1.find((item) => item.instrumentId === instrumentId) ?? hcsStarterInstrumentCatalogV1[0];
+  return {
+    instrumentId: instrument.instrumentId,
+    level: instrument.defaultLevel,
+    muted: false,
+    soloed: false
+  };
+}
+
+function hcsScheduleInstrumentNoteV1(
+  audioContext: AudioContext,
+  destination: AudioNode,
+  instrument: HcsStarterInstrumentV1,
+  note: any,
+  profile: HcsTrackSoundProfileStateV1,
+  baseStartSeconds: number
+): number {
+  const startMs = Number(note?.start_ms ?? 0);
+  const durationMs = Math.max(40, Number(note?.duration_ms ?? 500));
+  const midiNote = Number(note?.midi_note ?? 60);
+  const frequency = Number(note?.frequency_hz ?? 0) > 0 ? Number(note.frequency_hz) : hcsRackFrequencyFromMidiV1(midiNote);
+  const velocity = Math.max(0.05, Math.min(1, Number(note?.velocity ?? 0.78)));
+  const startAt = baseStartSeconds + startMs / 1000;
+  const endAt = startAt + durationMs / 1000;
+  const releaseSeconds = instrument.releaseMs / 1000;
+  const attackSeconds = Math.max(0.002, instrument.attackMs / 1000);
+
+  for (const partial of instrument.partials) {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    oscillator.type = instrument.waveform;
+    oscillator.frequency.setValueAtTime(frequency * partial.ratio, startAt);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.linearRampToValueAtTime(Math.max(0.0002, profile.level * velocity * partial.gain * 0.22), startAt + attackSeconds);
+    gain.gain.exponentialRampToValueAtTime(0.0001, endAt + releaseSeconds);
+    oscillator.connect(gain);
+    gain.connect(destination);
+    oscillator.start(startAt);
+    oscillator.stop(endAt + releaseSeconds + 0.05);
+  }
+
+  return endAt + releaseSeconds;
+}
+
+function InstrumentRackAndTrackSoundV1({ report }: { report: HcsTrackEditorAndPianoRollV1Report | null }) {
+  const [profiles, setProfiles] = useState<Record<string, HcsTrackSoundProfileStateV1>>({});
+  const [lastPreview, setLastPreview] = useState<string>("No instrument mix played yet.");
+  const tracks = (((report as any)?.music_timeline?.tracks ?? []) as any[]);
+  const hasSolo = tracks.some((track) => {
+    const trackId = String(track?.track_id ?? "track");
+    const profile = profiles[trackId] ?? hcsDefaultTrackSoundProfileV1(track);
+    return profile.soloed;
+  });
+
+  function getProfile(track: any): HcsTrackSoundProfileStateV1 {
+    const trackId = String(track?.track_id ?? "track");
+    return profiles[trackId] ?? hcsDefaultTrackSoundProfileV1(track);
+  }
+
+  function updateProfile(track: any, patch: Partial<HcsTrackSoundProfileStateV1>) {
+    const trackId = String(track?.track_id ?? "track");
+    setProfiles((current) => ({
+      ...current,
+      [trackId]: {
+        ...hcsDefaultTrackSoundProfileV1(track),
+        ...(current[trackId] ?? {}),
+        ...patch
+      }
+    }));
+  }
+
+  async function playInstrumentMix(filterTrackId?: string) {
+    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextCtor) {
+      setLastPreview("This browser shell does not expose Web Audio playback.");
+      return;
+    }
+
+    const audioContext = new AudioContextCtor() as AudioContext;
+    const master = audioContext.createGain();
+    master.gain.value = 0.82;
+    master.connect(audioContext.destination);
+    const baseStart = audioContext.currentTime + 0.055;
+    let scheduled = 0;
+    let maxStop = baseStart + 0.2;
+
+    for (const track of tracks) {
+      const trackId = String(track?.track_id ?? "track");
+      if (filterTrackId && filterTrackId !== trackId) continue;
+      const profile = getProfile(track);
+      const shouldPlay = filterTrackId ? !profile.muted : !profile.muted && (!hasSolo || profile.soloed);
+      if (!shouldPlay) continue;
+      const instrument = hcsStarterInstrumentCatalogV1.find((item) => item.instrumentId === profile.instrumentId) ?? hcsStarterInstrumentCatalogV1[0];
+      const notes = ((track?.notes ?? []) as any[]);
+      for (const note of notes) {
+        maxStop = Math.max(maxStop, hcsScheduleInstrumentNoteV1(audioContext, master, instrument, note, profile, baseStart));
+        scheduled += 1;
+      }
+    }
+
+    if (scheduled === 0) {
+      setLastPreview("No audible notes were scheduled. Check mute/solo or add notes to the score.");
+      void audioContext.close();
+      return;
+    }
+
+    setLastPreview(`Playing ${scheduled} source-backed notes through instrument rack profiles.`);
+    window.setTimeout(() => {
+      void audioContext.close();
+    }, Math.max(600, (maxStop - audioContext.currentTime + 0.25) * 1000));
+  }
+
+  return (
+    <section className="instrument-rack-v1" aria-label="Instrument Rack and Track Sound v1">
+      <div className="board-title-row">
+        <div>
+          <p className="eyebrow">Instrument Rack and Track Sound v1</p>
+          <h3>Assign real sounds to tracks, then play the studio mix</h3>
+          <p className="note">Track sound profiles are downstream render settings. The source remains current_score.music.tracks[*].notes, and pitch stays tied to the locked MIDI frequency registry.</p>
+        </div>
+        <button onClick={() => void playInstrumentMix()} type="button">Play Instrument Mix</button>
+      </div>
+
+      <div className="rack-sync-law-v1">
+        <strong>Sound chain:</strong>
+        <span>score notes → track instrument → mute/solo/level → Web Audio preview → waveform/field inspection</span>
+      </div>
+
+      <div className="instrument-catalog-strip-v1" aria-label="Starter instrument set">
+        {hcsStarterInstrumentCatalogV1.map((instrument) => (
+          <span key={instrument.instrumentId}>{instrument.displayName}</span>
+        ))}
+      </div>
+
+      <div className="instrument-rack-grid-v1">
+        {tracks.map((track) => {
+          const trackId = String(track?.track_id ?? "track");
+          const role = String(track?.role ?? "score lane");
+          const notes = ((track?.notes ?? []) as any[]);
+          const profile = getProfile(track);
+          const instrument = hcsStarterInstrumentCatalogV1.find((item) => item.instrumentId === profile.instrumentId) ?? hcsStarterInstrumentCatalogV1[0];
+          const audible = !profile.muted && (!hasSolo || profile.soloed);
+          return (
+            <article key={`instrument-rack-${trackId}`} className={audible ? "track-sound-card-v1" : "track-sound-card-v1 muted"}>
+              <div className="track-sound-header-v1">
+                <div>
+                  <strong>{trackId}</strong>
+                  <span>{role} · {notes.length} notes</span>
+                </div>
+                <button onClick={() => void playInstrumentMix(trackId)} type="button">Preview Track</button>
+              </div>
+
+              <label className="rack-field-v1">
+                <span>Instrument</span>
+                <select
+                  value={profile.instrumentId}
+                  onChange={(event) => updateProfile(track, { instrumentId: event.target.value })}
+                >
+                  {hcsStarterInstrumentCatalogV1.map((item) => (
+                    <option key={item.instrumentId} value={item.instrumentId}>{item.displayName}</option>
+                  ))}
+                </select>
+              </label>
+
+              <p className="instrument-description-v1">{instrument.description}</p>
+
+              <label className="rack-field-v1">
+                <span>Level {Math.round(profile.level * 100)}%</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={profile.level}
+                  onChange={(event) => updateProfile(track, { level: Number(event.target.value) })}
+                />
+              </label>
+
+              <div className="rack-toggle-row-v1">
+                <button
+                  className={profile.muted ? "active" : ""}
+                  onClick={() => updateProfile(track, { muted: !profile.muted })}
+                  type="button"
+                >
+                  {profile.muted ? "Muted" : "Mute"}
+                </button>
+                <button
+                  className={profile.soloed ? "active" : ""}
+                  onClick={() => updateProfile(track, { soloed: !profile.soloed })}
+                  type="button"
+                >
+                  {profile.soloed ? "Soloed" : "Solo"}
+                </button>
+                <span>{audible ? "audible" : "silent"}</span>
+              </div>
+            </article>
+          );
+        })}
+        {tracks.length === 0 && (
+          <article className="track-sound-card-v1">
+            <strong>No tracks yet</strong>
+            <span>Import a score or press the keyboard to create tracks for the rack.</span>
+          </article>
+        )}
+      </div>
+
+      <p className="rack-preview-status-v1">{lastPreview}</p>
+    </section>
+  );
+}
+
 type StudioTrackEditorAndPianoRollV1Props = {
   musicTimeline: MusicTimelineReport | null;
   selectedNoteKey: string | null;
@@ -860,6 +1175,8 @@ function StudioTrackEditorAndPianoRollV1({
       </div>
 
       <NotationRenderSyncV1 report={report} selectedNoteKey={selectedNoteKey} onSelectNote={onSelectNote} />
+
+      <InstrumentRackAndTrackSoundV1 report={report} />
 
       <section className="piano-roll-grid-v1">
         <div className="board-title-row">

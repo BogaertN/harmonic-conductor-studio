@@ -1,0 +1,20 @@
+{
+  "contract_id": "aiweb.hfield.instrument_rack_and_track_sound.v1",
+  "schema_version": "1.0.0",
+  "patch": "HCS_INSTRUMENT_RACK_AND_TRACK_SOUND_V1",
+  "adds": [
+    "per-track instrument assignment",
+    "starter instrument catalog",
+    "track mute/solo/level controls",
+    "Web Audio instrument mix preview",
+    "backend report command",
+    "source-backed current_score.music.tracks[*].notes playback"
+  ],
+  "does_not": [
+    "mutate Forge",
+    "write Identity Vault",
+    "change bundle custody semantics",
+    "replace the key frequency registry",
+    "introduce LLM authority"
+  ]
+}

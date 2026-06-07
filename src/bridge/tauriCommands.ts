@@ -441,6 +441,39 @@ export type HcsKeyFrequencyRegistryV1Report = {
 
 
 
+
+export type HcsInstrumentRackTrackSoundProfileV1 = {
+  track_id: string;
+  role: string;
+  instrument_id: string;
+  level: number;
+  muted: boolean;
+  soloed: boolean;
+  note_count: number;
+  assignment_source: string;
+  source_authority: string;
+  render_authority: string;
+};
+
+export type HcsInstrumentRackAndTrackSoundV1Report = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  purpose: string;
+  title: string;
+  score_hash: string;
+  tempo_bpm: number;
+  meter: string;
+  track_count: number;
+  note_count: number;
+  instrument_catalog: Array<Record<string, unknown>>;
+  track_sound_profiles: HcsInstrumentRackTrackSoundProfileV1[];
+  mixer_features: Record<string, boolean>;
+  sync_law: Record<string, unknown>;
+  frequency_authority: Record<string, unknown>;
+  authority_boundaries: Record<string, boolean>;
+};
+
 export type HcsProductionNotationRenderSyncV1Report = {
   status: string;
   contract_id: string;
@@ -1836,6 +1869,11 @@ export async function lookupHcsKeyFrequencyV1(midiNote: number): Promise<HcsKeyF
 }
 
 
+
+
+export async function getHcsInstrumentRackAndTrackSoundV1Report(): Promise<HcsInstrumentRackAndTrackSoundV1Report> {
+  return await invoke<HcsInstrumentRackAndTrackSoundV1Report>("get_hcs_instrument_rack_and_track_sound_v1_report");
+}
 
 export async function getHcsProductionNotationRenderSyncV1Report(): Promise<HcsProductionNotationRenderSyncV1Report> {
   return await invoke<HcsProductionNotationRenderSyncV1Report>("get_hcs_production_notation_render_sync_v1_report");
