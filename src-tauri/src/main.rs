@@ -839,6 +839,96 @@ fn render_current_project_music_wav(
     ))
 }
 
+const HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID: &str = "aiweb.hfield.key_frequency_registry.v1";
+const HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ: f64 = 440.0;
+const HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI: i32 = 69;
+
+fn hcs_key_frequency_registry_midi_to_frequency_hz_v1(midi_note: u8) -> f64 {
+    let semitone_delta = midi_note as f64 - HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI as f64;
+    HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ * 2_f64.powf(semitone_delta / 12.0)
+}
+
+fn hcs_key_frequency_registry_midi_to_label_v1(midi_note: u8) -> String {
+    let names = [
+        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+    ];
+    let note_name = names[(midi_note % 12) as usize];
+    let octave = (midi_note as i32 / 12) - 1;
+    format!("{note_name}{octave}")
+}
+
+fn hcs_key_frequency_registry_record_v1(midi_note: u8) -> serde_json::Value {
+    let frequency_hz = hcs_key_frequency_registry_midi_to_frequency_hz_v1(midi_note);
+    json!({
+        "midi_note": midi_note,
+        "pitch_label": hcs_key_frequency_registry_midi_to_label_v1(midi_note),
+        "frequency_hz": frequency_hz,
+        "frequency_hz_rounded_2dp": (frequency_hz * 100.0).round() / 100.0,
+        "tuning_mode": "twelve_tone_equal_temperament",
+        "a4_hz": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ,
+        "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
+        "formula_id": "frequency_hz = 440 * 2^((midi_note - 69) / 12)",
+        "authority": HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID,
+        "simulated": false
+    })
+}
+
+fn hcs_key_frequency_registry_report_v1() -> serde_json::Value {
+    let full_registry = (0_u16..=127_u16)
+        .map(|midi| hcs_key_frequency_registry_record_v1(midi as u8))
+        .collect::<Vec<_>>();
+    let piano_range = (21_u16..=108_u16)
+        .map(|midi| hcs_key_frequency_registry_record_v1(midi as u8))
+        .collect::<Vec<_>>();
+    let studio_anchor_keys = [36_u8, 48, 60, 69, 72, 84]
+        .into_iter()
+        .map(hcs_key_frequency_registry_record_v1)
+        .collect::<Vec<_>>();
+
+    json!({
+        "status": "ok",
+        "contract_id": HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "purpose": "deterministic key-to-frequency authority for piano roll, virtual keyboard, score import, audio playback provenance, and Glass Reader field mapping",
+        "tuning_mode": "twelve_tone_equal_temperament",
+        "a4_hz": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ,
+        "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
+        "formula_id": "frequency_hz = 440 * 2^((midi_note - 69) / 12)",
+        "full_midi_range": [0, 127],
+        "standard_piano_range": [21, 108],
+        "tracked_key_count": full_registry.len(),
+        "standard_piano_key_count": piano_range.len(),
+        "registry": full_registry,
+        "standard_piano_registry": piano_range,
+        "studio_anchor_keys": studio_anchor_keys,
+        "non_simulation_rules": {
+            "all_virtual_keyboard_keys_show_frequency": true,
+            "all_piano_roll_notes_report_frequency_hz": true,
+            "score_import_pitch_labels_resolve_to_midi_then_frequency": true,
+            "audio_and_field_layers_must_use_midi_frequency_authority": true,
+            "hidden_or_guessed_frequency_mapping_allowed": false,
+            "uses_llm": false
+        },
+        "authority_boundaries": {
+            "mutates_current_hcs_score": false,
+            "mutates_forge": false,
+            "performs_identity_vault_write": false,
+            "exports_private_identity": false,
+            "changes_bundle_custody_semantics": false
+        }
+    })
+}
+
+#[tauri::command]
+fn get_hcs_key_frequency_registry_v1_report() -> Result<serde_json::Value, String> {
+    Ok(hcs_key_frequency_registry_report_v1())
+}
+
+#[tauri::command]
+fn lookup_hcs_key_frequency_v1(midi_note: u8) -> Result<serde_json::Value, String> {
+    Ok(hcs_key_frequency_registry_record_v1(midi_note.min(127)))
+}
+
 const HCS_TRACK_EDITOR_AND_PIANO_ROLL_V1_CONTRACT_ID: &str =
     "aiweb.hfield.track_editor_and_piano_roll.v1";
 
@@ -900,6 +990,14 @@ fn hcs_track_editor_report_v1(
         "tempo_bpm": score.music.tempo_bpm,
         "meter": score.music.meter,
         "tuning_mode": score.music.tuning_mode,
+        "frequency_authority": {
+            "contract_id": HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID,
+            "tuning_mode": "twelve_tone_equal_temperament",
+            "a4_hz": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ,
+            "a4_midi_note": HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI,
+            "formula_id": "frequency_hz = 440 * 2^((midi_note - 69) / 12)",
+            "simulated": false
+        },
         "track_count": timeline.track_count,
         "note_count": timeline.total_note_count,
         "total_duration_ms": timeline.total_duration_ms,
@@ -2142,6 +2240,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "desktop_launcher_studio_startup_fix_v1_contract_id": "aiweb.hfield.desktop_launcher_studio_startup_fix.v1",
         "studio_creation_backend_and_placeholder_purge_v1_contract_id": "aiweb.hfield.studio_creation_backend_and_placeholder_purge.v1",
         "track_editor_and_piano_roll_v1_contract_id": "aiweb.hfield.track_editor_and_piano_roll.v1",
+        "key_frequency_registry_v1_contract_id": "aiweb.hfield.key_frequency_registry.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -4460,6 +4559,8 @@ fn main() {
             play_current_project_music_audio,
             render_current_project_music_wav,
             get_hcs_track_editor_and_piano_roll_v1_report,
+            get_hcs_key_frequency_registry_v1_report,
+            lookup_hcs_key_frequency_v1,
             import_hcs_studio_score_json_v1,
             load_hcs_studio_score_preset_v1,
             set_hcs_piano_roll_note_v1,

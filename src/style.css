@@ -2383,3 +2383,38 @@ body {
     grid-template-columns: repeat(2, minmax(120px, 1fr));
   }
 }
+
+
+/* HCS Key Frequency Registry v1 */
+.frequency-authority-strip-v1 {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(84, 214, 255, 0.22);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, rgba(84, 214, 255, 0.09), transparent 54%),
+    rgba(0, 0, 0, 0.28);
+}
+.frequency-authority-strip-v1 strong {
+  color: #fff4bd;
+  letter-spacing: 0.01em;
+}
+.frequency-authority-strip-v1 span {
+  color: rgba(209, 241, 255, 0.72);
+  font-size: 0.72rem;
+}
+.piano-key small {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.55rem;
+  line-height: 1;
+  opacity: 0.74;
+}
+.black-key small {
+  color: rgba(248, 241, 212, 0.78);
+}
+.white-key small {
+  color: rgba(23, 19, 11, 0.74);
+}

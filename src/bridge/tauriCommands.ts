@@ -405,6 +405,40 @@ export type HcsStudioCreationBackendAndPlaceholderPurgeV1Report = {
 };
 
 
+
+export type HcsKeyFrequencyRegistryV1Record = {
+  midi_note: number;
+  pitch_label: string;
+  frequency_hz: number;
+  frequency_hz_rounded_2dp: number;
+  tuning_mode: string;
+  a4_hz: number;
+  a4_midi_note: number;
+  formula_id: string;
+  authority: string;
+  simulated: boolean;
+};
+
+export type HcsKeyFrequencyRegistryV1Report = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  purpose: string;
+  tuning_mode: string;
+  a4_hz: number;
+  a4_midi_note: number;
+  formula_id: string;
+  full_midi_range: [number, number];
+  standard_piano_range: [number, number];
+  tracked_key_count: number;
+  standard_piano_key_count: number;
+  registry: HcsKeyFrequencyRegistryV1Record[];
+  standard_piano_registry: HcsKeyFrequencyRegistryV1Record[];
+  studio_anchor_keys: HcsKeyFrequencyRegistryV1Record[];
+  non_simulation_rules: Record<string, boolean>;
+  authority_boundaries: Record<string, boolean>;
+};
+
 export type HcsTrackEditorAndPianoRollV1Report = {
   status: string;
   contract_id: string;
@@ -1748,6 +1782,15 @@ export async function renderGeneratedMappedCombinedWav(): Promise<WavRenderRepor
   return await invoke<WavRenderReport>("render_generated_mapped_combined_wav");
 }
 
+
+
+export async function getHcsKeyFrequencyRegistryV1Report(): Promise<HcsKeyFrequencyRegistryV1Report> {
+  return await invoke<HcsKeyFrequencyRegistryV1Report>("get_hcs_key_frequency_registry_v1_report");
+}
+
+export async function lookupHcsKeyFrequencyV1(midiNote: number): Promise<HcsKeyFrequencyRegistryV1Record> {
+  return await invoke<HcsKeyFrequencyRegistryV1Record>("lookup_hcs_key_frequency_v1", { midiNote });
+}
 
 export async function getHcsTrackEditorAndPianoRollV1Report(): Promise<HcsTrackEditorAndPianoRollV1Report> {
   return await invoke<HcsTrackEditorAndPianoRollV1Report>("get_hcs_track_editor_and_piano_roll_v1_report");

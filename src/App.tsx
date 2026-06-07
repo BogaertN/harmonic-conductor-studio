@@ -364,6 +364,23 @@ type StudioTrackEditorAndPianoRollV1Props = {
   report: HcsTrackEditorAndPianoRollV1Report | null;
 };
 
+
+const HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID = "aiweb.hfield.key_frequency_registry.v1";
+const HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ = 440;
+const HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI = 69;
+const hcsKeyFrequencyNamesV1 = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+function hcsCanonicalMidiFrequencyHzV1(midiNote: number): number {
+  return HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ * Math.pow(2, (midiNote - HCS_KEY_FREQUENCY_REGISTRY_V1_A4_MIDI) / 12);
+}
+
+function hcsMidiNoteLabelV1(midiNote: number): string {
+  const normalized = Math.max(0, Math.min(127, Math.round(midiNote)));
+  const name = hcsKeyFrequencyNamesV1[normalized % 12];
+  const octave = Math.floor(normalized / 12) - 1;
+  return `${name}${octave}`;
+}
+
 const studioKeyboardSemitones = [
   { label: "C", offset: 0, black: false },
   { label: "C#", offset: 1, black: true },
@@ -445,6 +462,7 @@ function StudioTrackEditorAndPianoRollV1({
       ...note,
       octave,
       midi: (octave + 1) * 12 + note.offset,
+      frequencyHz: hcsCanonicalMidiFrequencyHzV1((octave + 1) * 12 + note.offset),
       fullLabel: `${note.label}${octave}`
     }))
   );
@@ -460,7 +478,7 @@ function StudioTrackEditorAndPianoRollV1({
         <div>
           <p className="eyebrow">Track Editor and Piano Roll v1</p>
           <h2>Compose real music, then hear it and see it in the Glass Reader</h2>
-          <p className="note">This is the backed creation surface: import a score, click piano keys into timed steps, edit lanes, play the deterministic mix, then export audio or seal the bundle.</p>
+          <p className="note">This is the backed creation surface: import a score, click piano keys into timed steps, edit lanes, play the deterministic mix, then export audio or seal the bundle. Every key is tied to the canonical MIDI frequency registry, not guessed or simulated.</p>
         </div>
         <div className="button-row compact-row">
           <button onClick={() => onLoadPreset("glass_reader_arpeggio")} type="button">Load Arpeggio</button>
@@ -494,6 +512,10 @@ function StudioTrackEditorAndPianoRollV1({
           <div className="board-title-row">
             <h3>Virtual Keyboard</h3>
             <span>selected MIDI {activeMidiNote}</span>
+          </div>
+          <div className="frequency-authority-strip-v1">
+            <strong>{hcsMidiNoteLabelV1(activeMidiNote)} · MIDI {activeMidiNote} · {hcsCanonicalMidiFrequencyHzV1(activeMidiNote).toFixed(2)} Hz</strong>
+            <span>{HCS_KEY_FREQUENCY_REGISTRY_V1_CONTRACT_ID} · A4 = {HCS_KEY_FREQUENCY_REGISTRY_V1_A4_HZ} Hz · 12-TET · not simulated</span>
           </div>
           <div className="keyboard-controls-v1">
             <label>
@@ -531,9 +553,10 @@ function StudioTrackEditorAndPianoRollV1({
                 className={note.black ? "piano-key black-key" : "piano-key white-key"}
                 onClick={() => writeKeyboardNote(note.midi)}
                 type="button"
-                title={`Write ${note.fullLabel} to ${activeTrackId} step ${activeStepIndex}`}
+                title={`Write ${note.fullLabel} · ${note.frequencyHz.toFixed(2)} Hz · MIDI ${note.midi} to ${activeTrackId} step ${activeStepIndex}`}
               >
                 <span>{note.fullLabel}</span>
+                <small>{note.frequencyHz.toFixed(2)} Hz</small>
               </button>
             ))}
           </div>
