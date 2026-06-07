@@ -1,0 +1,21 @@
+{
+  "patch_id": "HCS_GLASS_READER_CAMERA_CONTROLS_EXACT_OUTPUT_CLOCK_V1",
+  "expected_base": "f6a71e2 Add Glass Reader cumulative reveal history v1",
+  "purpose": "Replace floaty Glass Reader dev controls with stable production view modes and make the glass ticker use the native output sample clock as its timing authority.",
+  "changes": [
+    "Simplify controls to Read, Ticker, Inspect, Free, Reset View, Play, Stop, Refresh.",
+    "Constrain OrbitControls and disable damping drift outside Free mode.",
+    "Pass native playback clock time into HfieldVolumetricPacketField.",
+    "Use authoritative clock time for scan plane, cumulative reveal boundary, and PMUT/ticker readout when playback is active.",
+    "Prevent requestAnimationFrame motion timing from racing native output playback.",
+    "Increase clock polling cadence for tighter output sync."
+  ],
+  "proof_gates": [
+    "npm run typecheck",
+    "npm run build",
+    "cargo test --workspace",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "git status and commit proof"
+  ],
+  "production_rule": "Read mode is stable, Ticker focuses glass timing, Inspect owns diagnostics, Free is the only exploratory orbit."
+}

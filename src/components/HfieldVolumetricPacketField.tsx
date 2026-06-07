@@ -12,6 +12,7 @@ export type HfieldVolumetricPacketFieldProps = {
   waveformBodyReport?: HcsWaveformTo3DFieldBodyV1Report | null;
   waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null;
   playheadReport?: PlayheadCursorReport | null;
+  authoritativeClockTimeMs?: number | null;
   isPlaying?: boolean;
   readerMode?: "production" | "inspection";
   cameraPresetId?: string;
@@ -41,6 +42,7 @@ const HCS_GLASS_READER_AIR_WAVEFORM_PIEZO_TICKER_V1 = "HCS_GLASS_READER_AIR_WAVE
 const HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1 = "HCS_GLASS_READER_LONG_AIR_WAVEFORM_TICKER_READOUT_V1";
 const HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1 = "HCS_GLASS_READER_TICKER_REVEAL_AND_TRANSLUCENT_SKIN_V1";
 const HCS_GLASS_READER_CUMULATIVE_REVEAL_HISTORY_V1 = "HCS_GLASS_READER_CUMULATIVE_REVEAL_HISTORY_V1";
+const HCS_GLASS_READER_CAMERA_CONTROLS_EXACT_CLOCK_V1 = "HCS_GLASS_READER_CAMERA_CONTROLS_EXACT_CLOCK_V1";
 
 function phaseColor(phase: number): string {
   const palette: Record<number, string> = {
@@ -97,6 +99,18 @@ function activeCurrentTimeMs(playheadReport: PlayheadCursorReport | null | undef
 
   const progress = currentPlayheadProgress(playheadReport) ?? 0;
   return Math.max(0, progress * Math.max(1, fallbackTotalDurationMs));
+}
+
+function resolvedPlaybackTimeMs(playheadReport: PlayheadCursorReport | null | undefined, fallbackTotalDurationMs: number, authoritativeClockTimeMs?: number | null): number {
+  if (typeof authoritativeClockTimeMs === "number" && Number.isFinite(authoritativeClockTimeMs)) {
+    return Math.max(0, Math.min(Math.max(1, fallbackTotalDurationMs), authoritativeClockTimeMs));
+  }
+
+  return Math.max(0, Math.min(Math.max(1, fallbackTotalDurationMs), activeCurrentTimeMs(playheadReport, fallbackTotalDurationMs)));
+}
+
+function playbackProgressFromTime(currentTimeMs: number, totalDurationMs: number): number {
+  return Math.max(0, Math.min(1, currentTimeMs / Math.max(1, totalDurationMs)));
 }
 
 function noteActivationAtTime(segment: TrueSoundBodyNoteSegment, currentTimeMs: number): number {
@@ -1063,10 +1077,10 @@ function createTrueSoundBodyGeometry(segment: TrueSoundBodyNoteSegment, lane: Tr
   return geometry;
 }
 
-function TrueSoundBodyExtrusionLayer({ waveformEditorReport, playheadReport, scanMinZ, scanMaxZ }: { waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null; playheadReport?: PlayheadCursorReport | null; scanMinZ: number; scanMaxZ: number }) {
+function TrueSoundBodyExtrusionLayer({ waveformEditorReport, playheadReport, authoritativeClockTimeMs, scanMinZ, scanMaxZ }: { waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null; playheadReport?: PlayheadCursorReport | null; authoritativeClockTimeMs?: number | null; scanMinZ: number; scanMaxZ: number }) {
   const lanes = waveformEditorReport?.track_lanes ?? [];
   const totalDurationMs = Math.max(1, waveformEditorReport?.total_duration_ms ?? 1);
-  const currentTimeMs = activeCurrentTimeMs(playheadReport, totalDurationMs);
+  const currentTimeMs = resolvedPlaybackTimeMs(playheadReport, totalDurationMs, authoritativeClockTimeMs);
   const visibleSegments = useMemo(() => lanes.flatMap((lane) => lane.note_segments
     .filter((segment) => isSegmentTouchedByTicker(segment, currentTimeMs))
     .map((segment) => ({ lane, segment, revealState: revealStateAtTime(segment, currentTimeMs) }))), [lanes, currentTimeMs]);
@@ -1110,10 +1124,10 @@ function TrueSoundBodyExtrusion({ lane, laneCount, segment, totalDurationMs, sca
   );
 }
 
-function TrueSoundBodyPiezoTickerLayer({ waveformEditorReport, playheadReport, scanMinZ, scanMaxZ }: { waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null; playheadReport?: PlayheadCursorReport | null; scanMinZ: number; scanMaxZ: number }) {
+function TrueSoundBodyPiezoTickerLayer({ waveformEditorReport, playheadReport, authoritativeClockTimeMs, scanMinZ, scanMaxZ }: { waveformEditorReport?: HcsComposerWaveformEditorTrueSoundBodyV1Report | null; playheadReport?: PlayheadCursorReport | null; authoritativeClockTimeMs?: number | null; scanMinZ: number; scanMaxZ: number }) {
   const lanes = waveformEditorReport?.track_lanes ?? [];
   const totalDurationMs = Math.max(1, waveformEditorReport?.total_duration_ms ?? 1);
-  const currentTimeMs = activeCurrentTimeMs(playheadReport, totalDurationMs);
+  const currentTimeMs = resolvedPlaybackTimeMs(playheadReport, totalDurationMs, authoritativeClockTimeMs);
   const scanZ = trueSoundBodyZ(currentTimeMs, totalDurationMs, scanMinZ, scanMaxZ);
   const activeSegments = lanes.flatMap((lane) => lane.note_segments.map((segment) => ({ lane, segment, activation: noteActivationAtTime(segment, currentTimeMs), point: soundBodyPointAtTime(segment, currentTimeMs), crossing: isSegmentCrossingTicker(segment, currentTimeMs) })))
     .filter((entry) => entry.crossing)
@@ -1360,6 +1374,7 @@ export default function HfieldVolumetricPacketField({
   waveformBodyReport,
   waveformEditorReport,
   playheadReport,
+  authoritativeClockTimeMs = null,
   isPlaying = false,
   readerMode = "production",
   cameraPresetId = "studio-angle",
@@ -1378,7 +1393,8 @@ export default function HfieldVolumetricPacketField({
   const referencePoints = useMemo(() => renderManifest?.reference_points ?? [], [renderManifest]);
   const waveformBodiesByTrack = useMemo(() => waveformTrackBodyMap(waveformBodyReport), [waveformBodyReport]);
   const activeSourceEntryIds = useMemo(() => playheadActiveSourceEntryIds(playheadReport), [playheadReport]);
-  const baseProgress = currentPlayheadProgress(playheadReport);
+  const exactPlaybackTimeMs = resolvedPlaybackTimeMs(playheadReport, totalDurationMs, authoritativeClockTimeMs);
+  const baseProgress = playbackProgressFromTime(exactPlaybackTimeMs, totalDurationMs);
   const inspectionMode = readerMode === "inspection";
   const showProductionComposer = readerMode === "production";
   const hasTrueSoundBodyReport = (waveformEditorReport?.segment_count ?? 0) > 0;
@@ -1387,10 +1403,17 @@ export default function HfieldVolumetricPacketField({
   const fieldWidth = showProductionComposer && hasTrueSoundBodyReport ? Math.max(rawFieldWidth, 18.5) : rawFieldWidth;
   const fieldHeight = showProductionComposer && hasTrueSoundBodyReport ? Math.max(rawFieldHeight, 12.4) : rawFieldHeight;
   const visibleBodies = useMemo(() => inspectionMode ? bodies : (hasTrueSoundBodyReport ? [] : bodies.filter((body) => body.layer_key === "payload_tone")), [bodies, hasTrueSoundBodyReport, inspectionMode]);
-  const controlsTarget: [number, number, number] = cameraPresetId === "through-wave" ? [0, 4.4, 0.25] : cameraPresetId === "glass-plane" ? [0, 4.75, 0] : cameraPresetId === "active-follow" ? [0, 4.85, 0] : [0, 4.9, 0];
+  const tickerZ = trueSoundBodyZ(exactPlaybackTimeMs, totalDurationMs, scanMinZ, scanMaxZ);
+  const controlMode = cameraPresetId === "ticker" ? "ticker" : cameraPresetId === "inspect" ? "inspect" : cameraPresetId === "free" ? "free" : "read";
+  const controlsTarget: [number, number, number] = controlMode === "ticker"
+    ? [0, 5.45, tickerZ]
+    : controlMode === "inspect"
+      ? [0, 5.25, tickerZ]
+      : [0, 5.15, 0];
+  const controlsLocked = controlMode !== "free";
 
   useFrame(() => {
-    const progress = baseProgress ?? 0;
+    const progress = baseProgress;
     const scanZ = THREE.MathUtils.lerp(scanMinZ, scanMaxZ, progress);
 
     if (scanRef.current) {
@@ -1416,7 +1439,7 @@ export default function HfieldVolumetricPacketField({
   void totalDurationMs;
 
   return (
-    <group>
+    <group userData={{ contract_id: HCS_GLASS_READER_CAMERA_CONTROLS_EXACT_CLOCK_V1, exact_playback_time_ms: exactPlaybackTimeMs, camera_control_mode: controlMode }}>
       <color attach="background" args={["#02070b"]} />
       <ambientLight intensity={0.56} />
       <directionalLight position={[4, 5, 4]} intensity={1.12} />
@@ -1424,20 +1447,29 @@ export default function HfieldVolumetricPacketField({
       <pointLight position={[-3.2, 1.9, -2.2]} intensity={0.76} color="#f6d36b" />
 
       <OrbitControls
+        key={`reader-controls-${controlMode}`}
         makeDefault
-        enablePan
+        enablePan={!controlsLocked || inspectionMode}
         enableZoom
         enableRotate
         autoRotate={false}
-        minDistance={2.2}
-        maxDistance={190}
+        enableDamping={false}
+        minDistance={controlMode === "ticker" ? 7.5 : controlMode === "inspect" ? 5.8 : 28}
+        maxDistance={controlMode === "free" ? 210 : controlMode === "inspect" ? 72 : 155}
+        minPolarAngle={controlMode === "free" ? 0.18 : 0.62}
+        maxPolarAngle={controlMode === "free" ? Math.PI - 0.18 : controlMode === "ticker" ? 1.34 : 1.18}
+        minAzimuthAngle={controlMode === "free" ? -Infinity : controlMode === "ticker" ? -0.88 : -0.42}
+        maxAzimuthAngle={controlMode === "free" ? Infinity : controlMode === "ticker" ? 0.88 : 0.42}
+        rotateSpeed={controlMode === "free" ? 0.58 : 0.28}
+        zoomSpeed={0.7}
+        panSpeed={controlMode === "free" ? 0.55 : 0.18}
         target={controlsTarget}
       />
 
       {inspectionMode ? <ReaderGrid width={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
       {inspectionMode ? <GlassReaderSurfaceLayer cymaticReport={cymaticReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
-      {showProductionComposer && hasTrueSoundBodyReport ? <TrueSoundBodyExtrusionLayer waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
-      {showProductionComposer && hasTrueSoundBodyReport ? <TrueSoundBodyPiezoTickerLayer waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {showProductionComposer && hasTrueSoundBodyReport ? <TrueSoundBodyExtrusionLayer waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} authoritativeClockTimeMs={authoritativeClockTimeMs} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
+      {showProductionComposer && hasTrueSoundBodyReport ? <TrueSoundBodyPiezoTickerLayer waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} authoritativeClockTimeMs={authoritativeClockTimeMs} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
       {showProductionComposer && !hasTrueSoundBodyReport ? <ProductionWaveformTrackCorridors waveformBodyReport={waveformBodyReport} bodies={bodies} /> : null}
       {inspectionMode ? <CarrierRippleLayer carrierReport={carrierReport} fieldWidth={fieldWidth} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} /> : null}
       {inspectionMode ? <ConductorGestureFlowLayer fieldReport={fieldReport} playheadReport={playheadReport} scanMinZ={scanMinZ} scanMaxZ={scanMaxZ} inspection={inspectionMode} /> : null}

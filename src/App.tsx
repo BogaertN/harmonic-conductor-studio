@@ -2262,6 +2262,12 @@ export default function App() {
       return undefined;
     }
 
+    // Native audio playback owns timing while a real output stream is active.
+    // This prevents the Glass Reader from drifting against the actual sample clock.
+    if (playbackClockReport?.status === "playing") {
+      return undefined;
+    }
+
     let animationFrame = 0;
 
     const tick = (now: number) => {
@@ -2284,7 +2290,7 @@ export default function App() {
     return () => {
       cancelAnimationFrame(animationFrame);
     };
-  }, [isMotionPlaying, motionReport, motionPlaybackEndMs]);
+  }, [isMotionPlaying, motionReport, motionPlaybackEndMs, playbackClockReport?.status]);
 
   // Rust-owned playhead cursor sync. The UI clock supplies time; Rust computes
   // measure, beat, active notes, and active conductor cue for that instant.
@@ -2294,7 +2300,7 @@ export default function App() {
     }
 
     const roundedTime = Math.round(motionTimeMs);
-    if (isMotionPlaying && Math.abs(roundedTime - playheadReportRequestRef.current) < 120) {
+    if (isMotionPlaying && playbackClockReport?.status !== "playing" && Math.abs(roundedTime - playheadReportRequestRef.current) < 24) {
       return;
     }
 
@@ -2314,7 +2320,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [motionTimeMs, isMotionPlaying, notationLayout?.total_duration_ms, musicTimeline?.total_duration_ms]);
+  }, [motionTimeMs, isMotionPlaying, playbackClockReport?.status, notationLayout?.total_duration_ms, musicTimeline?.total_duration_ms]);
 
   function startMotionAnimation() {
     motionStartRef.current = motionTimeMs;
@@ -2342,7 +2348,7 @@ export default function App() {
           const nextTimeMs = Math.max(0, Math.round(clock.current_time_ms));
           setMotionTimeMs(nextTimeMs);
 
-          if (Math.abs(nextTimeMs - playheadReportRequestRef.current) >= 40 || clock.status === "ended") {
+          if (Math.abs(nextTimeMs - playheadReportRequestRef.current) >= 12 || clock.status === "ended") {
             playheadReportRequestRef.current = nextTimeMs;
             const nextPlayhead = await getCurrentPlayheadCursorReport(nextTimeMs);
 
@@ -2370,7 +2376,7 @@ export default function App() {
       void pullPlaybackClock();
       intervalId = window.setInterval(() => {
         void pullPlaybackClock();
-      }, 60);
+      }, 20);
     }
 
     return () => {
@@ -4070,6 +4076,7 @@ export default function App() {
               <HfieldPhaseFieldViewport
                 report={fieldSynthesisReport}
                 playheadReport={playheadCursorReport}
+                playbackClockReport={playbackClockReport}
                 isPlaying={isMotionPlaying}
                 onRefresh={refreshFieldSynthesis}
                 onPlay={playCurrentCombinedAudio}

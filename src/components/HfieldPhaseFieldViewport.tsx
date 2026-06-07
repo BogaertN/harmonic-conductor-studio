@@ -16,12 +16,14 @@ import {
   type HfieldFieldSynthesisReport,
   type HfieldRuntimeCarrierPacketReport,
   type HfieldRustRenderManifestReport,
-  type PlayheadCursorReport
+  type PlayheadCursorReport,
+  type PlaybackClockReport
 } from "../bridge/tauriCommands";
 
 type ViewportProps = {
   report: HfieldFieldSynthesisReport | null;
   playheadReport: PlayheadCursorReport | null;
+  playbackClockReport?: PlaybackClockReport | null;
   isPlaying: boolean;
   onRefresh: () => void | Promise<void>;
   onPlay: () => void;
@@ -33,6 +35,7 @@ type SceneProps = {
   cymaticReport: HfieldCymaticReaderSurfaceReport | null;
   carrierReport: HfieldRuntimeCarrierPacketReport | null;
   playheadReport: PlayheadCursorReport | null;
+  playbackClockReport?: PlaybackClockReport | null;
   isPlaying: boolean;
 };
 
@@ -253,16 +256,15 @@ function RuntimeCarrierScene(props: HfieldVolumetricPacketFieldProps) {
   return <HfieldVolumetricPacketField {...props} />;
 }
 
-export default function HfieldPhaseFieldViewport({ report, playheadReport, isPlaying, onRefresh, onPlay, onStop }: ViewportProps) {
+export default function HfieldPhaseFieldViewport({ report, playheadReport, playbackClockReport, isPlaying, onRefresh, onPlay, onStop }: ViewportProps) {
   const [cymaticReport, setCymaticReport] = useState<HfieldCymaticReaderSurfaceReport | null>(null);
   const [carrierReport, setCarrierReport] = useState<HfieldRuntimeCarrierPacketReport | null>(null);
   const [renderManifest, setRenderManifest] = useState<HfieldRustRenderManifestReport | null>(null);
   const [waveformBodyReport, setWaveformBodyReport] = useState<HcsWaveformTo3DFieldBodyV1Report | null>(null);
   const [waveformEditorReport, setWaveformEditorReport] = useState<HcsComposerWaveformEditorTrueSoundBodyV1Report | null>(null);
   const [readerError, setReaderError] = useState<string | null>(null);
-  const [isFocusMode, setIsFocusMode] = useState(false);
   const [readerMode, setReaderMode] = useState<"production" | "inspection">("production");
-  const [cameraPresetId, setCameraPresetId] = useState("studio-angle");
+  const [cameraPresetId, setCameraPresetId] = useState<"read" | "ticker" | "inspect" | "free">("read");
   const [cameraRevision, setCameraRevision] = useState(0);
 
   useEffect(() => {
@@ -313,20 +315,24 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
     );
   }
 
-  const panelClassName = isFocusMode
+  const panelClassName = cameraPresetId === "inspect"
     ? "panel field-viewport-panel carrier-reader-panel field-reader-focus-active"
     : "panel field-viewport-panel carrier-reader-panel";
 
-  const cameraPosition: [number, number, number] = cameraPresetId === "through-wave"
-    ? [0, 4.6, 58]
-    : cameraPresetId === "glass-plane"
-      ? [10.5, 6.1, 18]
-      : cameraPresetId === "active-follow"
-        ? [9.5, 5.8, 24]
-        : isFocusMode
-          ? [0, 6.25, 48]
-          : [0, 6.85, 62];
-  const cameraFov = cameraPresetId === "through-wave" ? 18 : cameraPresetId === "glass-plane" ? 26 : isFocusMode ? 20 : 22;
+  const authoritativeClockTimeMs = playbackClockReport && (playbackClockReport.status === "playing" || playbackClockReport.status === "ended")
+    ? playbackClockReport.current_time_ms
+    : null;
+  const readerClockLabel = authoritativeClockTimeMs !== null
+    ? `${Math.round(authoritativeClockTimeMs)}ms sample-clock`
+    : `${Math.round(playheadReport?.current_time_ms ?? 0)}ms playhead`;
+  const cameraPosition: [number, number, number] = cameraPresetId === "ticker"
+    ? [0, 6.2, 34]
+    : cameraPresetId === "inspect"
+      ? [0, 5.65, 22]
+      : cameraPresetId === "free"
+        ? [18, 9.5, 78]
+        : [0, 8.2, 86];
+  const cameraFov = cameraPresetId === "ticker" ? 20 : cameraPresetId === "inspect" ? 18 : cameraPresetId === "free" ? 24 : 18;
   const activeNoteProof = playheadReport?.active_notes.map((note) => `${note.track_id}:${note.event_index}:${note.note_name}`).join(" · ") || "—";
   const activeCueProof = playheadReport?.active_conductor_cue
     ? `${playheadReport.active_conductor_cue.gesture_id}:${playheadReport.active_conductor_cue.event_index}`
@@ -338,8 +344,15 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
     renderManifest ? "manifest" : null,
     waveformBodyReport ? "waveform" : null,
     waveformEditorReport ? "true-wave-editor" : null,
-    playheadReport ? "playhead" : null
+    playheadReport ? "playhead" : null,
+    authoritativeClockTimeMs !== null ? "sample-clock" : null
   ].filter(Boolean).join(" + ");
+
+  const applyReaderView = (nextPreset: "read" | "ticker" | "inspect" | "free") => {
+    setCameraPresetId(nextPreset);
+    setReaderMode(nextPreset === "inspect" ? "inspection" : "production");
+    setCameraRevision((value) => value + 1);
+  };
 
   return (
     <section className={panelClassName}>
@@ -352,29 +365,28 @@ export default function HfieldPhaseFieldViewport({ report, playheadReport, isPla
           </p>
         </div>
         <div className="toolbar-row field-reader-stage-toolbar">
-          <button type="button" className="btn" onClick={onRefresh}>Refresh Reader</button>
-          <button type="button" className={readerMode === "production" ? "btn reader-mode-active" : "btn"} onClick={() => setReaderMode("production")}>Production</button>
-          <button type="button" className={readerMode === "inspection" ? "btn reader-mode-active" : "btn"} onClick={() => setReaderMode("inspection")}>Inspect</button>
-          <button type="button" className="btn" onClick={() => { setCameraPresetId("studio-angle"); setCameraRevision((value) => value + 1); }}>Studio</button>
-          <button type="button" className="btn" onClick={() => { setCameraPresetId("through-wave"); setCameraRevision((value) => value + 1); }}>Through Wave</button>
-          <button type="button" className="btn" onClick={() => { setCameraPresetId("glass-plane"); setCameraRevision((value) => value + 1); }}>Glass Plane</button>
-          <button type="button" className="btn" onClick={() => { setCameraPresetId("active-follow"); setCameraRevision((value) => value + 1); }}>Follow Active</button>
-          <button type="button" className="btn" onClick={() => setIsFocusMode((value) => !value)}>{isFocusMode ? "Exit Focus" : "Focus Stage"}</button>
+          <button type="button" className="btn" onClick={onRefresh}>Refresh</button>
+          <button type="button" className={cameraPresetId === "read" ? "btn reader-mode-active" : "btn"} onClick={() => applyReaderView("read")}>Read</button>
+          <button type="button" className={cameraPresetId === "ticker" ? "btn reader-mode-active" : "btn"} onClick={() => applyReaderView("ticker")}>Ticker</button>
+          <button type="button" className={cameraPresetId === "inspect" ? "btn reader-mode-active" : "btn"} onClick={() => applyReaderView("inspect")}>Inspect</button>
+          <button type="button" className={cameraPresetId === "free" ? "btn reader-mode-active" : "btn"} onClick={() => applyReaderView("free")}>Free</button>
+          <button type="button" className="btn" onClick={() => applyReaderView("read")}>Reset View</button>
           <button type="button" className="btn" onClick={onPlay}>Play</button>
           <button type="button" className="btn btn-danger" onClick={onStop}>Stop</button>
         </div>
       </div>
 
       <div className="field-canvas-shell carrier-reader-canvas-shell">
-        <Canvas key={`carrier-reader-${readerMode}-${cameraPresetId}-${isFocusMode ? "focus" : "inline"}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
-          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} isPlaying={isPlaying} readerMode={readerMode} cameraPresetId={cameraPresetId} />
+        <Canvas key={`carrier-reader-${readerMode}-${cameraPresetId}-${cameraRevision}`} camera={{ position: cameraPosition, fov: cameraFov }} dpr={[1, 1.75]} gl={{ antialias: true }}>
+          <RuntimeCarrierScene fieldReport={report} cymaticReport={cymaticReport} carrierReport={carrierReport} renderManifest={renderManifest} waveformBodyReport={waveformBodyReport} waveformEditorReport={waveformEditorReport} playheadReport={playheadReport} authoritativeClockTimeMs={authoritativeClockTimeMs} isPlaying={isPlaying} readerMode={readerMode} cameraPresetId={cameraPresetId} />
         </Canvas>
-        <div className="field-reader-stage-hint">Production shows huge stretched floating waveform bodies only. The glass plane is the timing ticker; note name and frequency readouts appear only when the waveform crosses the glass.</div>
+        <div className="field-reader-stage-hint">Read is locked and stable. Ticker frames the glass timing plane. Inspect exposes diagnostics. Free is the only loose orbit mode. Glass timing uses the native audio sample clock when playback is active.</div>
       </div>
 
       <div className="glass-reader-sync-proof-v1" aria-label="Glass Reader sync proof">
-        <span><strong>mode</strong>{readerMode} · {cameraPresetId}</span>
+        <span><strong>view</strong>{readerMode} · {cameraPresetId}</span>
         <span><strong>sync</strong>{syncProofStatus || "waiting"}</span>
+        <span><strong>glass clock</strong>{readerClockLabel}</span>
         <span><strong>active notes</strong>{activeNoteProof}</span>
         <span><strong>active cue</strong>{activeCueProof}</span>
       </div>
