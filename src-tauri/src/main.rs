@@ -1615,6 +1615,7 @@ fn hfield_schema_version_migration_registry_payload() -> serde_json::Value {
         "production_packaging_v1_contract_id": "aiweb.hfield.production_packaging.v1",
         "ui_studio_workflow_triage_and_rebuild_v1_contract_id": "aiweb.hfield.ui_studio_workflow_triage_and_rebuild.v1",
         "desktop_launcher_studio_startup_fix_v1_contract_id": "aiweb.hfield.desktop_launcher_studio_startup_fix.v1",
+        "studio_creation_backend_and_placeholder_purge_v1_contract_id": "aiweb.hfield.studio_creation_backend_and_placeholder_purge.v1",
         "current_packet_contract_id": "aiweb.hfield.packet_contract.v1",
         "canonical_bundle_manifest_contract_id": "aiweb.hfield.canonical_bundle_manifest.v1",
         "export_replay_verifier_contract_id": "aiweb.hfield.export_replay_verifier.v1",
@@ -2832,6 +2833,116 @@ fn save_current_hcs_sqlite_receipt_v1(
     )
 }
 
+
+const HCS_STUDIO_CREATION_BACKEND_AND_PLACEHOLDER_PURGE_V1_CONTRACT_ID: &str = "aiweb.hfield.studio_creation_backend_and_placeholder_purge.v1";
+
+#[tauri::command]
+fn get_hcs_studio_creation_backend_and_placeholder_purge_v1_report() -> serde_json::Value {
+    json!({
+        "status": "ok",
+        "contract_id": HCS_STUDIO_CREATION_BACKEND_AND_PLACEHOLDER_PURGE_V1_CONTRACT_ID,
+        "schema_version": "1.0.0",
+        "workflow_role": "production studio creation surface cleanup and backed-tool inventory for Harmonic Conductor Studio",
+        "visible_user_workflow": [
+            "Open Project",
+            "Create/Edit Music",
+            "Play Studio Mix",
+            "View 3D Glass Reader Field",
+            "Save Project",
+            "Seal Bundle v2",
+            "Export Audio"
+        ],
+        "production_backed_tools": {
+            "score_timeline": {
+                "visible": true,
+                "backing": ["get_current_music_timeline", "get_current_notation_layout", "get_current_playhead_cursor_report"],
+                "status": "production-backed timeline/track/cursor reader"
+            },
+            "piano_roll_grid": {
+                "visible": true,
+                "backing": ["music.tracks[*].notes", "select_current_notation_note", "edit_current_notation_note", "delete_current_notation_note"],
+                "status": "production-backed note selection and editing surface"
+            },
+            "track_lane_editor": {
+                "visible": true,
+                "backing": ["append_note_to_current_track", "clear_current_music_track", "reset_current_music_to_seed"],
+                "status": "production-backed track lane control"
+            },
+            "measure_beat_editor": {
+                "visible": true,
+                "backing": ["position_current_notation_note_measure_beat", "position_current_notation_note_start_ms", "nudge_current_notation_note_beats"],
+                "status": "production-backed timing editor"
+            },
+            "conductor_cue_lane": {
+                "visible": true,
+                "backing": ["get_current_gesture_timeline", "apply_generated_conductor_mapping_to_current_score", "get_current_conductor_motion_report"],
+                "status": "production-backed cue lane and motion mapping"
+            },
+            "deterministic_audio_export": {
+                "visible": true,
+                "backing": ["play_current_project_combined_audio", "render_current_project_combined_wav", "export_current_deterministic_audio_engine_v2_wav"],
+                "status": "production-backed playback and WAV export"
+            },
+            "local_library": {
+                "visible": true,
+                "backing": ["save_current_hcs_sqlite_project_library_v1", "list_hcs_sqlite_project_library_v1", "open_hcs_sqlite_project_from_library_v1"],
+                "status": "production-backed SQLite project storage"
+            },
+            "bundle_v2_sealing": {
+                "visible": true,
+                "backing": ["export_current_hfield_canonical_bundle_manifest_v2_json", "verify_latest_hfield_export_replay_manifest_json"],
+                "status": "production-backed custody and replay seal"
+            }
+        },
+        "hidden_or_advanced_only": [
+            "Composer Tool Dock placeholder card",
+            "Professional Score Tools placeholder card",
+            "Notation Staff placeholder",
+            "Palette placeholder",
+            "Mixer placeholder",
+            "Import/Export placeholder",
+            "Shortcuts placeholder",
+            "legacy Export Bundle Manifest v1",
+            "raw JSON/export diagnostic wall",
+            "raw g1-g9 button pad"
+        ],
+        "legacy_surfaces": {
+            "bundle_manifest_v1": "advanced/debug only; Bundle Manifest v2 is the normal seal path",
+            "project_file_name_entry": "advanced file fallback only; SQLite library and Bundle Manifest v2 are the normal project path",
+            "quick_note_buttons": "hidden from normal composer flow; note creation uses the backed note editor entry path",
+            "raw_gesture_buttons": "hidden from normal conductor flow; conductor cue lane and mapping remain visible"
+        },
+        "open_source_dependency_policy": {
+            "new_dependencies_added_in_this_patch": [],
+            "reason": "Current locked Rust/Tauri stack already backs the visible studio workflow. Future MIDI/MusicXML/audio-engine upgrades may add open-source libraries in separate audited patches.",
+            "future_allowed_categories": ["MIDI import/export", "MusicXML import/export", "advanced piano-roll editing", "DAW-style mixer buses", "notation engraving"]
+        },
+        "authority_boundaries": {
+            "studio_creation_backend_is_source_authority": false,
+            "studio_creation_backend_is_forge_authority": false,
+            "studio_creation_backend_mutates_forge": false,
+            "studio_creation_backend_performs_identity_vault_write": false,
+            "studio_creation_backend_exports_private_identity": false,
+            "studio_creation_backend_changes_hfield_custody_semantics": false,
+            "hidden_diagnostics_remain_available_in_advanced": true,
+            "visible_tools_must_be_backed_by_commands_or_locked_reports": true
+        },
+        "readiness_gates": {
+            "no_placeholder_cards_in_normal_user_flow": true,
+            "notation_staff_placeholder_hidden": true,
+            "piano_roll_grid_uses_real_music_tracks": true,
+            "measure_beat_editor_uses_rust_commands": true,
+            "save_open_seal_export_audio_normalized": true,
+            "advanced_diagnostics_still_available": true
+        },
+        "next_work": [
+            "Build full project browser/open-by-project-id UI on top of SQLite v1.",
+            "Build real MIDI import/export after selecting audited open-source dependency path.",
+            "Build advanced mixer buses only after deterministic audio engine exposes mix parameters."
+        ]
+    })
+}
+
 const HCS_PRODUCTION_PACKAGING_V1_CONTRACT_ID: &str = "aiweb.hfield.production_packaging.v1";
 const HCS_PRODUCTION_PACKAGING_V1_PROFILE_ID: &str =
     "tauri_linux_release_notices_and_verification_v1";
@@ -3851,6 +3962,7 @@ fn main() {
             list_hcs_sqlite_motifs_v1,
             save_current_hcs_sqlite_receipt_v1,
             get_hcs_production_packaging_v1_report,
+            get_hcs_studio_creation_backend_and_placeholder_purge_v1_report,
             verify_latest_hfield_export_replay_manifest_json,
             verify_hfield_export_replay_manifest_json_by_path,
             get_hfield_schema_version_migration_registry_json,

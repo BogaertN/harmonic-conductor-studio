@@ -387,6 +387,23 @@ export type HcsSqliteMotifProjectLibraryV1Report = {
 };
 
 
+
+export type HcsStudioCreationBackendAndPlaceholderPurgeV1Report = {
+  status: string;
+  contract_id: string;
+  schema_version: string;
+  workflow_role: string;
+  visible_user_workflow: string[];
+  production_backed_tools: unknown;
+  hidden_or_advanced_only: string[];
+  legacy_surfaces: unknown;
+  open_source_dependency_policy: unknown;
+  authority_boundaries: unknown;
+  readiness_gates: unknown;
+  next_work: string[];
+  [key: string]: unknown;
+};
+
 export type HcsProductionPackagingV1Report = {
   status: string;
   contract_id: string;
@@ -1552,6 +1569,11 @@ export async function saveCurrentHcsSqliteReceiptV1(): Promise<HcsSqliteMotifPro
   return await invoke<HcsSqliteMotifProjectLibraryV1Report>("save_current_hcs_sqlite_receipt_v1");
 }
 
+
+
+export async function getHcsStudioCreationBackendAndPlaceholderPurgeV1Report(): Promise<HcsStudioCreationBackendAndPlaceholderPurgeV1Report> {
+  return await invoke<HcsStudioCreationBackendAndPlaceholderPurgeV1Report>("get_hcs_studio_creation_backend_and_placeholder_purge_v1_report");
+}
 
 export async function getHcsProductionPackagingV1Report(): Promise<HcsProductionPackagingV1Report> {
   return await invoke<HcsProductionPackagingV1Report>("get_hcs_production_packaging_v1_report");

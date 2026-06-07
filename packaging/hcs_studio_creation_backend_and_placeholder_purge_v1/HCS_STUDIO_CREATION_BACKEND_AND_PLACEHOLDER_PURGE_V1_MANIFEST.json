@@ -1,0 +1,30 @@
+{
+  "contract_id": "aiweb.hfield.studio_creation_backend_and_placeholder_purge.v1",
+  "patch_name": "HCS_STUDIO_CREATION_BACKEND_AND_PLACEHOLDER_PURGE_V1",
+  "requires_prior_ui_commit": "2f10dba",
+  "normal_user_workflow": [
+    "Open Project",
+    "Create/Edit Music",
+    "Play Studio Mix",
+    "View 3D Glass Reader Field",
+    "Save Project",
+    "Seal Bundle v2",
+    "Export Audio"
+  ],
+  "hidden_from_normal_user_flow": [
+    "Composer Tool Dock placeholder",
+    "Professional Score Tools placeholder",
+    "Notation Staff placeholder",
+    "raw g1-g9 gesture button pad",
+    "legacy Bundle Manifest v1 normal action",
+    "raw diagnostic/export wall"
+  ],
+  "new_dependencies_added": [],
+  "authority_boundaries": {
+    "mutates_forge": false,
+    "writes_identity_vault": false,
+    "changes_hfield_source_authority": false,
+    "changes_audio_determinism": false,
+    "changes_bundle_custody_semantics": false
+  }
+}

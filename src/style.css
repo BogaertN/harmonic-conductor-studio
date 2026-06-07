@@ -2098,3 +2098,70 @@ body {
 }
 /* END HCS UI Studio Workflow Triage and Rebuild v1 */
 
+/* HCS Studio Creation Backend and Placeholder Purge v1 */
+.composer-tool-dock,
+.legacy-quick-add-section,
+.gesture-demo-button-grid,
+.notation-board {
+  display: none !important;
+}
+
+.composition-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.piano-roll-board {
+  min-height: 260px;
+  border-color: rgba(244, 223, 155, 0.18);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(244, 223, 155, 0.08), transparent 34%),
+    rgba(6, 9, 16, 0.74);
+}
+
+.note-edit-section h3::after {
+  content: "  · backed editor";
+  color: rgba(244, 223, 155, 0.66);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.conductor-cue-lane-section .note {
+  margin-bottom: 0.75rem;
+}
+
+.studio-signal-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.65rem 0 0.9rem;
+  padding: 0.72rem 0.85rem;
+  border: 1px solid rgba(84, 214, 255, 0.16);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 5% 0%, rgba(84, 214, 255, 0.10), transparent 30%),
+    rgba(4, 8, 14, 0.72);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.studio-signal-chain strong {
+  color: rgba(244, 223, 155, 0.74);
+}
+
+.studio-signal-chain span:last-child {
+  color: #f4df9b;
+}
+
+.advanced-export-drawer .export-button-row button:first-child {
+  opacity: 0.72;
+}
+
+/* Remove the old placeholder warning even if an older build path leaves notation-board mounted. */
+.notation-board .staff-system::after {
+  content: none !important;
+}
+/* END HCS Studio Creation Backend and Placeholder Purge v1 */
+

@@ -25,6 +25,7 @@ import {
   listHcsSqliteMotifsV1,
   saveCurrentHcsSqliteReceiptV1,
   getHcsProductionPackagingV1Report,
+  getHcsStudioCreationBackendAndPlaceholderPurgeV1Report,
   verifyLatestHfieldExportReplayManifestJson,
   getHfieldSchemaVersionMigrationRegistryJson,
   inspectCurrentHfieldSchemaMigrationRegistryJson,
@@ -105,6 +106,7 @@ import {
   type HfieldSchemaVersionMigrationRegistryReport,
   type HcsSqliteMotifProjectLibraryV1Report,
   type HcsProductionPackagingV1Report,
+  type HcsStudioCreationBackendAndPlaceholderPurgeV1Report,
   type HfieldExportReplayVerifierReport,
   type PlaybackReport,
   type StopReport,
@@ -177,6 +179,7 @@ type DiagnosticKey =
   | "syllableShapedExpressionV1"
   | "hcsSqliteMotifProjectLibraryV1"
   | "hcsProductionPackagingV1"
+  | "hcsStudioCreationBackendAndPlaceholderPurgeV1"
   | "mappedWav"
   | "currentScore"
   | "defaultScore"
@@ -251,6 +254,7 @@ const diagnosticOptions: Array<{ key: DiagnosticKey; label: string }> = [
   { key: "syllableShapedExpressionV1", label: "Syllable-Shaped Expression v1" },
   { key: "hcsSqliteMotifProjectLibraryV1", label: "SQLite Motif / Project Library v1" },
   { key: "hcsProductionPackagingV1", label: "Production Packaging v1" },
+  { key: "hcsStudioCreationBackendAndPlaceholderPurgeV1", label: "Studio Creation Backend v1" },
   { key: "mappedWav", label: "Generated Mapped WAV" },
   { key: "currentScore", label: "Current .hfield Score" },
   { key: "defaultScore", label: "Default .hfield Score" },
@@ -685,6 +689,7 @@ export default function App() {
   const [syllableShapedExpressionV1ExportReport, setSyllableShapedExpressionV1ExportReport] = useState<ExportFileReport | null>(null);
   const [hcsSqliteLibraryV1Report, setHcsSqliteLibraryV1Report] = useState<HcsSqliteMotifProjectLibraryV1Report | null>(null);
   const [hcsProductionPackagingV1Report, setHcsProductionPackagingV1Report] = useState<HcsProductionPackagingV1Report | null>(null);
+  const [hcsStudioCreationBackendAndPlaceholderPurgeV1Report, setHcsStudioCreationBackendAndPlaceholderPurgeV1Report] = useState<HcsStudioCreationBackendAndPlaceholderPurgeV1Report | null>(null);
   const [mappedWavReport, setMappedWavReport] = useState<WavRenderReport | null>(null);
   const [playbackReport, setPlaybackReport] = useState<PlaybackReport | null>(null);
   const [playbackClockReport, setPlaybackClockReport] = useState<PlaybackClockReport | null>(null);
@@ -1092,6 +1097,28 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+
+  async function appendNoteFromEditor() {
+    const midi = Number(noteEditMidi);
+    const duration = Number(noteEditDurationMs);
+    const velocity = Number(noteEditVelocity);
+
+    if (!Number.isFinite(midi) || midi < 0 || midi > 127) {
+      setError("MIDI pitch must be a number from 0 to 127.");
+      return;
+    }
+    if (!Number.isFinite(duration) || duration <= 0) {
+      setError("Duration must be a positive number of milliseconds.");
+      return;
+    }
+    if (!Number.isFinite(velocity) || velocity < 0 || velocity > 1) {
+      setError("Velocity must be between 0 and 1.");
+      return;
+    }
+
+    await appendMusicNote(noteEditTrackId, Math.round(midi), Math.round(duration), velocity);
   }
 
   async function clearMusicTrack(trackId: string) {
@@ -1647,6 +1674,17 @@ export default function App() {
     }
   }
 
+
+  async function inspectHcsStudioCreationBackendAndPlaceholderPurgeV1() {
+    setError(null);
+    try {
+      setHcsStudioCreationBackendAndPlaceholderPurgeV1Report(await getHcsStudioCreationBackendAndPlaceholderPurgeV1Report());
+      setSelectedDiagnostic("hcsStudioCreationBackendAndPlaceholderPurgeV1");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function inspectHcsProductionPackagingV1() {
     setError(null);
     try {
@@ -1899,6 +1937,8 @@ export default function App() {
         return hcsSqliteLibraryV1Report;
       case "hcsProductionPackagingV1":
         return hcsProductionPackagingV1Report;
+      case "hcsStudioCreationBackendAndPlaceholderPurgeV1":
+        return hcsStudioCreationBackendAndPlaceholderPurgeV1Report;
       case "mappedWav":
         return mappedWavReport;
       case "currentScore":
@@ -2042,9 +2082,9 @@ export default function App() {
 
               <section className="composer-tool-dock" aria-label="Composer workstation tool dock">
                 <div className="tool-card primary-tool-card">
-                  <p className="eyebrow">Composer Tool Dock</p>
-                  <h3>Professional Score Tools</h3>
-                  <p className="note">Roadmap-only tools are hidden from the main studio path until they are backed by real editing behavior. Use the note editor, track lanes, and Score Timeline Preview below for current production editing.</p>
+                  <p className="eyebrow">Backed Score Tools</p>
+                  <h3>Live Score Editor</h3>
+                  <p className="note">Only backed controls remain in the normal studio path: score timeline, piano-roll lanes, selected-note editor, track-lane controls, deterministic playback, local save, audio export, and Bundle Manifest v2 sealing.</p>
                 </div>
                 <div className="tool-card"><strong>Notation</strong><span>staff, clef, rests, ties, slurs, dynamics</span></div>
                 <div className="tool-card"><strong>Piano Roll</strong><span>pitch grid, duration, velocity, lanes</span></div>
@@ -2057,7 +2097,7 @@ export default function App() {
               <div className="composition-grid">
                 <section className="notation-board">
                   <div className="board-title-row">
-                    <h3>Score Timeline Preview</h3>
+                    <h3>Measure Overview</h3>
                     <span>{musicTimeline?.meter ?? "4/4"} · {musicTimeline?.tempo_bpm ?? 84} BPM · {musicTimeline?.tuning_mode ?? "12-TET"}</span>
                   </div>
                   <div className="staff-system" aria-label="Score timeline preview">
@@ -2313,10 +2353,26 @@ export default function App() {
                   <p className="note">Save actual multi-track music locally, then seal Bundle Manifest v2 when the project needs custody/replay proof.</p>
                   <div className="button-row studio-action-row">
                     <button onClick={saveCurrentProjectToHcsSqliteLibraryV1} type="button">Save Project</button>
+                    <button onClick={renderCurrentProjectWav} type="button">Export Audio</button>
+                    <button onClick={renderCurrentProjectWav} type="button">Export Audio</button>
                     <button onClick={exportHfieldCanonicalBundleManifestV2} type="button">Seal Bundle v2</button>
                     <button onClick={() => setActiveTab("diagnostics")} type="button">Advanced</button>
                   </div>
                 </article>
+              </section>
+
+              <section className="studio-signal-chain" aria-label="Studio signal chain">
+                <span>Music score</span>
+                <strong>→</strong>
+                <span>Conductor cues</span>
+                <strong>→</strong>
+                <span>Deterministic audio</span>
+                <strong>→</strong>
+                <span>Waveform / field</span>
+                <strong>→</strong>
+                <span>Glass Reader cymatics</span>
+                <strong>→</strong>
+                <span>Sealed bundle</span>
               </section>
 
               <NotationSpine
@@ -2435,14 +2491,15 @@ export default function App() {
                   <button onClick={exportHfieldRuntimeCarrier} type="button">Export Carrier Packet</button>
                   <button onClick={exportHfieldPacketContract} type="button">Export Packet Contract</button>
                   <button onClick={exportHfieldCombinedWav} type="button">Export Combined WAV</button>
-                  <button onClick={exportHfieldCanonicalBundleManifest} type="button">Export Bundle Manifest</button>
-                  <button onClick={exportHfieldCanonicalBundleManifestV2} type="button">Export Bundle Manifest v2</button>
+                  <button onClick={exportHfieldCanonicalBundleManifest} type="button">Legacy Bundle Manifest v1</button>
+                  <button onClick={exportHfieldCanonicalBundleManifestV2} type="button">Seal Bundle v2</button>
                   <button onClick={inspectHcsSqliteMotifProjectLibraryV1} type="button">Inspect SQLite Library</button>
                   <button onClick={saveCurrentProjectToHcsSqliteLibraryV1} type="button">Save Project to SQLite</button>
                   <button onClick={listHcsSqliteProjectsV1} type="button">List SQLite Projects</button>
                   <button onClick={saveCurrentMotifsToHcsSqliteLibraryV1} type="button">Save Motifs to SQLite</button>
                   <button onClick={listHcsSqliteMotifBatchesV1} type="button">List SQLite Motifs</button>
                   <button onClick={saveCurrentReceiptToHcsSqliteLibraryV1} type="button">Save SQLite Receipt</button>
+                  <button onClick={inspectHcsStudioCreationBackendAndPlaceholderPurgeV1} type="button">Inspect Studio Creation Backend</button>
                   <button onClick={inspectHcsProductionPackagingV1} type="button">Inspect Production Packaging</button>
                   <button onClick={verifyHfieldExportReplayManifest} type="button">Verify Latest Bundle</button>
                   <button onClick={inspectHfieldSchemaMigrationRegistry} type="button">Inspect Schema Registry</button>
@@ -2461,7 +2518,7 @@ export default function App() {
                   <button onClick={inspectSyllableShapedExpressionV1} type="button">Inspect Syllable Expression</button>
                   <button onClick={exportSyllableShapedExpressionV1Json} type="button">Export Syllable Expression JSON</button>
                 </div>
-                  <pre>{JSON.stringify(hcsProductionPackagingV1Report ?? hcsSqliteLibraryV1Report ?? syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report ?? cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report ?? gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
+                  <pre>{JSON.stringify(hcsStudioCreationBackendAndPlaceholderPurgeV1Report ?? hcsProductionPackagingV1Report ?? hcsSqliteLibraryV1Report ?? syllableShapedExpressionV1ExportReport ?? syllableShapedExpressionV1Report ?? cymaticFieldModelV2ExportReport ?? cymaticFieldModelV2Report ?? gestureAwareFieldRendererV2ExportReport ?? gestureAwareFieldRendererV2Report ?? trueConductorGestureReferenceManifestExportReport ?? trueConductorGestureReferenceManifestReport ?? deterministicAudioEngineV2Report ?? motifLibraryAnnotationLayerV1Report ?? couplingProfileEngineV1Report ?? harmonicFieldScoreV1UpgradeReport ?? nineGestureConductorEngineReport ?? hfieldSchemaMigrationRegistryReport ?? hfieldExportReplayVerifierReport ?? hfieldCanonicalBundleManifestExportReport ?? hfieldReaderBundleExportReport ?? hfieldProjectJsonExportReport ?? hfieldCombinedWavExportReport ?? "No reader packet export yet.", null, 2)}</pre>
                 </section>
               </details>
 
@@ -2549,7 +2606,7 @@ export default function App() {
 
 
               <section className="control-section note-edit-section">
-                <h3>Edit Selected Note</h3>
+                <h3>Create / Edit Note</h3>
                 <div className="note-edit-grid">
                   <label>
                     <span>MIDI Pitch</span>
@@ -2597,7 +2654,8 @@ export default function App() {
                   <button onClick={() => nudgeSelectedNotationNote(4)} disabled={!selectedNotationNote} type="button">+ Measure</button>
                 </div>
                 <div className="button-row">
-                  <button onClick={editSelectedNotationNote} disabled={!selectedNotationNote} type="button">Apply Note Edit</button>
+                  <button onClick={appendNoteFromEditor} type="button">Add as New Note</button>
+                  <button onClick={editSelectedNotationNote} disabled={!selectedNotationNote} type="button">Update Selected Note</button>
                   <button className="danger" onClick={deleteSelectedNotationNote} disabled={!selectedNotationNote} type="button">Delete Note</button>
                 </div>
               </section>
@@ -2614,9 +2672,9 @@ export default function App() {
                 </div>
               </section>
 
-              <section className="control-section">
-                <h3>Add Notes</h3>
-                <div className="button-grid small-button-grid">
+              <section className="control-section legacy-quick-add-section" aria-hidden="true">
+                <h3>Legacy Quick Add Notes</h3>
+                <div className="button-grid small-button-grid legacy-quick-add-grid">
                   {musicAppendPlan.map((note) => (
                     <button key={`${note.trackId}-${note.midiNote}-${note.label}`} onClick={() => appendMusicNote(note.trackId, note.midiNote, note.durationMs, note.velocity)} type="button">
                       {note.label}
@@ -2626,12 +2684,12 @@ export default function App() {
               </section>
 
               <section className="control-section">
-                <h3>Track Controls</h3>
+                <h3>Track Lane Controls</h3>
                 <div className="button-row">
-                  <button onClick={resetMusicNotes} type="button">Reset Seed Notes</button>
-                  <button onClick={() => clearMusicTrack("lead_voice")} type="button">Clear Lead</button>
-                  <button onClick={() => clearMusicTrack("depth_voice")} type="button">Clear Depth</button>
-                  <button onClick={() => clearMusicTrack("field_voice")} type="button">Clear Field</button>
+                  <button onClick={resetMusicNotes} type="button">Reset Score to Demo</button>
+                  <button onClick={() => clearMusicTrack("lead_voice")} type="button">Clear Lead Lane</button>
+                  <button onClick={() => clearMusicTrack("depth_voice")} type="button">Clear Depth Lane</button>
+                  <button onClick={() => clearMusicTrack("field_voice")} type="button">Clear Field Lane</button>
                 </div>
               </section>
             </div>
@@ -2647,16 +2705,17 @@ export default function App() {
                   <button onClick={refreshCurrentMotion} type="button">Refresh Motion</button>
                 </div>
               </section>
-              <section className="control-section">
-                <h3>Gesture Timeline</h3>
-                <div className="button-grid small-button-grid">
+              <section className="control-section conductor-cue-lane-section">
+                <h3>Conductor Cue Lane</h3>
+                <p className="note">Use the visible score cue lane and Map Cues workflow. Raw g1–g9 buttons are hidden from the musician path.</p>
+                <div className="button-grid small-button-grid gesture-demo-button-grid" aria-hidden="true">
                   {gestureAppendPlan.map((gesture) => (
                     <button key={gesture.id} onClick={() => appendGesture(gesture.id, gesture.durationMs, gesture.intensity, gesture.operator)} type="button">{gesture.id}</button>
                   ))}
                 </div>
                 <div className="button-row">
-                  <button onClick={resetTimeline} type="button">Reset Standard</button>
-                  <button onClick={clearTimeline} type="button">Clear</button>
+                  <button onClick={resetTimeline} type="button">Reset Standard Cue Path</button>
+                  <button onClick={clearTimeline} type="button">Clear Cue Lane</button>
                 </div>
               </section>
             </div>
