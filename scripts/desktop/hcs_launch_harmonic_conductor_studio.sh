@@ -32,13 +32,22 @@ node -v || true
 echo "npm: $(command -v npm || true)"
 npm -v || true
 
-if [[ -x "$APP_ROOT/src-tauri/target/release/harmonic-conductor-studio" ]]; then
-  echo "Launching installed/release binary."
-  exec "$APP_ROOT/src-tauri/target/release/harmonic-conductor-studio"
+RELEASE_BIN="$APP_ROOT/src-tauri/target/release/harmonic-conductor-studio"
+export HCS_DESKTOP_LAUNCHER_STUDIO_STARTUP_FIX_V1="1"
+
+if [[ "${HCS_USE_RELEASE_BINARY:-0}" == "1" && -x "$RELEASE_BIN" ]]; then
+  echo "Launching release binary because HCS_USE_RELEASE_BINARY=1 was explicitly set."
+  exec "$RELEASE_BIN"
+fi
+
+if [[ -x "$RELEASE_BIN" ]]; then
+  echo "Release binary exists, but the one-click launcher is using source-backed dev startup by default to avoid stale UI bundles."
+  echo "Set HCS_USE_RELEASE_BINARY=1 only after running the production release build and verification path."
 fi
 
 if [[ -x "$HCS_NODE_TOOLCHAIN/npm" ]]; then
   echo "Launching Tauri dev workflow through locked HCS Node toolchain."
+  echo "Studio startup contract: aiweb.hfield.desktop_launcher_studio_startup_fix.v1"
   exec "$HCS_NODE_TOOLCHAIN/npm" run tauri dev
 fi
 

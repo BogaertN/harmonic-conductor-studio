@@ -1,0 +1,15 @@
+{
+  "contract_id": "aiweb.hfield.desktop_launcher_studio_startup_fix.v1",
+  "patch_name": "HCS_DESKTOP_LAUNCHER_STUDIO_STARTUP_FIX_V1",
+  "requires_prior_ui_commit": "2f10dba",
+  "startup_mode": "studio",
+  "desktop_launcher_policy": "source-backed dev startup by default; release binary only when HCS_USE_RELEASE_BINARY=1",
+  "authority_boundaries": {
+    "startup_fix_is_source_authority": false,
+    "startup_fix_is_forge_authority": false,
+    "startup_fix_mutates_forge": false,
+    "startup_fix_performs_identity_vault_write": false,
+    "startup_fix_exports_private_identity": false,
+    "startup_fix_changes_hfield_custody_semantics": false
+  }
+}

@@ -128,6 +128,8 @@ import {
 } from "./bridge/tauriCommands";
 
 type OperatorTab = "compose" | "conduct" | "rehearse" | "perform" | "field" | "project" | "diagnostics";
+
+const HCS_DESKTOP_LAUNCHER_STUDIO_STARTUP_FIX_V1_CONTRACT_ID = "aiweb.hfield.desktop_launcher_studio_startup_fix.v1";
 type DiagnosticKey =
   | "projectReport"
   | "projectList"
@@ -606,6 +608,17 @@ function VisibleConductorMotion({
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<OperatorTab>("field");
+
+  useEffect(() => {
+    setActiveTab("field");
+    try {
+      window.localStorage?.removeItem("hcs.activeTab");
+      window.sessionStorage?.setItem("hcs.desktopLauncherStartupMode", "studio");
+      window.sessionStorage?.setItem("hcs.desktopLauncherStartupContract", HCS_DESKTOP_LAUNCHER_STUDIO_STARTUP_FIX_V1_CONTRACT_ID);
+    } catch {
+      // Startup mode should never block the studio if browser storage is unavailable.
+    }
+  }, []);
   const [selectedDiagnostic, setSelectedDiagnostic] = useState<DiagnosticKey>("motionReport");
   const [report, setReport] = useState<PreviewReport | null>(null);
   const [musicReport, setMusicReport] = useState<MusicPreviewReport | null>(null);
