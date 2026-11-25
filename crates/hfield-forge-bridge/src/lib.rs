@@ -281,6 +281,50 @@ mod tests {
     }
 
     #[test]
+    fn optional_forge_memory_is_backward_compatible_and_stays_a_claim() {
+        let bare = FieldScore::default_hcs();
+        let bare_json = serde_json::to_string(&bare).expect("serialize");
+        assert!(!bare_json.contains("forge_memory"));
+        let restored: FieldScore = serde_json::from_str(&bare_json).expect("old packet");
+        assert!(hfield_domain::optional_forge_memory(&restored.packet)
+            .expect("absent section")
+            .is_none());
+        let bare_report = create_forge_packet_bridge_stub_report(&restored);
+        assert!(!bare_report.export_policy.live_execution_authorized);
+
+        let mut with_memory = FieldScore::default_hcs();
+        with_memory.packet.forge_memory = Some(hfield_domain::ForgeMemorySection {
+            schema: hfield_domain::FORGE_MEMORY_SCHEMA.to_string(),
+            key: serde_json::json!({"key_version": "0.2.0"}),
+            message: serde_json::json!({"type": "CLAIM"}),
+            records: vec![serde_json::json!({"fact_id": "f1", "text": "A wren is a bird."})],
+            receiver_policy: serde_json::json!({
+                "content_is_claim": true,
+                "auto_persist": false,
+                "peer_is_publisher": false
+            }),
+            payload_hash_sha256: None,
+        });
+        let kept = hfield_domain::optional_forge_memory(&with_memory.packet)
+            .expect("rkm schema")
+            .expect("section present");
+        assert_eq!(kept.records.len(), 1);
+        assert_eq!(
+            kept.receiver_policy["peer_is_publisher"],
+            serde_json::json!(false)
+        );
+        let report = create_forge_packet_bridge_stub_report(&with_memory);
+        assert!(!report.export_policy.live_execution_authorized);
+        assert_eq!(
+            report.execution_mode,
+            HFIELD_FORGE_BRIDGE_EXECUTION_MODE
+        );
+
+        with_memory.packet.forge_memory.as_mut().unwrap().schema = "other".to_string();
+        assert!(hfield_domain::optional_forge_memory(&with_memory.packet).is_err());
+    }
+
+    #[test]
     fn bridge_stub_reports_runtime_refs_but_does_not_execute() {
         let mut score = FieldScore::default_hcs();
         score.packet.forge_bridge.forge_runtime_ref =
