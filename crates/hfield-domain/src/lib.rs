@@ -1408,6 +1408,9 @@ pub struct HfieldPacketContract {
     pub render_targets: Vec<String>,
     pub forge_bridge: ForgeBridgeDescriptor,
     pub migration_profile: String,
+    /// Optional Resonant Key Memory section. Absent on every packet written before it existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forge_memory: Option<ForgeMemorySection>,
 }
 
 impl Default for HfieldPacketContract {
@@ -1438,7 +1441,48 @@ impl Default for HfieldPacketContract {
             ],
             forge_bridge: ForgeBridgeDescriptor::default(),
             migration_profile: "no_migration_required_v1".to_string(),
+            forge_memory: None,
         }
+    }
+}
+
+pub const FORGE_MEMORY_SCHEMA: &str = "forge.hfield.memory.v1";
+
+/// The optional `forge_memory` object Forge RKM emits beside `forge_bridge`.
+/// Records stay claims. A peer is not a publisher. Missing means the packet has no memory section.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ForgeMemorySection {
+    pub schema: String,
+    #[serde(default)]
+    pub key: serde_json::Value,
+    #[serde(default)]
+    pub message: serde_json::Value,
+    #[serde(default)]
+    pub records: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub receiver_policy: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload_hash_sha256: Option<String>,
+}
+
+impl ForgeMemorySection {
+    pub fn accepts_rkm_schema(&self) -> bool {
+        self.schema == FORGE_MEMORY_SCHEMA
+    }
+}
+
+/// `Ok(None)` when the section was omitted. `Ok(Some)` when the schema is the RKM schema.
+/// A present section with another schema is refused. Older packets stay valid.
+pub fn optional_forge_memory(
+    packet: &HfieldPacketContract,
+) -> Result<Option<&ForgeMemorySection>, String> {
+    match &packet.forge_memory {
+        None => Ok(None),
+        Some(section) if section.accepts_rkm_schema() => Ok(Some(section)),
+        Some(section) => Err(format!(
+            "forge_memory schema {} is not {FORGE_MEMORY_SCHEMA}",
+            section.schema
+        )),
     }
 }
 
